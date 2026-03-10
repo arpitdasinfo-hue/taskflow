@@ -1,4 +1,4 @@
-import { useEffect, lazy, Suspense } from 'react'
+import { useEffect, lazy, Suspense, Component } from 'react'
 import Sidebar from './components/layout/Sidebar'
 import BottomNav from './components/layout/BottomNav'
 import TaskDetail from './components/tasks/TaskDetail'
@@ -11,6 +11,7 @@ const Dashboard = lazy(() => import('./pages/Dashboard'))
 const Tasks     = lazy(() => import('./pages/Tasks'))
 const Today     = lazy(() => import('./pages/Today'))
 const Settings  = lazy(() => import('./pages/Settings'))
+const Projects  = lazy(() => import('./pages/Projects'))
 
 const PageFallback = () => (
   <div className="flex-1 flex items-center justify-center">
@@ -21,14 +22,46 @@ const PageFallback = () => (
   </div>
 )
 
+class ErrorBoundary extends Component {
+  constructor(props) {
+    super(props)
+    this.state = { hasError: false }
+  }
+  static getDerivedStateFromError() {
+    return { hasError: true }
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex-1 flex flex-col items-center justify-center gap-3 px-6 text-center">
+          <div className="text-3xl">⚠️</div>
+          <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+            Something went wrong
+          </p>
+          <button
+            onClick={() => this.setState({ hasError: false })}
+            className="btn-accent px-4 py-2 text-sm"
+          >
+            Try again
+          </button>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
+
 function PageRouter({ page }) {
   return (
-    <Suspense fallback={<PageFallback />}>
-      {page === 'dashboard' && <Dashboard />}
-      {page === 'tasks'     && <Tasks />}
-      {page === 'today'     && <Today />}
-      {page === 'settings'  && <Settings />}
-    </Suspense>
+    <ErrorBoundary>
+      <Suspense fallback={<PageFallback />}>
+        {page === 'dashboard' && <Dashboard />}
+        {page === 'tasks'     && <Tasks />}
+        {page === 'today'     && <Today />}
+        {page === 'settings'  && <Settings />}
+        {page === 'projects'  && <Projects />}
+      </Suspense>
+    </ErrorBoundary>
   )
 }
 

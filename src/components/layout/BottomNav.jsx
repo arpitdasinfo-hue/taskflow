@@ -1,5 +1,5 @@
 import { memo } from 'react'
-import { LayoutDashboard, ListTodo, CalendarClock, Settings2 } from 'lucide-react'
+import { LayoutDashboard, ListTodo, CalendarClock, Settings2, FolderKanban } from 'lucide-react'
 import useSettingsStore from '../../store/useSettingsStore'
 import { useTaskStats } from '../../hooks/useFilteredTasks'
 
@@ -7,6 +7,7 @@ const NAV_ITEMS = [
   { id: 'dashboard', label: 'Home',     icon: LayoutDashboard },
   { id: 'tasks',     label: 'Tasks',    icon: ListTodo        },
   { id: 'today',     label: 'Today',    icon: CalendarClock   },
+  { id: 'projects',  label: 'Projects', icon: FolderKanban    },
   { id: 'settings',  label: 'Settings', icon: Settings2       },
 ]
 

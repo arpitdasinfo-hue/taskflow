@@ -6,6 +6,7 @@ const PAGE_TITLES = {
   dashboard: 'Dashboard',
   tasks:     'All Tasks',
   today:     'Today',
+  projects:  'Projects',
   settings:  'Settings',
 }
 

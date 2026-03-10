@@ -42,7 +42,7 @@ export function useFilteredTasks() {
     })
 
     return result
-  }, [tasks, filters, sortBy])
+  }, [tasks, filters, sortBy, activeProjectId])
 }
 
 /** Returns tasks grouped by status for Board view */

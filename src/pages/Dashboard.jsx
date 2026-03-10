@@ -101,7 +101,7 @@ const Dashboard = memo(function Dashboard() {
             {[
               { label: 'Blocked',  value: blocked,    color: '#ef4444' },
               { label: 'Critical', value: critical,   color: '#f97316' },
-              { label: 'On Track', value: total - blocked - overdue, color: '#10b981' },
+              { label: 'On Track', value: tasks.filter((t) => t.status !== 'done' && t.status !== 'blocked' && t.status !== 'review').length, color: '#10b981' },
             ].map(({ label, value, color }) => (
               <div key={label} className="text-center">
                 <div className="text-lg font-bold" style={{ color }}>{value}</div>

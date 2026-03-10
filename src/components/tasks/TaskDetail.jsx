@@ -79,17 +79,17 @@ const TaskDetail = memo(function TaskDetail() {
   }, [closeTask])
 
   const saveTitle = useCallback(() => {
-    if (titleValue.trim()) updateTask(task.id, { title: titleValue.trim() })
+    if (task?.id && titleValue.trim()) updateTask(task.id, { title: titleValue.trim() })
     setEditingTitle(false)
   }, [titleValue, task?.id, updateTask])
 
   const saveDesc = useCallback(() => {
-    updateTask(task.id, { description: descValue })
+    if (task?.id) updateTask(task.id, { description: descValue })
     setEditingDesc(false)
   }, [descValue, task?.id, updateTask])
 
   const handleAddTag = useCallback((e) => {
-    if ((e.key === 'Enter' || e.key === ',') && tagInput.trim()) {
+    if ((e.key === 'Enter' || e.key === ',') && tagInput.trim() && task?.id) {
       e.preventDefault()
       const tag = tagInput.trim().toLowerCase().replace(/,/g, '')
       if (tag && !task.tags.includes(tag)) updateTask(task.id, { tags: [...task.tags, tag] })
@@ -98,11 +98,11 @@ const TaskDetail = memo(function TaskDetail() {
   }, [tagInput, task?.id, task?.tags, updateTask])
 
   const removeTag = useCallback((tag) => {
-    updateTask(task.id, { tags: task.tags.filter((t) => t !== tag) })
+    if (task?.id) updateTask(task.id, { tags: task.tags.filter((t) => t !== tag) })
   }, [task?.id, task?.tags, updateTask])
 
   const handleDelete = useCallback(() => {
-    deleteTask(task.id)
+    if (task?.id) deleteTask(task.id)
     closeTask()
   }, [task?.id, deleteTask, closeTask])
 
