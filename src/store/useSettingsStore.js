@@ -84,7 +84,7 @@ const useSettingsStore = create(
       setSortBy: (v) => set((s) => { s.sortBy = v }),
 
       // ── Project filter ────────────────────────────────────────────────
-      setActiveProject: (id) => set((s) => { s.activeProjectId = id; s.activePage = 'tasks' }),
+      setActiveProject: (id) => set((s) => { s.activeProjectId = id; if (id != null) s.activePage = 'tasks' }),
 
       // ── Sidebar ───────────────────────────────────────────────────────
       toggleSidebar: () => set((s) => { s.sidebarCollapsed = !s.sidebarCollapsed }),

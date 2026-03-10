@@ -5,10 +5,15 @@ import FilterBar from '../components/tasks/FilterBar'
 import EmptyState from '../components/common/EmptyState'
 import Header from '../components/layout/Header'
 import GlassCard from '../components/common/GlassCard'
-import { ListTodo, Plus } from 'lucide-react'
+import { ListTodo, ChevronRight } from 'lucide-react'
 import useSettingsStore from '../store/useSettingsStore'
 import useTaskStore from '../store/useTaskStore'
+import useProjectStore from '../store/useProjectStore'
 import { useFilteredTasks, useTasksByStatus } from '../hooks/useFilteredTasks'
+
+const PRIORITY_COLOR = { critical: '#ef4444', high: '#f97316', medium: '#f59e0b', low: '#64748b' }
+const STATUS_COLOR   = { todo: '#94a3b8', 'in-progress': '#22d3ee', review: '#f59e0b', done: '#10b981', blocked: '#ef4444' }
+const STATUS_LABEL   = { todo: 'To Do', 'in-progress': 'Active', review: 'Review', done: 'Done', blocked: 'Blocked' }
 
 const STATUS_COLUMNS = [
   { id: 'todo',        label: 'To Do',       color: '#94a3b8' },
@@ -71,6 +76,77 @@ const BoardColumn = memo(function BoardColumn({ column, tasks, provided, snapsho
 })
 
 // ── List View ─────────────────────────────────────────────────────────────────
+const TaskRow = memo(function TaskRow({ task }) {
+  const selectTask = useSettingsStore((s) => s.selectTask)
+  const projects   = useProjectStore((s) => s.projects)
+  const project    = projects.find((p) => p.id === task.projectId)
+  const now        = new Date()
+  const isOverdue  = task.dueDate && new Date(task.dueDate) < now && task.status !== 'done'
+  const isDone     = task.status === 'done'
+  const completedSubs = task.subtasks?.filter((s) => s.completed).length ?? 0
+  const totalSubs     = task.subtasks?.length ?? 0
+
+  return (
+    <button
+      onClick={() => selectTask(task.id)}
+      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-colors hover:bg-white/5 group"
+      style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}
+    >
+      {/* Priority dot */}
+      <span className="w-2 h-2 rounded-full flex-shrink-0 mt-0.5"
+        style={{ background: PRIORITY_COLOR[task.priority] }} />
+
+      {/* Title + description */}
+      <div className="flex-1 min-w-0">
+        <p className="text-sm truncate"
+          style={{
+            color: isDone ? 'var(--text-secondary)' : 'var(--text-primary)',
+            textDecoration: isDone ? 'line-through' : 'none',
+          }}>
+          {task.title}
+        </p>
+        {task.description && (
+          <p className="text-[11px] truncate" style={{ color: 'var(--text-secondary)' }}>
+            {task.description}
+          </p>
+        )}
+      </div>
+
+      {/* Project chip */}
+      {project && (
+        <span className="hidden sm:inline text-[10px] px-1.5 py-0.5 rounded-full flex-shrink-0"
+          style={{ background: `${project.color}18`, color: project.color }}>
+          {project.name}
+        </span>
+      )}
+
+      {/* Subtask progress */}
+      {totalSubs > 0 && (
+        <span className="text-[10px] flex-shrink-0" style={{ color: 'var(--text-secondary)' }}>
+          {completedSubs}/{totalSubs}
+        </span>
+      )}
+
+      {/* Due date */}
+      {task.dueDate && (
+        <span className="text-[10px] flex-shrink-0"
+          style={{ color: isOverdue ? '#ef4444' : 'var(--text-secondary)' }}>
+          {new Date(task.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+        </span>
+      )}
+
+      {/* Status */}
+      <span className="text-[10px] px-1.5 py-0.5 rounded-full flex-shrink-0 font-medium"
+        style={{ background: `${STATUS_COLOR[task.status]}18`, color: STATUS_COLOR[task.status] }}>
+        {STATUS_LABEL[task.status]}
+      </span>
+
+      <ChevronRight size={12} style={{ color: 'var(--text-secondary)', flexShrink: 0 }}
+        className="opacity-0 group-hover:opacity-100 transition-opacity" />
+    </button>
+  )
+})
+
 const ListView = memo(function ListView({ tasks }) {
   if (tasks.length === 0)
     return (
@@ -81,9 +157,10 @@ const ListView = memo(function ListView({ tasks }) {
       />
     )
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 pb-6">
+    <div className="rounded-2xl overflow-hidden mb-6"
+      style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)' }}>
       {tasks.map((task) => (
-        <TaskCard key={task.id} task={task} />
+        <TaskRow key={task.id} task={task} />
       ))}
     </div>
   )
