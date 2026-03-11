@@ -7,11 +7,13 @@ import useSettingsStore from './store/useSettingsStore'
 import { useTheme } from './hooks/useTheme'
 
 // Lazy-load pages for code-splitting
-const Dashboard = lazy(() => import('./pages/Dashboard'))
-const Tasks     = lazy(() => import('./pages/Tasks'))
-const Today     = lazy(() => import('./pages/Today'))
-const Settings  = lazy(() => import('./pages/Settings'))
-const Projects  = lazy(() => import('./pages/Projects'))
+const Dashboard        = lazy(() => import('./pages/Dashboard'))
+const Tasks            = lazy(() => import('./pages/Tasks'))
+const Today            = lazy(() => import('./pages/Today'))
+const Settings         = lazy(() => import('./pages/Settings'))
+const Projects         = lazy(() => import('./pages/Projects'))
+const ProgramDashboard = lazy(() => import('./pages/ProgramDashboard'))
+const Timeline         = lazy(() => import('./pages/Timeline'))
 
 const PageFallback = () => (
   <div className="flex-1 flex items-center justify-center">
@@ -55,11 +57,13 @@ function PageRouter({ page }) {
   return (
     <ErrorBoundary>
       <Suspense fallback={<PageFallback />}>
-        {page === 'dashboard' && <Dashboard />}
-        {page === 'tasks'     && <Tasks />}
-        {page === 'today'     && <Today />}
-        {page === 'settings'  && <Settings />}
-        {page === 'projects'  && <Projects />}
+        {page === 'dashboard'          && <Dashboard />}
+        {page === 'tasks'              && <Tasks />}
+        {page === 'today'              && <Today />}
+        {page === 'settings'           && <Settings />}
+        {page === 'projects'           && <Projects />}
+        {page === 'program-dashboard'  && <ProgramDashboard />}
+        {page === 'timeline'           && <Timeline />}
       </Suspense>
     </ErrorBoundary>
   )

@@ -1,14 +1,15 @@
 import { memo } from 'react'
-import { LayoutDashboard, ListTodo, CalendarClock, Settings2, FolderKanban } from 'lucide-react'
+import { LayoutDashboard, ListTodo, CalendarClock, Settings2, FolderKanban, BarChart3 } from 'lucide-react'
 import useSettingsStore from '../../store/useSettingsStore'
 import { useTaskStats } from '../../hooks/useFilteredTasks'
 
 const NAV_ITEMS = [
-  { id: 'dashboard', label: 'Home',     icon: LayoutDashboard },
-  { id: 'tasks',     label: 'Tasks',    icon: ListTodo        },
-  { id: 'today',     label: 'Today',    icon: CalendarClock   },
-  { id: 'projects',  label: 'Projects', icon: FolderKanban    },
-  { id: 'settings',  label: 'Settings', icon: Settings2       },
+  { id: 'dashboard',         label: 'Home',      icon: LayoutDashboard },
+  { id: 'tasks',             label: 'Tasks',     icon: ListTodo        },
+  { id: 'today',             label: 'Today',     icon: CalendarClock   },
+  { id: 'projects',          label: 'Programs',  icon: FolderKanban    },
+  { id: 'program-dashboard', label: 'Analytics', icon: BarChart3       },
+  { id: 'settings',          label: 'Settings',  icon: Settings2       },
 ]
 
 const BottomNav = memo(function BottomNav() {
@@ -34,26 +35,25 @@ const BottomNav = memo(function BottomNav() {
             <button
               key={id}
               onClick={() => setPage(id)}
-              className="flex-1 flex flex-col items-center justify-center gap-1 relative no-select"
+              className="flex-1 flex flex-col items-center justify-center gap-0.5 relative no-select"
               style={{ color: isActive ? 'var(--accent)' : 'var(--text-secondary)' }}
             >
-              {/* Active indicator */}
               {isActive && (
                 <span
-                  className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 rounded-full"
+                  className="absolute top-0 left-1/2 -translate-x-1/2 w-6 h-0.5 rounded-full"
                   style={{ background: 'var(--accent)' }}
                 />
               )}
 
               <div className="relative">
-                <Icon size={20} strokeWidth={isActive ? 2.5 : 1.75} />
+                <Icon size={18} strokeWidth={isActive ? 2.5 : 1.75} />
                 {showDot && (
                   <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-red-500 rounded-full border border-black" />
                 )}
               </div>
 
               <span
-                className="text-[10px] font-medium leading-none"
+                className="text-[9px] font-medium leading-none"
                 style={isActive ? { color: 'var(--accent)' } : {}}
               >
                 {label}

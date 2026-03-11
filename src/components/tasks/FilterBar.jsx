@@ -1,6 +1,7 @@
 import { memo } from 'react'
 import { X } from 'lucide-react'
 import useSettingsStore from '../../store/useSettingsStore'
+import useProjectStore from '../../store/useProjectStore'
 
 const STATUSES   = ['todo', 'in-progress', 'review', 'done', 'blocked']
 const PRIORITIES = ['critical', 'high', 'medium', 'low']
@@ -19,13 +20,18 @@ const SORT_OPTIONS = [
 ]
 
 const FilterBar = memo(function FilterBar({ onClose }) {
-  const filters      = useSettingsStore((s) => s.filters)
-  const sortBy       = useSettingsStore((s) => s.sortBy)
-  const toggleFilter = useSettingsStore((s) => s.toggleFilter)
-  const clearFilters = useSettingsStore((s) => s.clearFilters)
-  const setSortBy    = useSettingsStore((s) => s.setSortBy)
+  const filters          = useSettingsStore((s) => s.filters)
+  const sortBy           = useSettingsStore((s) => s.sortBy)
+  const activeProgramId  = useSettingsStore((s) => s.activeProgramId)
+  const toggleFilter     = useSettingsStore((s) => s.toggleFilter)
+  const clearFilters     = useSettingsStore((s) => s.clearFilters)
+  const setSortBy        = useSettingsStore((s) => s.setSortBy)
+  const setActiveProgram = useSettingsStore((s) => s.setActiveProgram)
+  const programs         = useProjectStore((s) => s.programs)
 
-  const hasActive = filters.status.length + filters.priority.length > 0
+  const hasActive = filters.status.length + filters.priority.length > 0 || !!activeProgramId
+
+  const handleClearAll = () => { clearFilters(); setActiveProgram(null) }
 
   return (
     <div
@@ -39,11 +45,8 @@ const FilterBar = memo(function FilterBar({ onClose }) {
         </span>
         <div className="flex items-center gap-2">
           {hasActive && (
-            <button
-              onClick={clearFilters}
-              className="text-xs px-2 py-1 rounded-lg"
-              style={{ color: 'var(--accent)', background: 'var(--accent-dim)' }}
-            >
+            <button onClick={handleClearAll} className="text-xs px-2 py-1 rounded-lg"
+              style={{ color: 'var(--accent)', background: 'var(--accent-dim)' }}>
               Clear all
             </button>
           )}
@@ -55,6 +58,32 @@ const FilterBar = memo(function FilterBar({ onClose }) {
         </div>
       </div>
 
+      {/* Program filter */}
+      {programs.length > 0 && (
+        <div className="mb-4">
+          <p className="text-[10px] font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--text-secondary)' }}>
+            Program
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {programs.map((prog) => {
+              const active = activeProgramId === prog.id
+              return (
+                <button key={prog.id}
+                  onClick={() => setActiveProgram(active ? null : prog.id)}
+                  className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border font-medium transition-all"
+                  style={active
+                    ? { background: `${prog.color}20`, borderColor: prog.color, color: prog.color }
+                    : { background: 'rgba(255,255,255,0.04)', borderColor: 'rgba(255,255,255,0.1)', color: 'var(--text-secondary)' }
+                  }>
+                  <span className="w-1.5 h-1.5 rounded-full" style={{ background: active ? prog.color : 'currentColor' }} />
+                  {prog.name}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Status */}
       <div className="mb-4">
         <p className="text-[10px] font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--text-secondary)' }}>
@@ -64,15 +93,12 @@ const FilterBar = memo(function FilterBar({ onClose }) {
           {STATUSES.map((s) => {
             const active = filters.status.includes(s)
             return (
-              <button
-                key={s}
-                onClick={() => toggleFilter('status', s)}
+              <button key={s} onClick={() => toggleFilter('status', s)}
                 className="text-xs px-2.5 py-1 rounded-full border font-medium transition-all"
                 style={active
                   ? { background: 'rgba(var(--accent-rgb),0.2)', borderColor: 'var(--accent)', color: 'var(--accent)' }
                   : { background: 'rgba(255,255,255,0.04)', borderColor: 'rgba(255,255,255,0.1)', color: 'var(--text-secondary)' }
-                }
-              >
+                }>
                 {STATUS_LABELS[s]}
               </button>
             )
@@ -90,15 +116,12 @@ const FilterBar = memo(function FilterBar({ onClose }) {
             const active = filters.priority.includes(p)
             const color  = PRIORITY_COLORS[p]
             return (
-              <button
-                key={p}
-                onClick={() => toggleFilter('priority', p)}
+              <button key={p} onClick={() => toggleFilter('priority', p)}
                 className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border font-medium transition-all capitalize"
                 style={active
                   ? { background: `${color}20`, borderColor: color, color }
                   : { background: 'rgba(255,255,255,0.04)', borderColor: 'rgba(255,255,255,0.1)', color: 'var(--text-secondary)' }
-                }
-              >
+                }>
                 <span className="w-1.5 h-1.5 rounded-full" style={{ background: active ? color : 'currentColor' }} />
                 {p}
               </button>
@@ -116,15 +139,12 @@ const FilterBar = memo(function FilterBar({ onClose }) {
           {SORT_OPTIONS.map(({ value, label }) => {
             const active = sortBy === value
             return (
-              <button
-                key={value}
-                onClick={() => setSortBy(value)}
+              <button key={value} onClick={() => setSortBy(value)}
                 className="text-xs px-2.5 py-1 rounded-full border font-medium transition-all"
                 style={active
                   ? { background: 'rgba(var(--accent-rgb),0.2)', borderColor: 'var(--accent)', color: 'var(--accent)' }
                   : { background: 'rgba(255,255,255,0.04)', borderColor: 'rgba(255,255,255,0.1)', color: 'var(--text-secondary)' }
-                }
-              >
+                }>
                 {label}
               </button>
             )

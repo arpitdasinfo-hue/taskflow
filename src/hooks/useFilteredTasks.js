@@ -1,24 +1,35 @@
 import { useMemo } from 'react'
 import useTaskStore from '../store/useTaskStore'
 import useSettingsStore from '../store/useSettingsStore'
+import useProjectStore from '../store/useProjectStore'
 
 const PRIORITY_ORDER = { critical: 0, high: 1, medium: 2, low: 3 }
 
 /**
  * Returns tasks filtered by active filters and sorted by sortBy.
- * Memoised — only recomputes when tasks, filters, or sortBy change.
+ * Supports both project-level and program-level filtering (mutually exclusive).
  */
 export function useFilteredTasks() {
   const tasks           = useTaskStore((s) => s.tasks)
   const filters         = useSettingsStore((s) => s.filters)
   const sortBy          = useSettingsStore((s) => s.sortBy)
   const activeProjectId = useSettingsStore((s) => s.activeProjectId)
+  const activeProgramId = useSettingsStore((s) => s.activeProgramId)
+  const projects        = useProjectStore((s) => s.projects)
 
   return useMemo(() => {
     let result = [...tasks]
 
-    if (activeProjectId)
+    // Program filter (takes all projects in that program)
+    if (activeProgramId) {
+      const programProjectIds = new Set(
+        projects.filter((p) => p.programId === activeProgramId).map((p) => p.id)
+      )
+      result = result.filter((t) => t.projectId && programProjectIds.has(t.projectId))
+    } else if (activeProjectId) {
       result = result.filter((t) => t.projectId === activeProjectId)
+    }
+
     if (filters.status.length)
       result = result.filter((t) => filters.status.includes(t.status))
     if (filters.priority.length)
@@ -37,12 +48,11 @@ export function useFilteredTasks() {
       }
       if (sortBy === 'updatedAt')
         return new Date(b.updatedAt) - new Date(a.updatedAt)
-      // default: createdAt desc
       return new Date(b.createdAt) - new Date(a.createdAt)
     })
 
     return result
-  }, [tasks, filters, sortBy, activeProjectId])
+  }, [tasks, filters, sortBy, activeProjectId, activeProgramId, projects])
 }
 
 /** Returns tasks grouped by status for Board view */

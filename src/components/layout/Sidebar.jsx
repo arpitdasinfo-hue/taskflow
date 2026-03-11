@@ -1,7 +1,7 @@
 import { memo, useState } from 'react'
 import {
   LayoutDashboard, ListTodo, CalendarClock, Settings2, FolderKanban,
-  Zap, ChevronLeft, ChevronRight, Plus, Folder, ChevronDown,
+  Zap, ChevronLeft, ChevronRight, Plus, Folder, ChevronDown, BarChart3, GanttChart,
 } from 'lucide-react'
 import useSettingsStore from '../../store/useSettingsStore'
 import useProjectStore from '../../store/useProjectStore'
@@ -9,20 +9,46 @@ import useTaskStore from '../../store/useTaskStore'
 import { useTaskStats } from '../../hooks/useFilteredTasks'
 
 const NAV_ITEMS = [
-  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { id: 'tasks',     label: 'All Tasks', icon: ListTodo        },
-  { id: 'today',     label: 'Today',     icon: CalendarClock   },
-  { id: 'projects',  label: 'Programs',  icon: FolderKanban    },
-  { id: 'settings',  label: 'Settings',  icon: Settings2       },
+  { id: 'dashboard',         label: 'Dashboard',  icon: LayoutDashboard },
+  { id: 'tasks',             label: 'All Tasks',  icon: ListTodo        },
+  { id: 'today',             label: 'Today',      icon: CalendarClock   },
+  { id: 'projects',          label: 'Programs',   icon: FolderKanban    },
+  { id: 'program-dashboard', label: 'Analytics',  icon: BarChart3       },
+  { id: 'timeline',          label: 'Timeline',   icon: GanttChart      },
+  { id: 'settings',          label: 'Settings',   icon: Settings2       },
 ]
+
+const PROGRAM_STATUS_COLORS = {
+  planning:  '#94a3b8',
+  active:    '#22d3ee',
+  'on-hold': '#f59e0b',
+  completed: '#10b981',
+}
 
 // ── Program group with nested projects ───────────────────────────────────────
 const ProgramGroup = memo(function ProgramGroup({ program, projects, collapsed }) {
   const [open, setOpen]      = useState(true)
   const activeProjectId      = useSettingsStore((s) => s.activeProjectId)
+  const activeProgramId      = useSettingsStore((s) => s.activeProgramId)
   const setActiveProject     = useSettingsStore((s) => s.setActiveProject)
+  const setActiveProgram     = useSettingsStore((s) => s.setActiveProgram)
+  const setPage              = useSettingsStore((s) => s.setPage)
   const tasks                = useTaskStore((s) => s.tasks)
+  const allProjects          = useProjectStore((s) => s.projects)
   const taskCount = (pid) => tasks.filter((t) => t.projectId === pid && t.status !== 'done').length
+  const statusColor = PROGRAM_STATUS_COLORS[program.status] || '#94a3b8'
+
+  const handleProgramClick = () => {
+    if (collapsed) return
+    setOpen((o) => !o)
+  }
+
+  const handleProgramFilter = (e) => {
+    e.stopPropagation()
+    const isActive = activeProgramId === program.id
+    setActiveProgram(isActive ? null : program.id)
+    setPage('tasks')
+  }
 
   if (collapsed) {
     return (
@@ -44,51 +70,88 @@ const ProgramGroup = memo(function ProgramGroup({ program, projects, collapsed }
     )
   }
 
+  // Top-level projects only
+  const topLevel = projects.filter((p) => !p.parentId)
+
   return (
     <div className="mb-1">
       {/* Program row */}
       <button
-        onClick={() => setOpen((o) => !o)}
+        onClick={handleProgramClick}
         className="w-full flex items-center gap-1.5 px-2 py-1 rounded-lg mb-0.5 transition-colors hover:bg-white/5"
       >
-        <span className="w-2 h-2 rounded flex-shrink-0" style={{ background: program.color }} />
+        <span className="w-2 h-2 rounded flex-shrink-0"
+          style={{ background: program.color, boxShadow: `0 0 4px ${program.color}60` }} />
         <span className="flex-1 text-left text-[10px] font-bold uppercase tracking-wider truncate"
           style={{ color: 'var(--text-secondary)' }}>
           {program.name}
         </span>
+        {/* Status dot */}
+        <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" title={program.status || 'planning'}
+          style={{ background: statusColor }} />
         <ChevronDown size={10} style={{
           color: 'var(--text-secondary)',
           transform: open ? 'rotate(0deg)' : 'rotate(-90deg)',
           transition: 'transform 0.2s',
+          flexShrink: 0,
         }} />
       </button>
 
       {/* Projects nested under program */}
-      {open && projects.map((project) => {
+      {open && topLevel.map((project) => {
         const isActive = activeProjectId === project.id
         const count    = taskCount(project.id)
+        const subProjects = allProjects.filter((p) => p.parentId === project.id)
+
         return (
-          <button key={project.id}
-            onClick={() => setActiveProject(isActive ? null : project.id)}
-            className="w-full flex items-center gap-2 pl-5 pr-2 py-1.5 rounded-xl text-xs font-medium transition-all mb-0.5"
-            style={isActive
-              ? { background: `${project.color}20`, color: project.color, border: `1px solid ${project.color}30` }
-              : { color: 'var(--text-secondary)' }
-            }
-            title={project.name}>
-            <span className="w-1.5 h-1.5 rounded-full flex-shrink-0"
-              style={{ background: project.color, boxShadow: isActive ? `0 0 5px ${project.color}` : 'none' }} />
-            <span className="flex-1 text-left truncate">{project.name}</span>
-            {count > 0 && (
-              <span className="text-[10px] font-bold px-1 py-0.5 rounded-full min-w-[18px] text-center"
-                style={isActive
-                  ? { background: `${project.color}30`, color: project.color }
-                  : { background: 'rgba(255,255,255,0.07)', color: 'var(--text-secondary)' }
-                }>
-                {count}
-              </span>
-            )}
-          </button>
+          <div key={project.id}>
+            <button
+              onClick={() => setActiveProject(isActive ? null : project.id)}
+              className="w-full flex items-center gap-2 pl-5 pr-2 py-1.5 rounded-xl text-xs font-medium transition-all mb-0.5"
+              style={isActive
+                ? { background: `${project.color}20`, color: project.color, border: `1px solid ${project.color}30` }
+                : { color: 'var(--text-secondary)' }
+              }
+              title={project.name}>
+              <span className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                style={{ background: project.color, boxShadow: isActive ? `0 0 5px ${project.color}` : 'none' }} />
+              <span className="flex-1 text-left truncate">{project.name}</span>
+              {count > 0 && (
+                <span className="text-[10px] font-bold px-1 py-0.5 rounded-full min-w-[18px] text-center"
+                  style={isActive
+                    ? { background: `${project.color}30`, color: project.color }
+                    : { background: 'rgba(255,255,255,0.07)', color: 'var(--text-secondary)' }
+                  }>
+                  {count}
+                </span>
+              )}
+            </button>
+
+            {/* Sub-projects (3rd level) */}
+            {isActive && subProjects.map((sub) => {
+              const isSubActive = activeProjectId === sub.id
+              const subCount    = taskCount(sub.id)
+              return (
+                <button key={sub.id}
+                  onClick={(e) => { e.stopPropagation(); setActiveProject(isSubActive ? null : sub.id) }}
+                  className="w-full flex items-center gap-2 pl-9 pr-2 py-1 rounded-xl text-[11px] font-medium transition-all mb-0.5"
+                  style={isSubActive
+                    ? { background: `${sub.color}20`, color: sub.color, border: `1px solid ${sub.color}30` }
+                    : { color: 'var(--text-secondary)' }
+                  }
+                  title={sub.name}>
+                  <span className="w-1 h-1 rounded-full flex-shrink-0" style={{ background: sub.color }} />
+                  <span className="flex-1 text-left truncate">{sub.name}</span>
+                  {subCount > 0 && (
+                    <span className="text-[10px] font-bold px-1 py-0.5 rounded-full min-w-[18px] text-center"
+                      style={{ background: 'rgba(255,255,255,0.07)', color: 'var(--text-secondary)' }}>
+                      {subCount}
+                    </span>
+                  )}
+                </button>
+              )
+            })}
+          </div>
         )
       })}
     </div>
@@ -100,9 +163,11 @@ const Sidebar = memo(function Sidebar() {
   const activePage        = useSettingsStore((s) => s.activePage)
   const sidebarCollapsed  = useSettingsStore((s) => s.sidebarCollapsed)
   const activeProjectId   = useSettingsStore((s) => s.activeProjectId)
+  const activeProgramId   = useSettingsStore((s) => s.activeProgramId)
   const setPage           = useSettingsStore((s) => s.setPage)
   const toggleSidebar     = useSettingsStore((s) => s.toggleSidebar)
   const setActiveProject  = useSettingsStore((s) => s.setActiveProject)
+  const setActiveProgram  = useSettingsStore((s) => s.setActiveProgram)
   const programs          = useProjectStore((s) => s.programs)
   const projects          = useProjectStore((s) => s.projects)
   const tasks             = useTaskStore((s) => s.tasks)
@@ -137,13 +202,13 @@ const Sidebar = memo(function Sidebar() {
       {/* Main nav */}
       <nav className="px-2 space-y-0.5 mb-2">
         {NAV_ITEMS.map(({ id, label, icon: Icon }) => {
-          const isActive = activePage === id && !activeProjectId
+          const isActive = activePage === id && !activeProjectId && !activeProgramId
           const badge = id === 'today' && overdue > 0 ? overdue
             : id === 'tasks' && inProgress > 0 ? inProgress
             : null
           return (
             <button key={id}
-              onClick={() => { setPage(id); setActiveProject(null) }}
+              onClick={() => { setPage(id); setActiveProject(null); setActiveProgram(null) }}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 no-select ${sidebarCollapsed ? 'justify-center px-0' : ''}`}
               style={isActive
                 ? { background: 'var(--accent)', color: '#fff', boxShadow: '0 4px 12px rgba(var(--accent-rgb),0.3)' }
@@ -199,14 +264,14 @@ const Sidebar = memo(function Sidebar() {
         ))}
 
         {/* Unassigned projects */}
-        {!sidebarCollapsed && unassigned.length > 0 && (
+        {!sidebarCollapsed && unassigned.filter(p => !p.parentId).length > 0 && (
           <div className="mt-2">
             <div className="flex items-center gap-1.5 px-2 py-1 mb-0.5">
               <Folder size={10} style={{ color: 'var(--text-secondary)' }} />
               <span className="text-[10px] font-bold uppercase tracking-wider"
                 style={{ color: 'var(--text-secondary)' }}>Other</span>
             </div>
-            {unassigned.map((project) => {
+            {unassigned.filter(p => !p.parentId).map((project) => {
               const isActive = activeProjectId === project.id
               const count = tasks.filter((t) => t.projectId === project.id && t.status !== 'done').length
               return (

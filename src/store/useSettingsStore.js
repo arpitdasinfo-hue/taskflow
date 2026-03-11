@@ -17,7 +17,6 @@ const applyThemeToDom = (theme) => {
   r.setProperty('--bg-gradient', theme.gradient)
   r.setProperty('--text-primary', theme.textPrimary)
   r.setProperty('--text-secondary', theme.textSecondary)
-  // Update PWA theme-color meta
   const meta = document.querySelector('meta[name="theme-color"]')
   if (meta) meta.setAttribute('content', theme.accent)
 }
@@ -32,12 +31,14 @@ const useSettingsStore = create(
     immer((set, get) => ({
       themeIndex: 0,
       themeLastChanged: new Date().toISOString(),
-      view: 'list',                // 'list' | 'board'
-      activePage: 'dashboard',     // 'dashboard' | 'tasks' | 'today' | 'settings'
+      view: 'list',
+      activePage: 'dashboard',
       selectedTaskId: null,
       filters: { status: [], priority: [], tags: [] },
-      activeProjectId: null,       // null = all projects
-      sortBy: 'createdAt',         // 'createdAt' | 'dueDate' | 'priority' | 'updatedAt'
+      activeProjectId: null,
+      activeProgramId: null,
+      selectedTaskIds: [],
+      sortBy: 'createdAt',
       sidebarCollapsed: false,
 
       // ── Theme ─────────────────────────────────────────────────────────
@@ -59,7 +60,11 @@ const useSettingsStore = create(
         }),
 
       // ── Navigation ────────────────────────────────────────────────────
-      setPage: (page) => set((s) => { s.activePage = page; s.selectedTaskId = null }),
+      setPage: (page) => set((s) => {
+        s.activePage = page
+        s.selectedTaskId = null
+        s.selectedTaskIds = []
+      }),
 
       // ── Task selection ─────────────────────────────────────────────────
       selectTask: (id) => set((s) => { s.selectedTaskId = id }),
@@ -84,7 +89,31 @@ const useSettingsStore = create(
       setSortBy: (v) => set((s) => { s.sortBy = v }),
 
       // ── Project filter ────────────────────────────────────────────────
-      setActiveProject: (id) => set((s) => { s.activeProjectId = id; if (id != null) s.activePage = 'tasks' }),
+      setActiveProject: (id) => set((s) => {
+        s.activeProjectId = id
+        s.activeProgramId = null
+        if (id != null) s.activePage = 'tasks'
+      }),
+
+      // ── Program filter ────────────────────────────────────────────────
+      setActiveProgram: (id) => set((s) => {
+        s.activeProgramId = id
+        s.activeProjectId = null
+      }),
+
+      // ── Bulk selection ─────────────────────────────────────────────────
+      toggleTaskSelection: (id) =>
+        set((s) => {
+          const idx = s.selectedTaskIds.indexOf(id)
+          if (idx === -1) s.selectedTaskIds.push(id)
+          else s.selectedTaskIds.splice(idx, 1)
+        }),
+
+      selectAllTasks: (ids) =>
+        set((s) => { s.selectedTaskIds = [...ids] }),
+
+      clearTaskSelection: () =>
+        set((s) => { s.selectedTaskIds = [] }),
 
       // ── Sidebar ───────────────────────────────────────────────────────
       toggleSidebar: () => set((s) => { s.sidebarCollapsed = !s.sidebarCollapsed }),
@@ -92,11 +121,17 @@ const useSettingsStore = create(
     {
       name: 'taskflow-settings',
       storage: createJSONStorage(() => localStorage),
-      version: 1,
-      // Don't persist selectedTaskId — always start fresh
+      version: 2,
       partialize: (state) => {
-        const { selectedTaskId: _skip, ...rest } = state
+        const { selectedTaskId: _s1, selectedTaskIds: _s2, ...rest } = state
         return rest
+      },
+      migrate: (state, version) => {
+        let s = state
+        if (version < 2) {
+          s = { ...s, activeProgramId: null, selectedTaskIds: [] }
+        }
+        return s
       },
     }
   )

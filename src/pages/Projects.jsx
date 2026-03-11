@@ -1,9 +1,12 @@
 import { memo, useState } from 'react'
 import {
   Plus, Folder, FolderOpen, CheckCircle2, Clock, AlertTriangle,
-  Trash2, Check, X, ChevronDown, ChevronRight, LayoutList, Kanban, ArrowRight,
+  Trash2, Check, X, ChevronDown, ChevronRight, LayoutList, Kanban,
+  Calendar, GitBranch,
 } from 'lucide-react'
 import GlassCard from '../components/common/GlassCard'
+import { ProgramStatusBadge, STATUS_OPTIONS } from '../components/common/ProgramStatusBadge'
+import MilestonePanel from '../components/projects/MilestonePanel'
 import useProjectStore, { PROJECT_COLORS } from '../store/useProjectStore'
 import useTaskStore from '../store/useTaskStore'
 import useSettingsStore from '../store/useSettingsStore'
@@ -65,7 +68,7 @@ const ColorDot = memo(function ColorDot({ color, onChange }) {
 })
 
 // ── Task row (list view) ──────────────────────────────────────────────────────
-const TaskRow = memo(function TaskRow({ task, projectColor }) {
+const TaskRow = memo(function TaskRow({ task }) {
   const selectTask = useSettingsStore((s) => s.selectTask)
   const now = new Date()
   const isOverdue = task.dueDate && new Date(task.dueDate) < now && task.status !== 'done'
@@ -76,29 +79,20 @@ const TaskRow = memo(function TaskRow({ task, projectColor }) {
       className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-colors hover:bg-white/5 group"
       style={{ border: '1px solid rgba(255,255,255,0.04)' }}
     >
-      {/* Priority dot */}
       <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: PRIORITY_COLOR[task.priority] }} />
-
-      {/* Title */}
       <span className="flex-1 text-sm truncate" style={{ color: task.status === 'done' ? 'var(--text-secondary)' : 'var(--text-primary)', textDecoration: task.status === 'done' ? 'line-through' : 'none' }}>
         {task.title}
       </span>
-
-      {/* Subtasks */}
       {task.subtasks?.length > 0 && (
         <span className="text-[10px] flex-shrink-0" style={{ color: 'var(--text-secondary)' }}>
           {task.subtasks.filter((s) => s.completed).length}/{task.subtasks.length}
         </span>
       )}
-
-      {/* Due date */}
       {task.dueDate && (
         <span className="text-[10px] flex-shrink-0" style={{ color: isOverdue ? '#ef4444' : 'var(--text-secondary)' }}>
           {new Date(task.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
         </span>
       )}
-
-      {/* Status badge */}
       <span className="text-[10px] px-1.5 py-0.5 rounded-full flex-shrink-0 font-medium"
         style={{ background: `${STATUS_COLOR[task.status]}18`, color: STATUS_COLOR[task.status] }}>
         {STATUS_LABEL[task.status]}
@@ -136,15 +130,21 @@ const KANBAN_COLS = [
   { id: 'blocked',     label: 'Blocked',     color: '#ef4444' },
 ]
 
-const ProjectPanel = memo(function ProjectPanel({ project }) {
-  const tasks         = useTaskStore((s) => s.tasks)
-  const updateProject = useProjectStore((s) => s.updateProject)
-  const deleteProject = useProjectStore((s) => s.deleteProject)
+const ProjectPanel = memo(function ProjectPanel({ project, subProjects = [], depth = 0 }) {
+  const tasks            = useTaskStore((s) => s.tasks)
+  const updateProject    = useProjectStore((s) => s.updateProject)
+  const deleteProject    = useProjectStore((s) => s.deleteProject)
+  const addProject       = useProjectStore((s) => s.addProject)
   const setActiveProject = useSettingsStore((s) => s.setActiveProject)
+  const allProjects      = useProjectStore((s) => s.projects)
 
-  const [view, setView]           = useState('list')
-  const [expanded, setExpanded]   = useState(true)
-  const [confirmDel, setConfirmDel] = useState(false)
+  const [view, setView]               = useState('list')
+  const [expanded, setExpanded]       = useState(true)
+  const [confirmDel, setConfirmDel]   = useState(false)
+  const [addingSub, setAddingSub]     = useState(false)
+  const [subName, setSubName]         = useState('')
+  const [subColor, setSubColor]       = useState(project.color)
+  const [showMilestones, setShowMilestones] = useState(false)
 
   const projectTasks = tasks.filter((t) => t.projectId === project.id)
   const total      = projectTasks.length
@@ -155,8 +155,21 @@ const ProjectPanel = memo(function ProjectPanel({ project }) {
   const overdue    = projectTasks.filter((t) => t.dueDate && new Date(t.dueDate) < now && t.status !== 'done').length
   const completion = total ? Math.round((done / total) * 100) : 0
 
+  const submitSub = () => {
+    if (!subName.trim()) return
+    addProject({ name: subName.trim(), color: subColor, programId: project.programId, parentId: project.id })
+    setSubName(''); setAddingSub(false)
+  }
+
+  // Also get sub-projects from allProjects that reference this project
+  const childProjects = allProjects.filter((p) => p.parentId === project.id)
+
   return (
-    <div className="rounded-2xl overflow-hidden" style={{ border: `1px solid ${project.color}25`, background: 'rgba(255,255,255,0.02)' }}>
+    <div className="rounded-2xl overflow-hidden" style={{
+      border: `1px solid ${project.color}${depth > 0 ? '20' : '25'}`,
+      background: depth > 0 ? 'rgba(255,255,255,0.015)' : 'rgba(255,255,255,0.02)',
+      marginLeft: depth > 0 ? '0' : '0',
+    }}>
       {/* Project header */}
       <div className="flex items-center gap-2.5 px-4 py-3" style={{ background: `${project.color}08`, borderBottom: expanded ? `1px solid ${project.color}18` : 'none' }}>
         <button onClick={() => setExpanded((e) => !e)} className="flex-shrink-0 transition-transform" style={{ color: 'var(--text-secondary)' }}>
@@ -166,20 +179,36 @@ const ProjectPanel = memo(function ProjectPanel({ project }) {
         <ColorDot color={project.color} onChange={(c) => updateProject(project.id, { color: c })} />
 
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            {depth > 0 && <GitBranch size={10} style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />}
             <Editable value={project.name} onSave={(n) => updateProject(project.id, { name: n })}
               className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }} />
             <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium"
               style={{ background: `${project.color}18`, color: project.color }}>
               {total} task{total !== 1 ? 's' : ''}
             </span>
+            {project.dueDate && (
+              <span className="text-[10px] flex items-center gap-0.5" style={{ color: 'var(--text-secondary)' }}>
+                <Calendar size={9} />
+                {new Date(project.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+              </span>
+            )}
           </div>
           {project.description && (
             <p className="text-[11px] truncate" style={{ color: 'var(--text-secondary)' }}>{project.description}</p>
           )}
         </div>
 
-        {/* Stats row */}
+        {/* Date editor */}
+        <input
+          type="date"
+          value={project.dueDate ? new Date(project.dueDate).toISOString().split('T')[0] : ''}
+          onChange={(e) => updateProject(project.id, { dueDate: e.target.value ? new Date(e.target.value).toISOString() : null })}
+          className="hidden"
+          id={`due-${project.id}`}
+        />
+
+        {/* Stats */}
         <div className="hidden sm:flex items-center gap-3 text-[10px]" style={{ color: 'var(--text-secondary)' }}>
           {inProgress > 0 && <span style={{ color: '#22d3ee' }}>{inProgress} active</span>}
           {blocked > 0    && <span style={{ color: '#ef4444' }}>{blocked} blocked</span>}
@@ -232,7 +261,7 @@ const ProjectPanel = memo(function ProjectPanel({ project }) {
       {expanded && (
         <div className="px-3 py-2" style={{ background: `${project.color}04` }}>
           {total === 0 ? (
-            <p className="text-xs text-center py-4" style={{ color: 'var(--text-secondary)' }}>
+            <p className="text-xs text-center py-3" style={{ color: 'var(--text-secondary)' }}>
               No tasks yet —{' '}
               <button onClick={() => setActiveProject(project.id)} className="underline" style={{ color: 'var(--accent)' }}>
                 add one
@@ -240,7 +269,7 @@ const ProjectPanel = memo(function ProjectPanel({ project }) {
             </p>
           ) : view === 'list' ? (
             <div className="space-y-1">
-              {projectTasks.map((t) => <TaskRow key={t.id} task={t} projectColor={project.color} />)}
+              {projectTasks.map((t) => <TaskRow key={t.id} task={t} />)}
             </div>
           ) : (
             <div className="flex gap-2 overflow-x-auto pb-2 snap-x">
@@ -261,6 +290,63 @@ const ProjectPanel = memo(function ProjectPanel({ project }) {
               })}
             </div>
           )}
+
+          {/* Sub-projects */}
+          {childProjects.length > 0 && (
+            <div className="mt-3 space-y-2 pl-3 border-l-2" style={{ borderColor: `${project.color}30` }}>
+              <p className="text-[10px] font-semibold uppercase tracking-wide mb-1.5" style={{ color: 'var(--text-secondary)' }}>
+                Sub-projects ({childProjects.length})
+              </p>
+              {childProjects.map((sub) => <ProjectPanel key={sub.id} project={sub} depth={depth + 1} />)}
+            </div>
+          )}
+
+          {/* Add sub-project */}
+          {depth === 0 && (
+            <div className="mt-2">
+              {addingSub ? (
+                <div className="p-2.5 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                  <input autoFocus value={subName} onChange={(e) => setSubName(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') submitSub(); if (e.key === 'Escape') setAddingSub(false) }}
+                    placeholder="Sub-project name…" maxLength={60}
+                    className="w-full text-xs px-2 py-1.5 rounded-lg mb-2 bg-transparent border"
+                    style={{ borderColor: 'rgba(var(--accent-rgb),0.3)', color: 'var(--text-primary)' }} />
+                  <div className="flex flex-wrap gap-1 mb-2">
+                    {PROJECT_COLORS.map((c) => (
+                      <button key={c} onClick={() => setSubColor(c)}
+                        className="w-4 h-4 rounded-full hover:scale-125 transition-transform"
+                        style={{ background: c, outline: c === subColor ? `2px solid ${c}` : 'none', outlineOffset: '1px' }} />
+                    ))}
+                  </div>
+                  <div className="flex gap-1.5">
+                    <button onClick={submitSub} className="flex-1 btn-accent py-1 text-[11px]">Add</button>
+                    <button onClick={() => setAddingSub(false)} className="btn-ghost py-1 text-[11px] px-2">Cancel</button>
+                  </div>
+                </div>
+              ) : (
+                <button onClick={() => setAddingSub(true)}
+                  className="flex items-center gap-1 text-[11px] px-2 py-1 rounded-lg hover:bg-white/5 transition-colors"
+                  style={{ color: 'var(--text-secondary)' }}>
+                  <Plus size={10} /> Add sub-project
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Milestones toggle */}
+          <div className="mt-2 border-t" style={{ borderColor: 'rgba(255,255,255,0.05)' }}>
+            <button onClick={() => setShowMilestones((v) => !v)}
+              className="w-full flex items-center gap-1.5 text-[10px] py-2 transition-colors hover:opacity-80"
+              style={{ color: 'var(--text-secondary)' }}>
+              <ChevronRight size={10} style={{ transform: showMilestones ? 'rotate(90deg)' : 'none', transition: 'transform 0.2s' }} />
+              Milestones
+            </button>
+            {showMilestones && (
+              <div className="pb-2">
+                <MilestonePanel projectId={project.id} projectColor={project.color} />
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
@@ -274,13 +360,17 @@ const ProgramSection = memo(function ProgramSection({ program, projects }) {
   const addProject    = useProjectStore((s) => s.addProject)
   const tasks         = useTaskStore((s) => s.tasks)
 
-  const [collapsed, setCollapsed] = useState(false)
-  const [confirmDel, setConfirmDel] = useState(false)
+  const [collapsed, setCollapsed]     = useState(false)
+  const [confirmDel, setConfirmDel]   = useState(false)
   const [addingProject, setAddingProject] = useState(false)
   const [newProjName, setNewProjName] = useState('')
   const [newProjColor, setNewProjColor] = useState(PROJECT_COLORS[0])
+  const [showStatusPicker, setShowStatusPicker] = useState(false)
 
-  const allTasks = tasks.filter((t) => projects.some((p) => p.id === t.projectId))
+  // Only top-level projects (no parentId)
+  const topLevelProjects = projects.filter((p) => !p.parentId)
+
+  const allTasks   = tasks.filter((t) => projects.some((p) => p.id === t.projectId))
   const totalTasks = allTasks.length
   const doneTasks  = allTasks.filter((t) => t.status === 'done').length
 
@@ -303,10 +393,36 @@ const ProgramSection = memo(function ProgramSection({ program, projects }) {
         {program.description && (
           <span className="text-xs hidden sm:inline" style={{ color: 'var(--text-secondary)' }}>— {program.description}</span>
         )}
+
+        {/* Program status badge */}
+        <div className="relative">
+          <button onClick={() => setShowStatusPicker((v) => !v)}>
+            <ProgramStatusBadge status={program.status || 'planning'} />
+          </button>
+          {showStatusPicker && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setShowStatusPicker(false)} />
+              <div className="absolute top-full left-0 mt-1 z-50 rounded-xl overflow-hidden"
+                style={{ background: '#1a1025', border: '1px solid rgba(255,255,255,0.12)', boxShadow: '0 16px 48px rgba(0,0,0,0.5)', minWidth: '140px' }}>
+                {STATUS_OPTIONS.map(({ value, label, color }) => (
+                  <button key={value}
+                    onClick={() => { updateProgram(program.id, { status: value }); setShowStatusPicker(false) }}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-left hover:bg-white/5 transition-colors"
+                    style={(program.status || 'planning') === value ? { color, background: `${color}12` } : { color: 'var(--text-secondary)' }}>
+                    <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: color }} />
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+
         <span className="text-[10px] px-2 py-0.5 rounded-full ml-1"
           style={{ background: `${program.color}15`, color: program.color }}>
-          {projects.length} project{projects.length !== 1 ? 's' : ''} · {totalTasks} tasks
+          {topLevelProjects.length} project{topLevelProjects.length !== 1 ? 's' : ''} · {totalTasks} tasks
         </span>
+
         <div className="ml-auto flex items-center gap-1.5">
           <button onClick={() => setAddingProject(true)}
             className="flex items-center gap-1 text-[11px] px-2 py-1 rounded-lg transition-colors hover:bg-white/5"
@@ -370,13 +486,13 @@ const ProgramSection = memo(function ProgramSection({ program, projects }) {
       {/* Projects */}
       {!collapsed && (
         <div className="space-y-2 pl-6">
-          {projects.length === 0 && !addingProject ? (
+          {topLevelProjects.length === 0 && !addingProject ? (
             <p className="text-xs py-2" style={{ color: 'var(--text-secondary)' }}>
               No projects yet.{' '}
               <button onClick={() => setAddingProject(true)} className="underline" style={{ color: 'var(--accent)' }}>Add one</button>
             </p>
           ) : (
-            projects.map((p) => <ProjectPanel key={p.id} project={p} />)
+            topLevelProjects.map((p) => <ProjectPanel key={p.id} project={p} />)
           )}
         </div>
       )}
@@ -387,7 +503,9 @@ const ProgramSection = memo(function ProgramSection({ program, projects }) {
 // ── Unassigned projects section ───────────────────────────────────────────────
 const UnassignedSection = memo(function UnassignedSection({ projects }) {
   const [collapsed, setCollapsed] = useState(false)
-  if (projects.length === 0) return null
+  // Only top-level
+  const topLevel = projects.filter((p) => !p.parentId)
+  if (topLevel.length === 0) return null
   return (
     <div className="mb-6">
       <div className="flex items-center gap-2.5 mb-3 px-1">
@@ -397,12 +515,12 @@ const UnassignedSection = memo(function UnassignedSection({ projects }) {
         <Folder size={14} style={{ color: 'var(--text-secondary)' }} />
         <span className="text-base font-bold" style={{ color: 'var(--text-secondary)' }}>Unassigned</span>
         <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--text-secondary)' }}>
-          {projects.length} project{projects.length !== 1 ? 's' : ''}
+          {topLevel.length} project{topLevel.length !== 1 ? 's' : ''}
         </span>
       </div>
       {!collapsed && (
         <div className="space-y-2 pl-6">
-          {projects.map((p) => <ProjectPanel key={p.id} project={p} />)}
+          {topLevel.map((p) => <ProjectPanel key={p.id} project={p} />)}
         </div>
       )}
     </div>

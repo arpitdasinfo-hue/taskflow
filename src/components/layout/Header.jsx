@@ -3,11 +3,13 @@ import { LayoutList, Kanban, SlidersHorizontal } from 'lucide-react'
 import useSettingsStore from '../../store/useSettingsStore'
 
 const PAGE_TITLES = {
-  dashboard: 'Dashboard',
-  tasks:     'All Tasks',
-  today:     'Today',
-  projects:  'Projects',
-  settings:  'Settings',
+  dashboard:           'Dashboard',
+  tasks:               'All Tasks',
+  today:               'Today',
+  projects:            'Projects',
+  settings:            'Settings',
+  'program-dashboard': 'Analytics',
+  timeline:            'Timeline',
 }
 
 const Header = memo(function Header({ showViewToggle = false, showFilter = false, onFilter }) {

@@ -1,7 +1,8 @@
-import { memo } from 'react'
-import { Palette, Database, Info, Trash2, Download } from 'lucide-react'
+import { memo, useState } from 'react'
+import { Palette, Database, Info, Trash2, Download, FileText, Table } from 'lucide-react'
 import GlassCard from '../components/common/GlassCard'
 import ThemeSelector from '../components/common/ThemeSelector'
+import ExportModal from '../components/settings/ExportModal'
 import Header from '../components/layout/Header'
 import useTaskStore from '../store/useTaskStore'
 import useSettingsStore from '../store/useSettingsStore'
@@ -28,6 +29,7 @@ const Settings = memo(function Settings() {
   const tasks    = useTaskStore((s) => s.tasks)
   const { total, done, inProgress } = useTaskStats()
   const themeIndex = useSettingsStore((s) => s.themeIndex)
+  const [showExport, setShowExport] = useState(false)
 
   const exportData = () => {
     const data = JSON.stringify({ tasks, exportedAt: new Date().toISOString() }, null, 2)
@@ -46,6 +48,7 @@ const Settings = memo(function Settings() {
   }
 
   return (
+    <>
     <div className="flex-1 flex flex-col overflow-hidden">
       <Header />
       <div className="flex-1 overflow-y-auto px-4 md:px-6 pb-24 md:pb-8">
@@ -90,6 +93,21 @@ const Settings = memo(function Settings() {
           </div>
         </Section>
 
+        {/* Export */}
+        <Section icon={Download} title="Export">
+          <p className="text-xs mb-3" style={{ color: 'var(--text-secondary)' }}>
+            Export your tasks and projects data for backup or analysis.
+          </p>
+          <button
+            onClick={() => setShowExport(true)}
+            className="w-full flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-medium transition-colors"
+            style={{ background: 'rgba(var(--accent-rgb),0.1)', color: 'var(--accent)', border: '1px solid rgba(var(--accent-rgb),0.2)' }}
+          >
+            <Download size={13} />
+            Export Data (CSV / PDF)
+          </button>
+        </Section>
+
         {/* About */}
         <Section icon={Info} title="About">
           <div className="space-y-2.5">
@@ -109,6 +127,8 @@ const Settings = memo(function Settings() {
 
       </div>
     </div>
+    {showExport && <ExportModal onClose={() => setShowExport(false)} />}
+    </>
   )
 })
 

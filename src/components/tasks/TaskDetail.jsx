@@ -1,5 +1,5 @@
 import { memo, useState, useCallback, useEffect } from 'react'
-import { X, Trash2, Calendar, Tag, ChevronDown, Folder } from 'lucide-react'
+import { X, Trash2, Calendar, Tag, ChevronDown, Folder, AlertTriangle } from 'lucide-react'
 import { format } from 'date-fns'
 import useSettingsStore from '../../store/useSettingsStore'
 import useTaskStore from '../../store/useTaskStore'
@@ -7,6 +7,8 @@ import useProjectStore from '../../store/useProjectStore'
 import { PriorityBadge, StatusBadge, TagBadge } from '../common/Badge'
 import SubtaskList from './SubtaskList'
 import NoteList from './NoteList'
+import DependencyList from './DependencyList'
+import { useIsBlockedByDependency } from '../../hooks/useBlockedTasks'
 
 const STATUSES   = ['todo', 'in-progress', 'review', 'done', 'blocked']
 const PRIORITIES = ['critical', 'high', 'medium', 'low']
@@ -57,6 +59,7 @@ const TaskDetail = memo(function TaskDetail() {
   const projects       = useProjectStore((s) => s.projects)
 
   const task = tasks.find((t) => t.id === selectedTaskId)
+  const isBlockedByDep = useIsBlockedByDependency(selectedTaskId)
   const [tab, setTab]         = useState('subtasks')
   const [editingTitle, setEditingTitle] = useState(false)
   const [titleValue, setTitleValue]     = useState('')
@@ -113,6 +116,15 @@ const TaskDetail = memo(function TaskDetail() {
       className="flex flex-col h-full overflow-hidden"
       style={{ background: 'rgba(10,0,21,0.92)', borderLeft: '1px solid var(--glass-border)' }}
     >
+      {/* Blocked by dependency warning */}
+      {isBlockedByDep && (
+        <div className="flex items-center gap-2 px-5 py-2.5 text-xs flex-shrink-0"
+          style={{ background: 'rgba(245,158,11,0.1)', borderBottom: '1px solid rgba(245,158,11,0.2)', color: '#f59e0b' }}>
+          <AlertTriangle size={13} />
+          Blocked by incomplete dependencies
+        </div>
+      )}
+
       {/* Header */}
       <div
         className="flex items-center justify-between px-5 py-4 flex-shrink-0"
@@ -298,7 +310,7 @@ const TaskDetail = memo(function TaskDetail() {
             className="flex gap-1 p-1 rounded-xl mb-4"
             style={{ background: 'rgba(255,255,255,0.04)' }}
           >
-            {['subtasks', 'notes'].map((t) => (
+            {['subtasks', 'notes', 'deps'].map((t) => (
               <button
                 key={t}
                 onClick={() => setTab(t)}
@@ -308,7 +320,9 @@ const TaskDetail = memo(function TaskDetail() {
                   : { color: 'var(--text-secondary)' }
                 }
               >
-                {t === 'subtasks' ? `Subtasks (${task.subtasks.length})` : `Notes (${task.notes.length})`}
+                {t === 'subtasks' ? `Subtasks (${task.subtasks.length})`
+                  : t === 'notes' ? `Notes (${task.notes.length})`
+                  : `Deps (${(task.dependsOn ?? []).length})`}
               </button>
             ))}
           </div>
@@ -318,6 +332,9 @@ const TaskDetail = memo(function TaskDetail() {
           )}
           {tab === 'notes' && (
             <NoteList taskId={task.id} notes={task.notes} />
+          )}
+          {tab === 'deps' && (
+            <DependencyList taskId={task.id} />
           )}
         </div>
       </div>
