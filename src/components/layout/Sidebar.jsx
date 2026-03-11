@@ -1,11 +1,12 @@
 import { memo, useState } from 'react'
 import {
   LayoutDashboard, ListTodo, CalendarClock, Settings2, FolderKanban,
-  Zap, ChevronLeft, ChevronRight, Plus, Folder, ChevronDown, BarChart3, GanttChart,
+  Zap, ChevronLeft, ChevronRight, Plus, Folder, ChevronDown, BarChart3, GanttChart, LogOut,
 } from 'lucide-react'
 import useSettingsStore from '../../store/useSettingsStore'
 import useProjectStore from '../../store/useProjectStore'
 import useTaskStore from '../../store/useTaskStore'
+import useAuthStore from '../../store/useAuthStore'
 import { useTaskStats } from '../../hooks/useFilteredTasks'
 
 const NAV_ITEMS = [
@@ -172,6 +173,8 @@ const Sidebar = memo(function Sidebar() {
   const projects          = useProjectStore((s) => s.projects)
   const tasks             = useTaskStore((s) => s.tasks)
   const { overdue, inProgress } = useTaskStats()
+  const user              = useAuthStore((s) => s.user)
+  const signOut           = useAuthStore((s) => s.signOut)
 
   const unassigned = projects.filter(
     (p) => !p.programId || !programs.find((prog) => prog.id === p.programId)
@@ -300,6 +303,53 @@ const Sidebar = memo(function Sidebar() {
           </div>
         )}
       </div>
+
+      {/* User section */}
+      {user && (
+        <div className="px-2 mb-1 mt-1">
+          {sidebarCollapsed ? (
+            <button
+              onClick={signOut}
+              title="Sign out"
+              className="w-full flex items-center justify-center py-2 rounded-xl transition-colors hover:bg-red-500/10"
+              style={{ color: 'var(--text-secondary)' }}
+            >
+              <LogOut size={14} />
+            </button>
+          ) : (
+            <div
+              className="flex items-center gap-2 px-3 py-2.5 rounded-xl"
+              style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}
+            >
+              {/* Avatar */}
+              <div
+                className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 text-[11px] font-bold"
+                style={{ background: 'var(--accent)', color: '#fff' }}
+              >
+                {(user.user_metadata?.name?.[0] || user.email?.[0] || '?').toUpperCase()}
+              </div>
+              {/* Email */}
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-medium truncate" style={{ color: 'var(--text-primary)' }}>
+                  {user.user_metadata?.name || user.email?.split('@')[0]}
+                </p>
+                <p className="text-[10px] truncate" style={{ color: 'var(--text-secondary)' }}>
+                  {user.email}
+                </p>
+              </div>
+              {/* Sign out */}
+              <button
+                onClick={signOut}
+                title="Sign out"
+                className="p-1.5 rounded-lg transition-colors hover:bg-red-500/10 flex-shrink-0"
+                style={{ color: 'var(--text-secondary)' }}
+              >
+                <LogOut size={13} />
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Collapse toggle */}
       <div className="px-2 pb-4 mt-2">

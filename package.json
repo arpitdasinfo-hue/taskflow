@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@hello-pangea/dnd": "^18.0.1",
+    "@supabase/supabase-js": "^2.99.1",
     "date-fns": "^4.1.0",
     "framer-motion": "^12.35.2",
     "immer": "^11.1.4",

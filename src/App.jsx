@@ -4,7 +4,9 @@ import BottomNav from './components/layout/BottomNav'
 import TaskDetail from './components/tasks/TaskDetail'
 import QuickAdd from './components/tasks/QuickAdd'
 import useSettingsStore from './store/useSettingsStore'
+import useAuthStore from './store/useAuthStore'
 import { useTheme } from './hooks/useTheme'
+import Auth from './pages/Auth'
 
 // Lazy-load pages for code-splitting
 const Dashboard        = lazy(() => import('./pages/Dashboard'))
@@ -74,6 +76,29 @@ export default function App() {
 
   const activePage     = useSettingsStore((s) => s.activePage)
   const selectedTaskId = useSettingsStore((s) => s.selectedTaskId)
+  const session        = useAuthStore((s) => s.session)
+  const loading        = useAuthStore((s) => s.loading)
+  const init           = useAuthStore((s) => s.init)
+
+  useEffect(() => { init() }, [init])
+
+  // Show spinner while restoring session
+  if (loading) {
+    return (
+      <div className="flex h-full min-h-dvh items-center justify-center"
+        style={{ background: 'var(--bg-gradient)' }}>
+        <div
+          className="w-8 h-8 rounded-full border-2 animate-spin"
+          style={{ borderColor: 'rgba(var(--accent-rgb),0.2)', borderTopColor: 'var(--accent)' }}
+        />
+      </div>
+    )
+  }
+
+  // Show login page if not authenticated
+  if (!session) {
+    return <Auth />
+  }
 
   return (
     <div className="flex h-full min-h-dvh">
