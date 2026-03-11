@@ -1,10 +1,12 @@
 import { memo } from 'react'
-import { TrendingUp, Clock, AlertTriangle, CheckCircle2, Zap, ArrowRight } from 'lucide-react'
+import { TrendingUp, Clock, AlertTriangle, CheckCircle2, Zap, ArrowRight, Sparkles } from 'lucide-react'
 import GlassCard from '../components/common/GlassCard'
 import TaskCard from '../components/tasks/TaskCard'
 import EmptyState from '../components/common/EmptyState'
 import { useTaskStats, useFilteredTasks } from '../hooks/useFilteredTasks'
 import useSettingsStore from '../store/useSettingsStore'
+import useProjectStore from '../store/useProjectStore'
+import useTaskStore from '../store/useTaskStore'
 
 const StatCard = memo(function StatCard({ icon: Icon, label, value, sub, color, onClick }) {
   return (
@@ -32,16 +34,53 @@ const StatCard = memo(function StatCard({ icon: Icon, label, value, sub, color, 
   )
 })
 
+const WelcomeCard = memo(function WelcomeCard({ onGetStarted }) {
+  return (
+    <div
+      className="rounded-2xl p-6 mb-6 flex flex-col items-center text-center gap-4"
+      style={{ background: 'rgba(var(--accent-rgb),0.07)', border: '1px solid rgba(var(--accent-rgb),0.2)' }}
+    >
+      <div
+        className="w-12 h-12 rounded-2xl flex items-center justify-center"
+        style={{ background: 'var(--accent-dim)' }}
+      >
+        <Sparkles size={22} style={{ color: 'var(--accent)' }} />
+      </div>
+      <div>
+        <p className="text-base font-bold mb-1" style={{ color: 'var(--text-primary)' }}>
+          Welcome to TaskFlow
+        </p>
+        <p className="text-sm max-w-xs" style={{ color: 'var(--text-secondary)' }}>
+          Organize your work into Programs, Projects, and Tasks. Start by creating your first program.
+        </p>
+      </div>
+      <button
+        onClick={onGetStarted}
+        className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold transition-opacity hover:opacity-80"
+        style={{ background: 'var(--accent)', color: '#fff' }}
+      >
+        Create your first program <ArrowRight size={14} />
+      </button>
+    </div>
+  )
+})
+
 const Dashboard = memo(function Dashboard() {
   const { total, inProgress, done, blocked, overdue, critical, completion } = useTaskStats()
   const tasks    = useFilteredTasks()
   const setPage  = useSettingsStore((s) => s.setPage)
   const selectTask = useSettingsStore((s) => s.selectTask)
+  const programs = useProjectStore((s) => s.programs)
+  const allTasks = useTaskStore((s) => s.tasks)
 
   const recent = tasks.filter((t) => t.status !== 'done').slice(0, 4)
+  const isEmpty = programs.length === 0 && allTasks.length === 0
 
   return (
     <div className="flex-1 overflow-y-auto px-4 md:px-6 pb-24 md:pb-8">
+      {/* Welcome onboarding */}
+      {isEmpty && <WelcomeCard onGetStarted={() => setPage('projects')} />}
+
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
         <StatCard
