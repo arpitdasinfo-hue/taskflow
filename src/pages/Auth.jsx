@@ -1,6 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Zap, Mail, ArrowRight, CheckCircle2, AlertCircle } from 'lucide-react'
 import useAuthStore from '../store/useAuthStore'
+
+const OTP_COOLDOWN_SECONDS = 45
 
 export default function Auth() {
   const [mode,    setMode]    = useState('signin') // signin | signup
@@ -10,26 +12,49 @@ export default function Auth() {
   const [sent,    setSent]    = useState(false)
   const [loading, setLoading] = useState(false)
   const [error,   setError]   = useState('')
+  const [cooldownLeft, setCooldownLeft] = useState(0)
 
   const signInWithEmail = useAuthStore((s) => s.signInWithEmail)
   const verifyEmailOtp  = useAuthStore((s) => s.verifyEmailOtp)
 
+  useEffect(() => {
+    if (cooldownLeft <= 0) return undefined
+    const timerId = setInterval(() => {
+      setCooldownLeft((prev) => Math.max(0, prev - 1))
+    }, 1000)
+    return () => clearInterval(timerId)
+  }, [cooldownLeft])
+
+  const getFriendlyAuthError = (rawMessage) => {
+    const raw = rawMessage || ''
+    const lower = raw.toLowerCase()
+
+    const notRegistered =
+      lower.includes('signups not allowed for otp') ||
+      lower.includes('user not found')
+    if (mode === 'signin' && notRegistered) {
+      return 'No account found for this email. Use Sign up to create one.'
+    }
+
+    if (lower.includes('rate limit')) {
+      return `Too many requests. Wait ${OTP_COOLDOWN_SECONDS}s and try again.`
+    }
+
+    return raw
+  }
+
   const handleSendCode = async (e) => {
     e.preventDefault()
+    if (cooldownLeft > 0) return
     if (!email.trim()) return
     setLoading(true)
     setError('')
     const { error } = await signInWithEmail(email.trim().toLowerCase(), mode)
     setLoading(false)
     if (error) {
-      const raw = error.message || ''
-      const notRegistered =
-        raw.toLowerCase().includes('signups not allowed for otp') ||
-        raw.toLowerCase().includes('user not found')
-      if (mode === 'signin' && notRegistered) {
-        setError('No account found for this email. Use Sign up to create one.')
-      } else {
-        setError(raw)
+      setError(getFriendlyAuthError(error.message))
+      if ((error.message || '').toLowerCase().includes('rate limit')) {
+        setCooldownLeft(OTP_COOLDOWN_SECONDS)
       }
       return
     }
@@ -37,6 +62,7 @@ export default function Auth() {
     setStep('code')
     setCode('')
     setSent(true)
+    setCooldownLeft(OTP_COOLDOWN_SECONDS)
   }
 
   const handleVerifyCode = async (e) => {
@@ -55,12 +81,20 @@ export default function Auth() {
   }
 
   const handleResendCode = async () => {
+    if (cooldownLeft > 0) return
     if (!email.trim()) return
     setLoading(true)
     setError('')
     const { error } = await signInWithEmail(email.trim().toLowerCase(), mode)
     setLoading(false)
-    if (error) setError(error.message || 'Unable to resend code.')
+    if (error) {
+      setError(getFriendlyAuthError(error.message || 'Unable to resend code.'))
+      if ((error.message || '').toLowerCase().includes('rate limit')) {
+        setCooldownLeft(OTP_COOLDOWN_SECONDS)
+      }
+      return
+    }
+    setCooldownLeft(OTP_COOLDOWN_SECONDS)
   }
 
   return (
@@ -136,11 +170,11 @@ export default function Auth() {
               <div className="mt-4 flex items-center justify-between">
                 <button
                   onClick={handleResendCode}
-                  disabled={loading}
+                  disabled={loading || cooldownLeft > 0}
                   className="text-xs underline transition-opacity hover:opacity-70 disabled:opacity-40"
                   style={{ color: 'var(--text-secondary)' }}
                 >
-                  Resend code
+                  {cooldownLeft > 0 ? `Resend in ${cooldownLeft}s` : 'Resend code'}
                 </button>
                 <button
                   onClick={() => { setStep('email'); setSent(false); setCode(''); setError('') }}
@@ -221,11 +255,13 @@ export default function Auth() {
                 {/* Submit */}
                 <button
                   type="submit"
-                  disabled={loading || !email.trim()}
+                  disabled={loading || !email.trim() || cooldownLeft > 0}
                   className="flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-opacity hover:opacity-85 disabled:opacity-40"
                   style={{ background: 'var(--accent)', color: '#fff' }}
                 >
-                  {loading
+                  {cooldownLeft > 0
+                    ? `Try again in ${cooldownLeft}s`
+                    : loading
                     ? 'Sending…'
                     : <><span>{mode === 'signup' ? 'Send sign-up code' : 'Send sign-in code'}</span><ArrowRight size={14} /></>}
                 </button>
