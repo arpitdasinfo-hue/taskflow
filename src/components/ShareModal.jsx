@@ -229,254 +229,258 @@ const ShareModal = memo(function ShareModal({ resourceType, resourceId, resource
     <>
       <div className="overlay-bg z-50" onClick={onClose} />
       <div
-        className="fixed inset-x-0 bottom-0 z-[60] rounded-t-3xl p-5 anim-slide-up safe-bottom
+        className="fixed inset-x-0 bottom-0 z-[60]
                    md:inset-x-auto md:left-1/2 md:top-1/2 md:bottom-auto md:-translate-x-1/2 md:-translate-y-1/2
-                   md:w-[min(680px,calc(100vw-2rem))] md:max-h-[90vh] md:rounded-2xl"
-        style={{
-          background: 'rgba(18,8,30,0.96)',
-          backdropFilter: 'blur(24px)',
-          WebkitBackdropFilter: 'blur(24px)',
-          border: '1px solid rgba(var(--accent-rgb),0.28)',
-          boxShadow: '0 -16px 64px rgba(var(--accent-rgb),0.16)',
-        }}
+                   md:w-[min(680px,calc(100vw-2rem))]"
       >
-        <div className="flex items-center justify-between mb-3">
-          <div>
-            <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-              Share {resourceLabel} View
-            </p>
-            <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>
-              Manager-style read-only dashboard link. No write or comment access.
-            </p>
+        <div
+          className="rounded-t-3xl md:rounded-2xl p-5 anim-slide-up safe-bottom"
+          style={{
+            background: 'rgba(18,8,30,0.96)',
+            backdropFilter: 'blur(24px)',
+            WebkitBackdropFilter: 'blur(24px)',
+            border: '1px solid rgba(var(--accent-rgb),0.28)',
+            boxShadow: '0 -16px 64px rgba(var(--accent-rgb),0.16)',
+          }}
+        >
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                Share {resourceLabel} View
+              </p>
+              <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>
+                Manager-style read-only dashboard link. No write or comment access.
+              </p>
+            </div>
+            <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/10" style={{ color: 'var(--text-secondary)' }}>
+              <X size={16} />
+            </button>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/10" style={{ color: 'var(--text-secondary)' }}>
-            <X size={16} />
-          </button>
-        </div>
 
-        {loading ? (
-          <div className="py-8 flex items-center justify-center">
-            <RefreshCw size={18} className="animate-spin" style={{ color: 'var(--accent)' }} />
-          </div>
-        ) : (
-          <div className="space-y-3 max-h-[70vh] overflow-y-auto pr-1">
-            <div
-              className="rounded-xl p-3"
-              style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}
-            >
-              <p className="text-[10px] uppercase tracking-wide mb-1" style={{ color: 'var(--text-secondary)' }}>
-                Link Name
-              </p>
-              <input
-                value={linkName}
-                onChange={(e) => setLinkName(e.target.value)}
-                placeholder={`${resourceLabel} manager view`}
-                className="w-full px-3 py-2 rounded-xl text-xs"
-                style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-primary)' }}
-              />
+          {loading ? (
+            <div className="py-8 flex items-center justify-center">
+              <RefreshCw size={18} className="animate-spin" style={{ color: 'var(--accent)' }} />
             </div>
-
-            <div
-              className="rounded-xl p-3"
-              style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}
-            >
-              <p className="text-[10px] uppercase tracking-wide mb-2" style={{ color: 'var(--text-secondary)' }}>
-                Modules
-              </p>
-              <div className="flex flex-wrap gap-1.5">
-                {SHARE_MODULE_OPTIONS.map((option) => (
-                  <TogglePill
-                    key={option.key}
-                    active={Boolean(config.modules[option.key])}
-                    onClick={() => toggleModule(option.key)}
-                    label={option.label}
-                  />
-                ))}
-              </div>
-            </div>
-
-            <div
-              className="rounded-xl p-3"
-              style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}
-            >
-              <p className="text-[10px] uppercase tracking-wide mb-2" style={{ color: 'var(--text-secondary)' }}>
-                Task Filters
-              </p>
-              <div className="flex items-center gap-2 mb-2">
-                <TogglePill
-                  active={Boolean(config.filters.includeCompleted)}
-                  onClick={() => setConfig((prev) => ({
-                    ...prev,
-                    filters: { ...prev.filters, includeCompleted: !prev.filters.includeCompleted },
-                  }))}
-                  label="Include completed"
-                />
-              </div>
-              <div className="mb-2">
-                <p className="text-[10px] mb-1" style={{ color: 'var(--text-secondary)' }}>Status</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {TASK_STATUS_OPTIONS.map((statusOption) => (
-                    <TogglePill
-                      key={statusOption.key}
-                      active={(config.filters.status ?? []).includes(statusOption.key)}
-                      onClick={() => toggleFilterValue('status', statusOption.key)}
-                      label={statusOption.label}
-                    />
-                  ))}
-                </div>
-              </div>
-              <div className="mb-2">
-                <p className="text-[10px] mb-1" style={{ color: 'var(--text-secondary)' }}>Priority</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {TASK_PRIORITY_OPTIONS.map((priorityOption) => (
-                    <TogglePill
-                      key={priorityOption.key}
-                      active={(config.filters.priority ?? []).includes(priorityOption.key)}
-                      onClick={() => toggleFilterValue('priority', priorityOption.key)}
-                      label={priorityOption.label}
-                    />
-                  ))}
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <p className="text-[10px] mb-1" style={{ color: 'var(--text-secondary)' }}>Due from</p>
-                  <input
-                    type="date"
-                    value={config.filters.dueFrom || ''}
-                    onChange={(e) => setConfig((prev) => ({ ...prev, filters: { ...prev.filters, dueFrom: e.target.value } }))}
-                    className="w-full px-2 py-1.5 rounded-lg text-xs"
-                    style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-primary)' }}
-                  />
-                </div>
-                <div>
-                  <p className="text-[10px] mb-1" style={{ color: 'var(--text-secondary)' }}>Due to</p>
-                  <input
-                    type="date"
-                    value={config.filters.dueTo || ''}
-                    onChange={(e) => setConfig((prev) => ({ ...prev, filters: { ...prev.filters, dueTo: e.target.value } }))}
-                    className="w-full px-2 py-1.5 rounded-lg text-xs"
-                    style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-primary)' }}
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div
-              className="rounded-xl p-3"
-              style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}
-            >
-              <p className="text-[10px] uppercase tracking-wide mb-2" style={{ color: 'var(--text-secondary)' }}>
-                Link Lifetime
-              </p>
-              <div className="flex items-center gap-2 mb-2">
-                <TogglePill active={neverExpires} onClick={() => setNeverExpires(true)} label="Never expires" />
-                <TogglePill active={!neverExpires} onClick={() => setNeverExpires(false)} label="Set expiry" />
-              </div>
-              {!neverExpires && (
+          ) : (
+            <div className="space-y-3 max-h-[70vh] overflow-y-auto pr-1">
+              <div
+                className="rounded-xl p-3"
+                style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}
+              >
+                <p className="text-[10px] uppercase tracking-wide mb-1" style={{ color: 'var(--text-secondary)' }}>
+                  Link Name
+                </p>
                 <input
-                  type="datetime-local"
-                  value={expiresAt}
-                  onChange={(e) => setExpiresAt(e.target.value)}
+                  value={linkName}
+                  onChange={(e) => setLinkName(e.target.value)}
+                  placeholder={`${resourceLabel} manager view`}
                   className="w-full px-3 py-2 rounded-xl text-xs"
                   style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-primary)' }}
                 />
-              )}
-              <p className="text-[10px] mt-2" style={{ color: 'var(--text-secondary)' }}>
-                Default is permanent. Access ends only when you disable or revoke from Shared Views.
-              </p>
-            </div>
+              </div>
 
-            {link ? (
               <div
                 className="rounded-xl p-3"
                 style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}
               >
-                <div
-                  className="flex items-center gap-2 px-3 py-2.5 rounded-xl mb-2"
-                  style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.09)' }}
-                >
-                  <Link2 size={14} style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />
-                  <span className="text-xs truncate" style={{ color: 'var(--text-primary)' }}>
-                    {shareUrl}
-                  </span>
+                <p className="text-[10px] uppercase tracking-wide mb-2" style={{ color: 'var(--text-secondary)' }}>
+                  Modules
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {SHARE_MODULE_OPTIONS.map((option) => (
+                    <TogglePill
+                      key={option.key}
+                      active={Boolean(config.modules[option.key])}
+                      onClick={() => toggleModule(option.key)}
+                      label={option.label}
+                    />
+                  ))}
                 </div>
+              </div>
+
+              <div
+                className="rounded-xl p-3"
+                style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}
+              >
+                <p className="text-[10px] uppercase tracking-wide mb-2" style={{ color: 'var(--text-secondary)' }}>
+                  Task Filters
+                </p>
                 <div className="flex items-center gap-2 mb-2">
-                  <span
-                    className="text-[10px] px-2 py-0.5 rounded-full"
-                    style={isActive
-                      ? { background: 'rgba(16,185,129,0.15)', color: '#10b981' }
-                      : { background: 'rgba(239,68,68,0.15)', color: '#ef4444' }}
-                  >
-                    {status}
-                  </span>
-                  <span className="text-[10px]" style={{ color: 'var(--text-secondary)' }}>
-                    View-only access
-                  </span>
+                  <TogglePill
+                    active={Boolean(config.filters.includeCompleted)}
+                    onClick={() => setConfig((prev) => ({
+                      ...prev,
+                      filters: { ...prev.filters, includeCompleted: !prev.filters.includeCompleted },
+                    }))}
+                    label="Include completed"
+                  />
                 </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={copyLink}
-                    disabled={working || !isActive}
-                    className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-medium transition-opacity disabled:opacity-50"
-                    style={{ background: 'rgba(var(--accent-rgb),0.12)', color: 'var(--accent)', border: '1px solid rgba(var(--accent-rgb),0.25)' }}
-                  >
-                    <Copy size={12} />
-                    {copied ? 'Copied' : 'Copy link'}
-                  </button>
-                  <button
-                    onClick={() => setDisabled(!link.disabled)}
-                    disabled={working}
-                    className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-medium transition-opacity disabled:opacity-50"
-                    style={{ background: 'rgba(245,158,11,0.08)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.2)' }}
-                  >
-                    <Shield size={12} />
-                    {link.disabled ? 'Enable' : 'Disable'}
-                  </button>
+                <div className="mb-2">
+                  <p className="text-[10px] mb-1" style={{ color: 'var(--text-secondary)' }}>Status</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {TASK_STATUS_OPTIONS.map((statusOption) => (
+                      <TogglePill
+                        key={statusOption.key}
+                        active={(config.filters.status ?? []).includes(statusOption.key)}
+                        onClick={() => toggleFilterValue('status', statusOption.key)}
+                        label={statusOption.label}
+                      />
+                    ))}
+                  </div>
                 </div>
-                <button
-                  onClick={revokeLink}
-                  disabled={working}
-                  className="w-full mt-2 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-medium transition-opacity disabled:opacity-50"
-                  style={{ background: 'rgba(239,68,68,0.08)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.2)' }}
+                <div className="mb-2">
+                  <p className="text-[10px] mb-1" style={{ color: 'var(--text-secondary)' }}>Priority</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {TASK_PRIORITY_OPTIONS.map((priorityOption) => (
+                      <TogglePill
+                        key={priorityOption.key}
+                        active={(config.filters.priority ?? []).includes(priorityOption.key)}
+                        onClick={() => toggleFilterValue('priority', priorityOption.key)}
+                        label={priorityOption.label}
+                      />
+                    ))}
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <p className="text-[10px] mb-1" style={{ color: 'var(--text-secondary)' }}>Due from</p>
+                    <input
+                      type="date"
+                      value={config.filters.dueFrom || ''}
+                      onChange={(e) => setConfig((prev) => ({ ...prev, filters: { ...prev.filters, dueFrom: e.target.value } }))}
+                      className="w-full px-2 py-1.5 rounded-lg text-xs"
+                      style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-primary)' }}
+                    />
+                  </div>
+                  <div>
+                    <p className="text-[10px] mb-1" style={{ color: 'var(--text-secondary)' }}>Due to</p>
+                    <input
+                      type="date"
+                      value={config.filters.dueTo || ''}
+                      onChange={(e) => setConfig((prev) => ({ ...prev, filters: { ...prev.filters, dueTo: e.target.value } }))}
+                      className="w-full px-2 py-1.5 rounded-lg text-xs"
+                      style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-primary)' }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div
+                className="rounded-xl p-3"
+                style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}
+              >
+                <p className="text-[10px] uppercase tracking-wide mb-2" style={{ color: 'var(--text-secondary)' }}>
+                  Link Lifetime
+                </p>
+                <div className="flex items-center gap-2 mb-2">
+                  <TogglePill active={neverExpires} onClick={() => setNeverExpires(true)} label="Never expires" />
+                  <TogglePill active={!neverExpires} onClick={() => setNeverExpires(false)} label="Set expiry" />
+                </div>
+                {!neverExpires && (
+                  <input
+                    type="datetime-local"
+                    value={expiresAt}
+                    onChange={(e) => setExpiresAt(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl text-xs"
+                    style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-primary)' }}
+                  />
+                )}
+                <p className="text-[10px] mt-2" style={{ color: 'var(--text-secondary)' }}>
+                  Default is permanent. Access ends only when you disable or revoke from Shared Views.
+                </p>
+              </div>
+
+              {link ? (
+                <div
+                  className="rounded-xl p-3"
+                  style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}
                 >
-                  <Trash2 size={12} />
-                  Revoke permanently
+                  <div
+                    className="flex items-center gap-2 px-3 py-2.5 rounded-xl mb-2"
+                    style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.09)' }}
+                  >
+                    <Link2 size={14} style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />
+                    <span className="text-xs truncate" style={{ color: 'var(--text-primary)' }}>
+                      {shareUrl}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <span
+                      className="text-[10px] px-2 py-0.5 rounded-full"
+                      style={isActive
+                        ? { background: 'rgba(16,185,129,0.15)', color: '#10b981' }
+                        : { background: 'rgba(239,68,68,0.15)', color: '#ef4444' }}
+                    >
+                      {status}
+                    </span>
+                    <span className="text-[10px]" style={{ color: 'var(--text-secondary)' }}>
+                      View-only access
+                    </span>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={copyLink}
+                      disabled={working || !isActive}
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-medium transition-opacity disabled:opacity-50"
+                      style={{ background: 'rgba(var(--accent-rgb),0.12)', color: 'var(--accent)', border: '1px solid rgba(var(--accent-rgb),0.25)' }}
+                    >
+                      <Copy size={12} />
+                      {copied ? 'Copied' : 'Copy link'}
+                    </button>
+                    <button
+                      onClick={() => setDisabled(!link.disabled)}
+                      disabled={working}
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-medium transition-opacity disabled:opacity-50"
+                      style={{ background: 'rgba(245,158,11,0.08)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.2)' }}
+                    >
+                      <Shield size={12} />
+                      {link.disabled ? 'Enable' : 'Disable'}
+                    </button>
+                  </div>
+                  <button
+                    onClick={revokeLink}
+                    disabled={working}
+                    className="w-full mt-2 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-medium transition-opacity disabled:opacity-50"
+                    style={{ background: 'rgba(239,68,68,0.08)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.2)' }}
+                  >
+                    <Trash2 size={12} />
+                    Revoke permanently
+                  </button>
+                </div>
+              ) : (
+                <div
+                  className="rounded-xl p-3"
+                  style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}
+                >
+                  <p className="text-[10px] mb-1" style={{ color: 'var(--text-secondary)' }}>
+                    No link created yet.
+                  </p>
+                  <p className="text-[10px]" style={{ color: 'var(--text-secondary)' }}>
+                    Create one to share a read-only manager dashboard.
+                  </p>
+                </div>
+              )}
+
+              <div className="flex gap-2">
+                <button
+                  onClick={() => saveLink({ forceEnable: true })}
+                  disabled={working}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-semibold transition-opacity disabled:opacity-50"
+                  style={{ background: 'var(--accent)', color: '#fff' }}
+                >
+                  {link ? <Check size={13} /> : <Link2 size={13} />}
+                  {link ? 'Save configuration' : 'Create permanent link'}
                 </button>
               </div>
-            ) : (
-              <div
-                className="rounded-xl p-3"
-                style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}
-              >
-                <p className="text-[10px] mb-1" style={{ color: 'var(--text-secondary)' }}>
-                  No link created yet.
-                </p>
-                <p className="text-[10px]" style={{ color: 'var(--text-secondary)' }}>
-                  Create one to share a read-only manager dashboard.
-                </p>
-              </div>
-            )}
 
-            <div className="flex gap-2">
-              <button
-                onClick={() => saveLink({ forceEnable: true })}
-                disabled={working}
-                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-semibold transition-opacity disabled:opacity-50"
-                style={{ background: 'var(--accent)', color: '#fff' }}
-              >
-                {link ? <Check size={13} /> : <Link2 size={13} />}
-                {link ? 'Save configuration' : 'Create permanent link'}
-              </button>
+              {error && (
+                <p className="text-xs px-2" style={{ color: '#ef4444' }}>
+                  {error}
+                </p>
+              )}
             </div>
-
-            {error && (
-              <p className="text-xs px-2" style={{ color: '#ef4444' }}>
-                {error}
-              </p>
-            )}
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </>
   ), document.body)
