@@ -18,6 +18,20 @@ export const PROJECT_COLORS = [
   '#a5b4fc',
   '#fcd34d',
   '#fb7185',
+  '#60a5fa',
+  '#2dd4bf',
+  '#84cc16',
+  '#f59e0b',
+  '#ef4444',
+  '#e879f9',
+  '#6366f1',
+  '#14b8a6',
+  '#a3e635',
+  '#f43f5e',
+  '#06b6d4',
+  '#10b981',
+  '#8b5cf6',
+  '#f97316',
 ]
 
 const getSyncContext = () => {

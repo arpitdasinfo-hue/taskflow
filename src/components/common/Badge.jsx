@@ -15,6 +15,27 @@ const STATUS_CONFIG = {
   'blocked':     { label: 'Blocked',     icon: '✕', bgClass: 'status-bg-blocked'     },
 }
 
+const TAG_COLORS = [
+  '#22d3ee',
+  '#34d399',
+  '#60a5fa',
+  '#a78bfa',
+  '#f472b6',
+  '#f59e0b',
+  '#ef4444',
+  '#84cc16',
+  '#14b8a6',
+  '#f97316',
+  '#c084fc',
+  '#06b6d4',
+]
+
+const pickTagColor = (tag) => {
+  if (!tag) return '#22d3ee'
+  const hash = [...tag].reduce((acc, ch) => ((acc << 5) - acc + ch.charCodeAt(0)) | 0, 0)
+  return TAG_COLORS[Math.abs(hash) % TAG_COLORS.length]
+}
+
 export const PriorityBadge = memo(function PriorityBadge({ priority, showDot = true, size = 'sm' }) {
   const cfg = PRIORITY_CONFIG[priority]
   if (!cfg) return null
@@ -40,10 +61,11 @@ export const StatusBadge = memo(function StatusBadge({ status, size = 'sm' }) {
 })
 
 export const TagBadge = memo(function TagBadge({ tag, onRemove }) {
+  const color = pickTagColor(tag)
   return (
     <span
       className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
-      style={{ background: 'rgba(var(--accent-rgb),0.12)', border: '1px solid rgba(var(--accent-rgb),0.25)', color: 'var(--accent)' }}
+      style={{ background: `${color}20`, border: `1px solid ${color}50`, color }}
     >
       {tag}
       {onRemove && (
