@@ -3,6 +3,7 @@ import { Zap, Mail, ArrowRight, CheckCircle2, AlertCircle } from 'lucide-react'
 import useAuthStore from '../store/useAuthStore'
 
 export default function Auth() {
+  const [mode,    setMode]    = useState('signin') // signin | signup
   const [email,   setEmail]   = useState('')
   const [sent,    setSent]    = useState(false)
   const [loading, setLoading] = useState(false)
@@ -15,10 +16,22 @@ export default function Auth() {
     if (!email.trim()) return
     setLoading(true)
     setError('')
-    const { error } = await signInWithEmail(email.trim().toLowerCase())
+    const { error } = await signInWithEmail(email.trim().toLowerCase(), mode)
     setLoading(false)
-    if (error) setError(error.message)
-    else setSent(true)
+    if (error) {
+      const raw = error.message || ''
+      const notRegistered =
+        raw.toLowerCase().includes('signups not allowed for otp') ||
+        raw.toLowerCase().includes('user not found')
+      if (mode === 'signin' && notRegistered) {
+        setError('No account found for this email. Use Sign up to create one.')
+      } else {
+        setError(raw)
+      }
+      return
+    }
+
+    setSent(true)
   }
 
   return (
@@ -56,12 +69,12 @@ export default function Auth() {
                 Check your email
               </p>
               <p className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-                We sent a magic link to{' '}
+                We sent a {mode === 'signup' ? 'sign-up' : 'sign-in'} link to{' '}
                 <strong style={{ color: 'var(--text-primary)' }}>{email}</strong>.
-                {' '}Click it to sign in — no password needed.
+                {' '}Open it to continue — no password needed.
               </p>
               <button
-                onClick={() => { setSent(false); setEmail('') }}
+                onClick={() => { setSent(false); setEmail(''); setError('') }}
                 className="mt-5 text-xs underline transition-opacity hover:opacity-70"
                 style={{ color: 'var(--text-secondary)' }}
               >
@@ -71,11 +84,37 @@ export default function Auth() {
           ) : (
             /* ── Sign-in form ── */
             <>
+              <div className="mb-4 flex items-center gap-1 rounded-xl p-1"
+                style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                <button
+                  type="button"
+                  onClick={() => { setMode('signin'); setError('') }}
+                  className="flex-1 py-1.5 rounded-lg text-xs font-semibold transition-colors"
+                  style={mode === 'signin'
+                    ? { background: 'var(--accent)', color: '#fff' }
+                    : { color: 'var(--text-secondary)' }}
+                >
+                  Sign in
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setMode('signup'); setError('') }}
+                  className="flex-1 py-1.5 rounded-lg text-xs font-semibold transition-colors"
+                  style={mode === 'signup'
+                    ? { background: 'var(--accent)', color: '#fff' }
+                    : { color: 'var(--text-secondary)' }}
+                >
+                  Sign up
+                </button>
+              </div>
+
               <p className="text-lg font-bold mb-1" style={{ color: 'var(--text-primary)' }}>
-                Sign in to TaskFlow
+                {mode === 'signup' ? 'Create your TaskFlow account' : 'Sign in to TaskFlow'}
               </p>
               <p className="text-sm mb-5" style={{ color: 'var(--text-secondary)' }}>
-                Enter your work email — we'll send a magic link. No password needed.
+                {mode === 'signup'
+                  ? "New here? Enter your email and we'll send a sign-up link."
+                  : "Already have an account? Enter your email and we'll send a sign-in link."}
               </p>
 
               <form onSubmit={handleSubmit} className="flex flex-col gap-3">
@@ -116,7 +155,9 @@ export default function Auth() {
                   className="flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-opacity hover:opacity-85 disabled:opacity-40"
                   style={{ background: 'var(--accent)', color: '#fff' }}
                 >
-                  {loading ? 'Sending…' : <><span>Send magic link</span><ArrowRight size={14} /></>}
+                  {loading
+                    ? 'Sending…'
+                    : <><span>{mode === 'signup' ? 'Send sign-up link' : 'Send sign-in link'}</span><ArrowRight size={14} /></>}
                 </button>
               </form>
             </>

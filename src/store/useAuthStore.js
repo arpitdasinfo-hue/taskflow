@@ -16,11 +16,14 @@ const useAuthStore = create((set) => ({
     })
   },
 
-  /** Send magic link to email */
-  signInWithEmail: async (email) => {
+  /** Send magic link to email (signin: existing users only, signup: allow create) */
+  signInWithEmail: async (email, mode = 'signin') => {
     const { error } = await supabase.auth.signInWithOtp({
       email,
-      options: { emailRedirectTo: window.location.origin },
+      options: {
+        emailRedirectTo: window.location.origin,
+        shouldCreateUser: mode === 'signup',
+      },
     })
     return { error }
   },
