@@ -4,6 +4,7 @@ import useTaskStore from '../../store/useTaskStore'
 import useProjectStore, { PROJECT_COLORS } from '../../store/useProjectStore'
 import useSettingsStore from '../../store/useSettingsStore'
 import { PriorityBadge } from '../common/Badge'
+import ColorPalettePicker from '../common/ColorPalettePicker'
 
 const TYPES = [
   { id: 'program', label: 'Program' },
@@ -324,26 +325,13 @@ const QuickAdd = memo(function QuickAdd() {
                   <label className="text-xs mb-1.5 block" style={{ color: 'var(--text-secondary)' }}>
                     Color
                   </label>
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <button
-                      onClick={() => setColor(null)}
-                      className="text-[11px] px-2.5 py-1 rounded-full border"
-                      style={color === null
-                        ? { background: 'rgba(var(--accent-rgb),0.15)', borderColor: 'var(--accent)', color: 'var(--accent)' }
-                        : { background: 'rgba(255,255,255,0.04)', borderColor: 'rgba(255,255,255,0.12)', color: 'var(--text-secondary)' }
-                      }
-                    >
-                      Auto
-                    </button>
-                    {PROJECT_COLORS.map((c) => (
-                      <button
-                        key={c}
-                        onClick={() => setColor(c)}
-                        className="w-5 h-5 rounded-full hover:scale-110 transition-transform"
-                        style={{ background: c, outline: c === color ? `2px solid ${c}` : 'none', outlineOffset: '2px' }}
-                      />
-                    ))}
-                  </div>
+                  <ColorPalettePicker
+                    colors={PROJECT_COLORS}
+                    value={color}
+                    allowAuto
+                    autoLabel="Auto assign"
+                    onChange={setColor}
+                  />
                 </div>
               )}
             </div>

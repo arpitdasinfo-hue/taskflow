@@ -6,6 +6,7 @@ import {
 } from 'lucide-react'
 import GlassCard from '../components/common/GlassCard'
 import InfoTooltip from '../components/common/InfoTooltip'
+import ColorPalettePicker from '../components/common/ColorPalettePicker'
 import ShareModal from '../components/ShareModal'
 import { ProgramStatusBadge, STATUS_CONFIG, STATUS_OPTIONS } from '../components/common/ProgramStatusBadge'
 import MilestonePanel from '../components/projects/MilestonePanel'
@@ -76,13 +77,20 @@ const ColorDot = memo(function ColorDot({ color, onChange }) {
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute top-5 left-0 z-50 p-2 rounded-xl flex flex-wrap gap-1.5"
-            style={{ background: '#1a1025', border: '1px solid rgba(255,255,255,0.12)', width: '120px', boxShadow: '0 16px 48px rgba(0,0,0,0.6)' }}>
-            {PROJECT_COLORS.map((c) => (
-              <button key={c} onClick={(e) => { e.stopPropagation(); onChange(c); setOpen(false) }}
-                className="w-5 h-5 rounded-full hover:scale-125 transition-transform"
-                style={{ background: c, outline: c === color ? `2px solid ${c}` : 'none', outlineOffset: '2px' }} />
-            ))}
+          <div
+            className="absolute top-5 left-0 z-50 w-[196px]"
+            style={{ boxShadow: '0 16px 48px rgba(0,0,0,0.6)' }}
+          >
+            <ColorPalettePicker
+              colors={PROJECT_COLORS}
+              value={color}
+              compact
+              onChange={(next) => {
+                if (!next) return
+                onChange(next)
+                setOpen(false)
+              }}
+            />
           </div>
         </>
       )}
@@ -513,12 +521,13 @@ const ProjectPanel = memo(function ProjectPanel({ project, depth = 0 }) {
                     placeholder="Sub-project name…" maxLength={60}
                     className="w-full text-xs px-2 py-1.5 rounded-lg mb-2 bg-transparent border"
                     style={{ borderColor: 'rgba(var(--accent-rgb),0.3)', color: 'var(--text-primary)' }} />
-                  <div className="flex flex-wrap gap-1 mb-2">
-                    {PROJECT_COLORS.map((c) => (
-                      <button key={c} onClick={() => setSubColor(c)}
-                        className="w-4 h-4 rounded-full hover:scale-125 transition-transform"
-                        style={{ background: c, outline: c === subColor ? `2px solid ${c}` : 'none', outlineOffset: '1px' }} />
-                    ))}
+                  <div className="mb-2">
+                    <ColorPalettePicker
+                      colors={PROJECT_COLORS}
+                      value={subColor}
+                      compact
+                      onChange={(next) => next && setSubColor(next)}
+                    />
                   </div>
                   <div className="flex gap-1.5">
                     <button onClick={submitSub} className="flex-1 btn-accent py-1 text-[11px]">Add</button>
@@ -764,12 +773,12 @@ const ProgramSection = memo(function ProgramSection({ program, projects }) {
             placeholder="Project name…" maxLength={60}
             className="w-full text-sm px-3 py-2 rounded-xl mb-2"
             style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(var(--accent-rgb),0.25)', color: 'var(--text-primary)' }} />
-          <div className="flex flex-wrap gap-1.5 mb-2">
-            {PROJECT_COLORS.map((c) => (
-              <button key={c} onClick={() => setNewProjColor(c)}
-                className="w-5 h-5 rounded-full hover:scale-125 transition-transform"
-                style={{ background: c, outline: c === newProjColor ? `2px solid ${c}` : 'none', outlineOffset: '2px' }} />
-            ))}
+          <div className="mb-2">
+            <ColorPalettePicker
+              colors={PROJECT_COLORS}
+              value={newProjColor}
+              onChange={(next) => next && setNewProjColor(next)}
+            />
           </div>
           <div className="flex gap-2">
             <button onClick={submitProject} className="flex-1 btn-accent py-1.5 text-xs">Create</button>
@@ -875,13 +884,11 @@ const NewProgramForm = memo(function NewProgramForm({ onDone }) {
       <input value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="Description (optional)" maxLength={120}
         className="w-full text-sm px-3 py-2 rounded-xl"
         style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', color: 'var(--text-primary)' }} />
-      <div className="flex flex-wrap gap-1.5">
-        {PROJECT_COLORS.map((c) => (
-          <button key={c} onClick={() => setColor(c)}
-            className="w-5 h-5 rounded-full hover:scale-125 transition-transform"
-            style={{ background: c, outline: c === color ? `2px solid ${c}` : 'none', outlineOffset: '2px' }} />
-        ))}
-      </div>
+      <ColorPalettePicker
+        colors={PROJECT_COLORS}
+        value={color}
+        onChange={(next) => next && setColor(next)}
+      />
       <div className="flex gap-2">
         <button onClick={submit} className="flex-1 btn-accent py-2 text-xs">Create program</button>
         <button onClick={onDone} className="btn-ghost py-2 text-xs px-3">Cancel</button>
