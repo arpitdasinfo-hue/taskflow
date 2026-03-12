@@ -30,8 +30,12 @@ const TimelineLegend = memo(function TimelineLegend() {
           <span>◆</span>
           Milestone
         </span>
+        <span className="text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1" style={{ background: 'rgba(56,189,248,0.16)', color: '#7dd3fc' }}>
+          <span>⛓</span>
+          Dependency risk
+        </span>
         <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--text-secondary)' }}>
-          Drag bars to move. Drag edges to resize.
+          Drag bars to move. Drag edges to resize. Use + to add tasks.
         </span>
       </div>
     </div>

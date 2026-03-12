@@ -24,6 +24,7 @@ const Timeline = memo(function Timeline() {
   const [expandedProjectIds, setExpandedProjectIds] = useState(() => new Set())
   const [onlyDelayed, setOnlyDelayed] = useState(false)
   const [onlyCritical, setOnlyCritical] = useState(false)
+  const [onlyDependencyRisk, setOnlyDependencyRisk] = useState(false)
 
   const {
     zoom,
@@ -45,6 +46,7 @@ const Timeline = memo(function Timeline() {
     expandedProjectIds,
     onlyDelayed,
     onlyCritical,
+    onlyDependencyRisk,
   })
 
   const toggleProgram = (id) => {
@@ -82,13 +84,24 @@ const Timeline = memo(function Timeline() {
     setFilteredProjectIds(new Set())
     setOnlyDelayed(false)
     setOnlyCritical(false)
+    setOnlyDependencyRisk(false)
+  }
+
+  const openTimelineTaskComposer = ({ projectId = '', programId = '' } = {}) => {
+    if (typeof window === 'undefined') return
+    window.dispatchEvent(
+      new CustomEvent('taskflow:quick-add', {
+        detail: { type: 'task', projectId, programId },
+      })
+    )
   }
 
   const filtered =
     filteredProgramIds.size > 0 ||
     filteredProjectIds.size > 0 ||
     onlyDelayed ||
-    onlyCritical
+    onlyCritical ||
+    onlyDependencyRisk
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
@@ -100,11 +113,14 @@ const Timeline = memo(function Timeline() {
         stats={stats}
         onlyDelayed={onlyDelayed}
         onlyCritical={onlyCritical}
+        onlyDependencyRisk={onlyDependencyRisk}
         onChangeZoom={changeZoom}
         onShiftRange={shiftRange}
         onResetToToday={resetToToday}
         onToggleOnlyDelayed={() => setOnlyDelayed((value) => !value)}
         onToggleOnlyCritical={() => setOnlyCritical((value) => !value)}
+        onToggleOnlyDependencyRisk={() => setOnlyDependencyRisk((value) => !value)}
+        onAddTask={() => openTimelineTaskComposer()}
       />
 
       {programs.length > 0 && (
@@ -133,6 +149,7 @@ const Timeline = memo(function Timeline() {
           onToggleProject={toggleExpandedProject}
           onSelectTask={selectTask}
           onUpdateTaskSchedule={(taskId, updates) => updateTask(taskId, updates)}
+          onQuickAddTask={openTimelineTaskComposer}
         />
       )}
     </div>

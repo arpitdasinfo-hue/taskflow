@@ -1,5 +1,5 @@
 import { memo } from 'react'
-import { AlertTriangle, CalendarClock, ChevronLeft, ChevronRight, Target } from 'lucide-react'
+import { AlertTriangle, CalendarClock, ChevronLeft, ChevronRight, Link2, Plus, Target } from 'lucide-react'
 import { ZOOM_CONFIGS } from './timelineConfig'
 
 const quickFilterStyle = (active, accent) => (active
@@ -12,11 +12,14 @@ const TimelineToolbar = memo(function TimelineToolbar({
   stats,
   onlyDelayed,
   onlyCritical,
+  onlyDependencyRisk,
   onChangeZoom,
   onShiftRange,
   onResetToToday,
   onToggleOnlyDelayed,
   onToggleOnlyCritical,
+  onToggleOnlyDependencyRisk,
+  onAddTask,
 }) {
   return (
     <div className="px-4 md:px-6 pb-2.5">
@@ -69,6 +72,15 @@ const TimelineToolbar = memo(function TimelineToolbar({
         </div>
 
         <button
+          onClick={onAddTask}
+          className="text-[11px] px-2.5 py-1 rounded-full transition-colors flex items-center gap-1"
+          style={{ background: 'rgba(var(--accent-rgb),0.16)', color: 'var(--accent)', border: '1px solid rgba(var(--accent-rgb),0.45)' }}
+        >
+          <Plus size={11} />
+          Add task
+        </button>
+
+        <button
           onClick={onToggleOnlyDelayed}
           className="text-[11px] px-2.5 py-1 rounded-full transition-colors flex items-center gap-1"
           style={quickFilterStyle(onlyDelayed, '#f97316')}
@@ -86,15 +98,30 @@ const TimelineToolbar = memo(function TimelineToolbar({
           Only critical
         </button>
 
+        <button
+          onClick={onToggleOnlyDependencyRisk}
+          className="text-[11px] px-2.5 py-1 rounded-full transition-colors flex items-center gap-1"
+          style={quickFilterStyle(onlyDependencyRisk, '#38bdf8')}
+        >
+          <Link2 size={11} />
+          Dependency risk
+        </button>
+
         <div className="ml-auto flex items-center gap-1.5 text-[11px]" style={{ color: 'var(--text-secondary)' }}>
           <span className="px-2 py-0.5 rounded-full" style={{ background: 'rgba(255,255,255,0.05)' }}>
             {stats.scheduledCount} scheduled
+          </span>
+          <span className="px-2 py-0.5 rounded-full" style={{ background: 'rgba(255,255,255,0.08)', color: '#cbd5e1' }}>
+            {stats.unscheduledCount} unscheduled
           </span>
           <span className="px-2 py-0.5 rounded-full" style={{ background: 'rgba(249,115,22,0.15)', color: '#fb923c' }}>
             {stats.delayedCount} delayed
           </span>
           <span className="px-2 py-0.5 rounded-full" style={{ background: 'rgba(239,68,68,0.15)', color: '#f87171' }}>
             {stats.criticalCount} critical
+          </span>
+          <span className="px-2 py-0.5 rounded-full" style={{ background: 'rgba(56,189,248,0.16)', color: '#7dd3fc' }}>
+            {stats.dependencyRiskCount} dep risk
           </span>
         </div>
       </div>

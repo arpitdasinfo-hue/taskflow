@@ -13,6 +13,7 @@ const TimelineGrid = memo(function TimelineGrid({
   onToggleProject,
   onSelectTask,
   onUpdateTaskSchedule,
+  onQuickAddTask,
 }) {
   return (
     <div className="flex-1 overflow-auto" style={{ scrollbarWidth: 'thin' }}>
@@ -36,6 +37,7 @@ const TimelineGrid = memo(function TimelineGrid({
             onToggleProject={onToggleProject}
             onSelectTask={onSelectTask}
             onUpdateTaskSchedule={onUpdateTaskSchedule}
+            onQuickAddTask={onQuickAddTask}
           />
         ))}
       </div>

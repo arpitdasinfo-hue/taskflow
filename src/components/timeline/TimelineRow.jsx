@@ -1,5 +1,5 @@
 import { memo } from 'react'
-import { ChevronDown, ChevronRight, GitBranch } from 'lucide-react'
+import { ChevronDown, ChevronRight, GitBranch, Link2, Plus } from 'lucide-react'
 import { STATUS_COLOR } from './timelineConfig'
 import { clamp, diffDays, startOfDay, toDisplayDate } from './timelineUtils'
 import TimelineTaskBar from './TimelineTaskBar'
@@ -32,11 +32,13 @@ const TimelineRow = memo(function TimelineRow({
   onToggleProject,
   onSelectTask,
   onUpdateTaskSchedule,
+  onQuickAddTask,
 }) {
   const height = ROW_HEIGHT[row.type] ?? 36
   const todayOffset = diffDays(startDate, startOfDay(new Date()))
   const isProject = row.type === 'project'
   const isTask = row.type === 'task'
+  const isProgram = row.type === 'program'
 
   return (
     <div className="flex" style={{ minHeight: height, borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
@@ -78,6 +80,14 @@ const TimelineRow = memo(function TimelineRow({
 
         {isProject && (
           <div className="flex items-center gap-1 flex-shrink-0">
+            {row.unscheduledCount > 0 && (
+              <span
+                className="text-[10px] px-1.5 py-0.5 rounded-full"
+                style={{ background: 'rgba(255,255,255,0.08)', color: '#cbd5e1' }}
+              >
+                {row.unscheduledCount} unscheduled
+              </span>
+            )}
             {row.delayedCount > 0 && (
               <span
                 className="text-[10px] px-1.5 py-0.5 rounded-full"
@@ -94,6 +104,28 @@ const TimelineRow = memo(function TimelineRow({
                 {row.criticalCount} critical
               </span>
             )}
+            {row.dependencyRiskCount > 0 && (
+              <span
+                className="text-[10px] px-1.5 py-0.5 rounded-full flex items-center gap-1"
+                style={{ background: 'rgba(56,189,248,0.16)', color: '#7dd3fc' }}
+              >
+                <Link2 size={9} />
+                {row.dependencyRiskCount}
+              </span>
+            )}
+          </div>
+        )}
+
+        {(isProgram || isProject) && (
+          <div className="flex-shrink-0">
+            <button
+              onClick={() => onQuickAddTask?.({ projectId: isProject ? row.projectId : '', programId: row.programId ?? '' })}
+              className="p-1 rounded-md hover:bg-white/10 transition-colors"
+              style={{ color: 'var(--accent)' }}
+              title={isProject ? 'Add task to this project' : 'Add task in this program'}
+            >
+              <Plus size={12} />
+            </button>
           </div>
         )}
       </div>
@@ -181,6 +213,30 @@ const TimelineRow = memo(function TimelineRow({
             </button>
           )
         })}
+
+        {isTask && row.unscheduled && (
+          <div
+            className="absolute text-[10px] px-2 py-1 rounded-full flex items-center gap-1"
+            style={{
+              left: 8,
+              top: '50%',
+              transform: 'translateY(-50%)',
+              color: '#cbd5e1',
+              background: 'rgba(255,255,255,0.05)',
+              border: '1px dashed rgba(255,255,255,0.18)',
+              zIndex: 3,
+            }}
+          >
+            No dates yet
+            <button
+              onClick={() => onSelectTask?.(row.taskId)}
+              className="underline hover:opacity-80"
+              style={{ color: 'var(--accent)' }}
+            >
+              schedule
+            </button>
+          </div>
+        )}
 
         {(row.milestones ?? []).map((milestone) => {
           const due = toDisplayDate(milestone.dueDate)
