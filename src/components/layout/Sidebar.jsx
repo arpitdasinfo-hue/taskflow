@@ -8,6 +8,7 @@ import useProjectStore from '../../store/useProjectStore'
 import useTaskStore from '../../store/useTaskStore'
 import useAuthStore from '../../store/useAuthStore'
 import { useTaskStats } from '../../hooks/useFilteredTasks'
+import InfoTooltip from '../common/InfoTooltip'
 
 const NAV_ITEMS = [
   { id: 'dashboard',         label: 'Dashboard',  icon: LayoutDashboard },
@@ -77,6 +78,7 @@ const ProgramGroup = memo(function ProgramGroup({ program, projects, collapsed }
           style={{ color: 'var(--text-secondary)' }}>
           {program.name}
         </span>
+        <InfoTooltip text={program.description} />
         {/* Status dot */}
         <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" title={program.status || 'planning'}
           style={{ background: statusColor }} />
@@ -107,6 +109,7 @@ const ProgramGroup = memo(function ProgramGroup({ program, projects, collapsed }
               <span className="w-1.5 h-1.5 rounded-full flex-shrink-0"
                 style={{ background: project.color, boxShadow: isActive ? `0 0 5px ${project.color}` : 'none' }} />
               <span className="flex-1 text-left truncate">{project.name}</span>
+              <InfoTooltip text={project.description} />
               {count > 0 && (
                 <span className="text-[10px] font-bold px-1 py-0.5 rounded-full min-w-[18px] text-center"
                   style={isActive
@@ -133,6 +136,7 @@ const ProgramGroup = memo(function ProgramGroup({ program, projects, collapsed }
                   title={sub.name}>
                   <span className="w-1 h-1 rounded-full flex-shrink-0" style={{ background: sub.color }} />
                   <span className="flex-1 text-left truncate">{sub.name}</span>
+                  <InfoTooltip text={sub.description} />
                   {subCount > 0 && (
                     <span className="text-[10px] font-bold px-1 py-0.5 rounded-full min-w-[18px] text-center"
                       style={{ background: 'rgba(255,255,255,0.07)', color: 'var(--text-secondary)' }}>
@@ -278,6 +282,7 @@ const Sidebar = memo(function Sidebar() {
                   title={project.name}>
                   <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: project.color }} />
                   <span className="flex-1 text-left truncate">{project.name}</span>
+                  <InfoTooltip text={project.description} />
                   {count > 0 && (
                     <span className="text-[10px] font-bold px-1 py-0.5 rounded-full min-w-[18px] text-center"
                       style={isActive

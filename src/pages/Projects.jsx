@@ -1,10 +1,12 @@
-import { memo, useState } from 'react'
+import { memo, useEffect, useState } from 'react'
 import {
   Plus, Folder, FolderOpen, CheckCircle2, Clock, AlertTriangle,
   Trash2, Check, X, ChevronDown, ChevronRight, LayoutList, Kanban,
-  Calendar, GitBranch,
+  Calendar, GitBranch, MoreHorizontal, Share2,
 } from 'lucide-react'
 import GlassCard from '../components/common/GlassCard'
+import InfoTooltip from '../components/common/InfoTooltip'
+import ShareModal from '../components/ShareModal'
 import { ProgramStatusBadge, STATUS_OPTIONS } from '../components/common/ProgramStatusBadge'
 import MilestonePanel from '../components/projects/MilestonePanel'
 import useProjectStore, { PROJECT_COLORS } from '../store/useProjectStore'
@@ -135,6 +137,7 @@ const ProjectPanel = memo(function ProjectPanel({ project, depth = 0 }) {
   const updateProject    = useProjectStore((s) => s.updateProject)
   const deleteProject    = useProjectStore((s) => s.deleteProject)
   const addProject       = useProjectStore((s) => s.addProject)
+  const programs         = useProjectStore((s) => s.programs)
   const setActiveProject = useSettingsStore((s) => s.setActiveProject)
   const allProjects      = useProjectStore((s) => s.projects)
 
@@ -145,6 +148,9 @@ const ProjectPanel = memo(function ProjectPanel({ project, depth = 0 }) {
   const [subName, setSubName]         = useState('')
   const [subColor, setSubColor]       = useState(project.color)
   const [showMilestones, setShowMilestones] = useState(false)
+  const [showMenu, setShowMenu]       = useState(false)
+  const [showMovePicker, setShowMovePicker] = useState(false)
+  const [showShare, setShowShare]     = useState(false)
 
   const projectTasks = tasks.filter((t) => t.projectId === project.id)
   const total      = projectTasks.length
@@ -171,7 +177,7 @@ const ProjectPanel = memo(function ProjectPanel({ project, depth = 0 }) {
       marginLeft: depth > 0 ? '0' : '0',
     }}>
       {/* Project header */}
-      <div className="flex items-center gap-2.5 px-4 py-3" style={{ background: `${project.color}08`, borderBottom: expanded ? `1px solid ${project.color}18` : 'none' }}>
+      <div className="relative group flex items-center gap-2.5 px-4 py-3" style={{ background: `${project.color}08`, borderBottom: expanded ? `1px solid ${project.color}18` : 'none' }}>
         <button onClick={() => setExpanded((e) => !e)} className="flex-shrink-0 transition-transform" style={{ color: 'var(--text-secondary)' }}>
           {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
         </button>
@@ -183,6 +189,7 @@ const ProjectPanel = memo(function ProjectPanel({ project, depth = 0 }) {
             {depth > 0 && <GitBranch size={10} style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />}
             <Editable value={project.name} onSave={(n) => updateProject(project.id, { name: n })}
               className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }} />
+            <InfoTooltip text={project.description} />
             <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium"
               style={{ background: `${project.color}18`, color: project.color }}>
               {total} task{total !== 1 ? 's' : ''}
@@ -194,9 +201,6 @@ const ProjectPanel = memo(function ProjectPanel({ project, depth = 0 }) {
               </span>
             )}
           </div>
-          {project.description && (
-            <p className="text-[11px] truncate" style={{ color: 'var(--text-secondary)' }}>{project.description}</p>
-          )}
         </div>
 
         {/* Date editor */}
@@ -229,6 +233,43 @@ const ProjectPanel = memo(function ProjectPanel({ project, depth = 0 }) {
           </div>
         )}
 
+        <button
+          onClick={() => setShowShare(true)}
+          className="p-1 rounded-lg hover:bg-white/8 transition-colors"
+          style={{ color: 'var(--text-secondary)' }}
+          title="Share project"
+        >
+          <Share2 size={13} />
+        </button>
+
+        <div className="relative">
+          <button
+            onClick={() => setShowMenu((v) => !v)}
+            className="p-1 rounded-lg hover:bg-white/8 transition-colors opacity-80 group-hover:opacity-100"
+            style={{ color: 'var(--text-secondary)' }}
+            title="Project actions"
+          >
+            <MoreHorizontal size={13} />
+          </button>
+          {showMenu && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
+              <div
+                className="absolute top-full right-0 mt-1 z-50 rounded-xl overflow-hidden"
+                style={{ background: '#1a1025', border: '1px solid rgba(255,255,255,0.12)', boxShadow: '0 16px 48px rgba(0,0,0,0.5)', minWidth: '160px' }}
+              >
+                <button
+                  onClick={() => { setShowMovePicker((v) => !v); setShowMenu(false) }}
+                  className="w-full text-left px-3 py-2 text-xs hover:bg-white/5 transition-colors"
+                  style={{ color: 'var(--text-secondary)' }}
+                >
+                  Move to program…
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+
         {/* Delete */}
         {confirmDel ? (
           <div className="flex items-center gap-1">
@@ -246,6 +287,25 @@ const ProjectPanel = memo(function ProjectPanel({ project, depth = 0 }) {
           </button>
         )}
       </div>
+
+      {showMovePicker && (
+        <div className="px-4 pb-2">
+          <select
+            value={project.programId ?? ''}
+            onChange={(e) => {
+              updateProject(project.id, { programId: e.target.value || null })
+              setShowMovePicker(false)
+            }}
+            className="w-full text-xs px-2.5 py-1.5 rounded-lg"
+            style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-primary)' }}
+          >
+            <option value="">Unassigned</option>
+            {programs.map((program) => (
+              <option key={program.id} value={program.id}>{program.name}</option>
+            ))}
+          </select>
+        </div>
+      )}
 
       {/* Progress bar */}
       {expanded && total > 0 && (
@@ -349,6 +409,15 @@ const ProjectPanel = memo(function ProjectPanel({ project, depth = 0 }) {
           </div>
         </div>
       )}
+
+      {showShare && (
+        <ShareModal
+          resourceType="project"
+          resourceId={project.id}
+          resourceName={project.name}
+          onClose={() => setShowShare(false)}
+        />
+      )}
     </div>
   )
 })
@@ -361,11 +430,12 @@ const ProgramSection = memo(function ProgramSection({ program, projects }) {
   const tasks         = useTaskStore((s) => s.tasks)
 
   const [collapsed, setCollapsed]     = useState(false)
-  const [confirmDel, setConfirmDel]   = useState(false)
   const [addingProject, setAddingProject] = useState(false)
   const [newProjName, setNewProjName] = useState('')
   const [newProjColor, setNewProjColor] = useState(PROJECT_COLORS[0])
   const [showStatusPicker, setShowStatusPicker] = useState(false)
+  const [deleteArmed, setDeleteArmed] = useState(false)
+  const [showShare, setShowShare] = useState(false)
 
   // Only top-level projects (no parentId)
   const topLevelProjects = projects.filter((p) => !p.parentId)
@@ -380,6 +450,12 @@ const ProgramSection = memo(function ProgramSection({ program, projects }) {
     setNewProjName(''); setAddingProject(false)
   }
 
+  useEffect(() => {
+    if (!deleteArmed) return
+    const timeoutId = setTimeout(() => setDeleteArmed(false), 3000)
+    return () => clearTimeout(timeoutId)
+  }, [deleteArmed])
+
   return (
     <div className="mb-6">
       {/* Program header */}
@@ -390,9 +466,7 @@ const ProgramSection = memo(function ProgramSection({ program, projects }) {
         <div className="w-3 h-3 rounded flex-shrink-0" style={{ background: program.color, boxShadow: `0 0 8px ${program.color}60` }} />
         <Editable value={program.name} onSave={(n) => updateProgram(program.id, { name: n })}
           className="text-base font-bold" style={{ color: 'var(--text-primary)' }} />
-        {program.description && (
-          <span className="text-xs hidden sm:inline" style={{ color: 'var(--text-secondary)' }}>— {program.description}</span>
-        )}
+        <InfoTooltip text={program.description} />
 
         {/* Program status badge */}
         <div className="relative">
@@ -424,24 +498,43 @@ const ProgramSection = memo(function ProgramSection({ program, projects }) {
         </span>
 
         <div className="ml-auto flex items-center gap-1.5">
+          <button
+            onClick={() => setShowShare(true)}
+            className="p-1.5 rounded-lg hover:bg-white/8 transition-colors"
+            style={{ color: 'var(--text-secondary)' }}
+            title="Share program"
+          >
+            <Share2 size={13} />
+          </button>
           <button onClick={() => setAddingProject(true)}
             className="flex items-center gap-1 text-[11px] px-2 py-1 rounded-lg transition-colors hover:bg-white/5"
             style={{ color: 'var(--accent)' }}>
             <Plus size={11} /> Project
           </button>
-          {confirmDel ? (
+          {deleteArmed ? (
             <>
-              <button onClick={() => deleteProgram(program.id)} className="p-1 rounded-lg" style={{ background: 'rgba(239,68,68,0.15)', color: '#ef4444' }}>
-                <Check size={12} />
+              <button
+                onClick={() => setDeleteArmed(false)}
+                className="text-[10px] px-2 py-1 rounded-lg"
+                style={{ background: 'rgba(255,255,255,0.08)', color: 'var(--text-secondary)' }}
+              >
+                Cancel
               </button>
-              <button onClick={() => setConfirmDel(false)} className="p-1 rounded-lg" style={{ color: 'var(--text-secondary)' }}>
-                <X size={12} />
+              <button
+                onClick={() => deleteProgram(program.id)}
+                className="text-[10px] px-2 py-1 rounded-lg"
+                style={{ background: 'rgba(239,68,68,0.2)', color: '#ef4444' }}
+              >
+                Really delete?
               </button>
             </>
           ) : (
-            <button onClick={() => setConfirmDel(true)} className="p-1 rounded-lg hover:bg-red-500/10 transition-colors"
-              style={{ color: 'var(--text-secondary)' }}>
-              <Trash2 size={13} />
+            <button
+              onClick={() => setDeleteArmed(true)}
+              className="text-[10px] px-2 py-1 rounded-lg hover:bg-red-500/10 transition-colors"
+              style={{ color: 'var(--text-secondary)' }}
+            >
+              Delete
             </button>
           )}
         </div>
@@ -495,6 +588,15 @@ const ProgramSection = memo(function ProgramSection({ program, projects }) {
             topLevelProjects.map((p) => <ProjectPanel key={p.id} project={p} />)
           )}
         </div>
+      )}
+
+      {showShare && (
+        <ShareModal
+          resourceType="program"
+          resourceId={program.id}
+          resourceName={program.name}
+          onClose={() => setShowShare(false)}
+        />
       )}
     </div>
   )
