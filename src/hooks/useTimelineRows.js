@@ -65,6 +65,22 @@ const getTaskSubtitle = (task, unscheduled = false, dependencyRisk = false) => {
   return parts.join(' · ')
 }
 
+const ZERO_STATS = {
+  scheduledCount: 0,
+  unscheduledCount: 0,
+  delayedCount: 0,
+  criticalCount: 0,
+  dependencyRiskCount: 0,
+}
+
+const mergeStats = (left = ZERO_STATS, right = ZERO_STATS) => ({
+  scheduledCount: left.scheduledCount + right.scheduledCount,
+  unscheduledCount: left.unscheduledCount + right.unscheduledCount,
+  delayedCount: left.delayedCount + right.delayedCount,
+  criticalCount: left.criticalCount + right.criticalCount,
+  dependencyRiskCount: left.dependencyRiskCount + right.dependencyRiskCount,
+})
+
 const useTimelineRows = ({
   programs,
   projects,
@@ -153,24 +169,20 @@ const useTimelineRows = ({
     return true
   }
 
-  let scheduledCount = 0
-  let delayedCount = 0
-  let criticalCount = 0
-  let dependencyRiskCount = 0
-  let unscheduledCount = 0
-
   const buildProjectRows = (project, depth, options = {}) => {
     const ancestorSelected = options.ancestorSelected ?? false
     const programAllowed = !hasProgramFilter || filteredProgramIds.has(project.programId)
-    if (!programAllowed) return []
+    if (!programAllowed) return { rows: [], stats: ZERO_STATS }
 
     const selectedSelf = filteredProjectIds.has(project.id)
     const selectedByHierarchy = selectedSelf || ancestorSelected || hasSelectedDescendant(project.id)
-    if (hasProjectFilter && !selectedByHierarchy) return []
+    if (hasProjectFilter && !selectedByHierarchy) return { rows: [], stats: ZERO_STATS }
 
-    const childRows = (childProjectsByParent.get(project.id) ?? []).flatMap((child) =>
+    const childResults = (childProjectsByParent.get(project.id) ?? []).map((child) =>
       buildProjectRows(child, depth + 1, { ancestorSelected: ancestorSelected || selectedSelf })
     )
+    const childRows = childResults.flatMap((result) => result.rows)
+    const childStats = childResults.reduce((acc, result) => mergeStats(acc, result.stats), ZERO_STATS)
 
     const allTasks = allTasksByProject.get(project.id) ?? []
     const scheduledTasks = (scheduledTasksByProject.get(project.id) ?? [])
@@ -185,11 +197,11 @@ const useTimelineRows = ({
     const hasAnyTask = scheduledTasks.length > 0 || unscheduledTasks.length > 0
 
     if (!hasAnyTask && childRows.length === 0 && !hasOwnSchedule) {
-      return []
+      return { rows: [], stats: ZERO_STATS }
     }
 
     if (hasQuickFilter && !hasAnyTask && childRows.length === 0) {
-      return []
+      return { rows: [], stats: ZERO_STATS }
     }
 
     const doneCount = allTasks.filter((task) => task.status === 'done').length
@@ -230,11 +242,13 @@ const useTimelineRows = ({
       unscheduledCount: unscheduledTasks.length,
     }
 
-    scheduledCount += scheduledTasks.length
-    unscheduledCount += unscheduledTasks.length
-    delayedCount += delayedTasks.length
-    criticalCount += criticalTasks.length
-    dependencyRiskCount += dependencyRiskTasks.length
+    const ownStats = {
+      scheduledCount: scheduledTasks.length,
+      unscheduledCount: unscheduledTasks.length,
+      delayedCount: delayedTasks.length,
+      criticalCount: criticalTasks.length,
+      dependencyRiskCount: dependencyRiskTasks.length,
+    }
 
     const taskRows = expandedProjectIds.has(project.id)
       ? [
@@ -275,110 +289,121 @@ const useTimelineRows = ({
         ]
       : []
 
-    return [projectRow, ...taskRows, ...childRows]
+    return {
+      rows: [projectRow, ...taskRows, ...childRows],
+      stats: mergeStats(childStats, ownStats),
+    }
   }
 
-  const rows = []
-
-  programs.forEach((program) => {
-    if (hasProgramFilter && !filteredProgramIds.has(program.id)) return
-
-    const topProjects = projects.filter((project) => project.programId === program.id && !project.parentId)
-    const programRows = topProjects.flatMap((project) =>
-      buildProjectRows(project, 1, { ancestorSelected: false })
-    )
-
-    const projectRows = programRows.filter((row) => row.type === 'project')
-    if (projectRows.length === 0) return
-
-    const projectIds = new Set(projectRows.map((row) => row.projectId))
-    const programTasks = tasks.filter((task) =>
-      projectIds.has(task.projectId) && taskMatchesQuickFilters(task)
-    )
-    const programScheduledTasks = programTasks.filter(hasSchedule)
-    const programUnscheduledCount = programTasks.length - programScheduledTasks.length
-    const programRange = getRangeFromTasks(programScheduledTasks)
-
-    rows.push({
-      id: `program-${program.id}`,
-      type: 'program',
-      programId: program.id,
-      depth: 0,
-      label: program.name,
-      subtitle: `${projectRows.length} projects · ${programScheduledTasks.length} scheduled${programUnscheduledCount ? ` · ${programUnscheduledCount} unscheduled` : ''}`,
-      color: program.color,
-      bars: [
-        buildRangeBar({
-          id: `program-summary-${program.id}`,
-          title: program.name,
-          color: program.color,
-          startDate: program.startDate ?? programRange.startDate,
-          dueDate: program.endDate ?? programRange.dueDate,
-          status: getStatusFromTasks(programTasks),
-          progress: programTasks.length
-            ? programTasks.filter((task) => task.status === 'done').length / programTasks.length
-            : 0,
-        }),
-      ].filter(Boolean),
-      milestones: [],
-    })
-
-    rows.push(...programRows)
-  })
-
-  if (!hasProgramFilter) {
-    const unassignedTopLevel = projects.filter((project) => !project.programId && !project.parentId)
-    const unassignedRows = unassignedTopLevel.flatMap((project) =>
-      buildProjectRows(project, 1, { ancestorSelected: false })
-    )
-
-    const unassignedProjectRows = unassignedRows.filter((row) => row.type === 'project')
-    if (unassignedProjectRows.length > 0) {
-      const unassignedIds = new Set(unassignedProjectRows.map((row) => row.projectId))
-      const unassignedTasks = tasks.filter((task) =>
-        unassignedIds.has(task.projectId) && taskMatchesQuickFilters(task)
+  const programSections = programs
+    .filter((program) => !hasProgramFilter || filteredProgramIds.has(program.id))
+    .map((program) => {
+      const topProjects = projects.filter((project) => project.programId === program.id && !project.parentId)
+      const programResults = topProjects.map((project) =>
+        buildProjectRows(project, 1, { ancestorSelected: false })
       )
-      const unassignedScheduledTasks = unassignedTasks.filter(hasSchedule)
-      const unassignedUnscheduledCount = unassignedTasks.length - unassignedScheduledTasks.length
-      const unassignedRange = getRangeFromTasks(unassignedScheduledTasks)
+      const programRows = programResults.flatMap((result) => result.rows)
+      const sectionStats = programResults.reduce((acc, result) => mergeStats(acc, result.stats), ZERO_STATS)
 
-      rows.push({
-        id: 'program-unassigned',
+      const projectRows = programRows.filter((row) => row.type === 'project')
+      if (projectRows.length === 0) return { rows: [], stats: sectionStats }
+
+      const projectIds = new Set(projectRows.map((row) => row.projectId))
+      const programTasks = tasks.filter((task) =>
+        projectIds.has(task.projectId) && taskMatchesQuickFilters(task)
+      )
+      const programScheduledTasks = programTasks.filter(hasSchedule)
+      const programUnscheduledCount = programTasks.length - programScheduledTasks.length
+      const programRange = getRangeFromTasks(programScheduledTasks)
+
+      const headerRow = {
+        id: `program-${program.id}`,
         type: 'program',
-        programId: null,
+        programId: program.id,
         depth: 0,
-        label: 'Unassigned',
-        subtitle: `${unassignedProjectRows.length} projects · ${unassignedScheduledTasks.length} scheduled${unassignedUnscheduledCount ? ` · ${unassignedUnscheduledCount} unscheduled` : ''}`,
-        color: '#94a3b8',
+        label: program.name,
+        subtitle: `${projectRows.length} projects · ${programScheduledTasks.length} scheduled${programUnscheduledCount ? ` · ${programUnscheduledCount} unscheduled` : ''}`,
+        color: program.color,
         bars: [
           buildRangeBar({
-            id: 'program-summary-unassigned',
-            title: 'Unassigned',
-            color: '#94a3b8',
-            startDate: unassignedRange.startDate,
-            dueDate: unassignedRange.dueDate,
-            status: getStatusFromTasks(unassignedTasks),
-            progress: unassignedTasks.length
-              ? unassignedTasks.filter((task) => task.status === 'done').length / unassignedTasks.length
+            id: `program-summary-${program.id}`,
+            title: program.name,
+            color: program.color,
+            startDate: program.startDate ?? programRange.startDate,
+            dueDate: program.endDate ?? programRange.dueDate,
+            status: getStatusFromTasks(programTasks),
+            progress: programTasks.length
+              ? programTasks.filter((task) => task.status === 'done').length / programTasks.length
               : 0,
           }),
         ].filter(Boolean),
         milestones: [],
-      })
+      }
 
-      rows.push(...unassignedRows)
-    }
-  }
+      return {
+        rows: [headerRow, ...programRows],
+        stats: sectionStats,
+      }
+    })
+
+  const unassignedSection = !hasProgramFilter
+    ? (() => {
+        const unassignedTopLevel = projects.filter((project) => !project.programId && !project.parentId)
+        const unassignedResults = unassignedTopLevel.map((project) =>
+          buildProjectRows(project, 1, { ancestorSelected: false })
+        )
+        const unassignedRows = unassignedResults.flatMap((result) => result.rows)
+        const sectionStats = unassignedResults.reduce((acc, result) => mergeStats(acc, result.stats), ZERO_STATS)
+
+        const unassignedProjectRows = unassignedRows.filter((row) => row.type === 'project')
+        if (unassignedProjectRows.length === 0) return null
+
+        const unassignedIds = new Set(unassignedProjectRows.map((row) => row.projectId))
+        const unassignedTasks = tasks.filter((task) =>
+          unassignedIds.has(task.projectId) && taskMatchesQuickFilters(task)
+        )
+        const unassignedScheduledTasks = unassignedTasks.filter(hasSchedule)
+        const unassignedUnscheduledCount = unassignedTasks.length - unassignedScheduledTasks.length
+        const unassignedRange = getRangeFromTasks(unassignedScheduledTasks)
+
+        const headerRow = {
+          id: 'program-unassigned',
+          type: 'program',
+          programId: null,
+          depth: 0,
+          label: 'Unassigned',
+          subtitle: `${unassignedProjectRows.length} projects · ${unassignedScheduledTasks.length} scheduled${unassignedUnscheduledCount ? ` · ${unassignedUnscheduledCount} unscheduled` : ''}`,
+          color: '#94a3b8',
+          bars: [
+            buildRangeBar({
+              id: 'program-summary-unassigned',
+              title: 'Unassigned',
+              color: '#94a3b8',
+              startDate: unassignedRange.startDate,
+              dueDate: unassignedRange.dueDate,
+              status: getStatusFromTasks(unassignedTasks),
+              progress: unassignedTasks.length
+                ? unassignedTasks.filter((task) => task.status === 'done').length / unassignedTasks.length
+                : 0,
+            }),
+          ].filter(Boolean),
+          milestones: [],
+        }
+
+        return {
+          rows: [headerRow, ...unassignedRows],
+          stats: sectionStats,
+        }
+      })()
+    : null
+
+  const sections = unassignedSection ? [...programSections, unassignedSection] : programSections
+  const rows = sections.flatMap((section) => section.rows)
+  const stats = sections.reduce((acc, section) => mergeStats(acc, section.stats), ZERO_STATS)
 
   return {
     rows,
-    stats: {
-      scheduledCount,
-      unscheduledCount,
-      delayedCount,
-      criticalCount,
-      dependencyRiskCount,
-    },
+    stats,
   }
 }, [
   programs,

@@ -1,14 +1,8 @@
 import { memo } from 'react'
 import { ChevronDown, ChevronRight, GitBranch, Link2, Plus } from 'lucide-react'
-import { STATUS_COLOR } from './timelineConfig'
+import { ROW_HEIGHT, STATUS_COLOR } from './timelineConfig'
 import { clamp, diffDays, startOfDay, toDisplayDate } from './timelineUtils'
 import TimelineTaskBar from './TimelineTaskBar'
-
-const ROW_HEIGHT = {
-  program: 42,
-  project: 38,
-  task: 34,
-}
 
 const getItemRange = (item) => {
   const start = toDisplayDate(item.startDate) || toDisplayDate(item.dueDate)

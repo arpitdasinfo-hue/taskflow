@@ -25,6 +25,7 @@ const Timeline = memo(function Timeline() {
   const [onlyDelayed, setOnlyDelayed] = useState(false)
   const [onlyCritical, setOnlyCritical] = useState(false)
   const [onlyDependencyRisk, setOnlyDependencyRisk] = useState(false)
+  const [showDependencies, setShowDependencies] = useState(true)
 
   const {
     zoom,
@@ -114,12 +115,14 @@ const Timeline = memo(function Timeline() {
         onlyDelayed={onlyDelayed}
         onlyCritical={onlyCritical}
         onlyDependencyRisk={onlyDependencyRisk}
+        showDependencies={showDependencies}
         onChangeZoom={changeZoom}
         onShiftRange={shiftRange}
         onResetToToday={resetToToday}
         onToggleOnlyDelayed={() => setOnlyDelayed((value) => !value)}
         onToggleOnlyCritical={() => setOnlyCritical((value) => !value)}
         onToggleOnlyDependencyRisk={() => setOnlyDependencyRisk((value) => !value)}
+        onToggleShowDependencies={() => setShowDependencies((value) => !value)}
         onAddTask={() => openTimelineTaskComposer()}
       />
 
@@ -150,6 +153,8 @@ const Timeline = memo(function Timeline() {
           onSelectTask={selectTask}
           onUpdateTaskSchedule={(taskId, updates) => updateTask(taskId, updates)}
           onQuickAddTask={openTimelineTaskComposer}
+          showDependencies={showDependencies}
+          onlyDependencyRisk={onlyDependencyRisk}
         />
       )}
     </div>

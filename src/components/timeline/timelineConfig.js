@@ -19,6 +19,12 @@ export const PRIORITY_COLOR = {
   low: '#94a3b8',
 }
 
+export const ROW_HEIGHT = {
+  program: 42,
+  project: 38,
+  task: 34,
+}
+
 export const DEFAULT_ZOOM = 'month'
 
 export const DEFAULT_OFFSET_BY_ZOOM = {

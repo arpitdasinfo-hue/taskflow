@@ -1,5 +1,5 @@
 import { memo } from 'react'
-import { AlertTriangle, CalendarClock, ChevronLeft, ChevronRight, Link2, Plus, Target } from 'lucide-react'
+import { AlertTriangle, CalendarClock, ChevronLeft, ChevronRight, GitBranch, Link2, Plus, Target } from 'lucide-react'
 import { ZOOM_CONFIGS } from './timelineConfig'
 
 const quickFilterStyle = (active, accent) => (active
@@ -13,12 +13,14 @@ const TimelineToolbar = memo(function TimelineToolbar({
   onlyDelayed,
   onlyCritical,
   onlyDependencyRisk,
+  showDependencies,
   onChangeZoom,
   onShiftRange,
   onResetToToday,
   onToggleOnlyDelayed,
   onToggleOnlyCritical,
   onToggleOnlyDependencyRisk,
+  onToggleShowDependencies,
   onAddTask,
 }) {
   return (
@@ -105,6 +107,15 @@ const TimelineToolbar = memo(function TimelineToolbar({
         >
           <Link2 size={11} />
           Dependency risk
+        </button>
+
+        <button
+          onClick={onToggleShowDependencies}
+          className="text-[11px] px-2.5 py-1 rounded-full transition-colors flex items-center gap-1"
+          style={quickFilterStyle(showDependencies, '#7dd3fc')}
+        >
+          <GitBranch size={11} />
+          Dependencies
         </button>
 
         <div className="ml-auto flex items-center gap-1.5 text-[11px]" style={{ color: 'var(--text-secondary)' }}>
