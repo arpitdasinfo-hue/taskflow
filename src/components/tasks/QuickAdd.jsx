@@ -82,6 +82,35 @@ const QuickAdd = memo(function QuickAdd() {
     return () => document.removeEventListener('keydown', onKey)
   }, [open, handleClose])
 
+  useEffect(() => {
+    const onQuickAddRequest = (event) => {
+      const detail = event.detail ?? {}
+      const requestedType = detail.type ?? 'task'
+      const requestedProjectId = detail.projectId ?? ''
+      const project = projects.find((p) => p.id === requestedProjectId)
+
+      setOpen(true)
+      setType(requestedType)
+      setName('')
+      setDesc('')
+      setColor(null)
+      setPriority('medium')
+      setDueDate('')
+
+      if (requestedType === 'task') {
+        setSelectedProjectId(requestedProjectId)
+        setFilterProgramId(detail.programId ?? project?.programId ?? '')
+      }
+
+      if (requestedType === 'project') {
+        setProgramId(detail.programId ?? '')
+      }
+    }
+
+    window.addEventListener('taskflow:quick-add', onQuickAddRequest)
+    return () => window.removeEventListener('taskflow:quick-add', onQuickAddRequest)
+  }, [projects])
+
   const handleSubmit = useCallback(() => {
     if (!name.trim()) return
 

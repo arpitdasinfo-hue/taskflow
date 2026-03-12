@@ -28,6 +28,7 @@ const Editable = memo(function Editable({ value, onSave, className, style, maxLe
       <input
         autoFocus value={draft}
         onChange={(e) => setDraft(e.target.value)}
+        onClick={(e) => e.stopPropagation()}
         onBlur={commit}
         onKeyDown={(e) => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') setEditing(false) }}
         className={className + ' bg-transparent border-b'}
@@ -38,7 +39,7 @@ const Editable = memo(function Editable({ value, onSave, className, style, maxLe
   }
   return (
     <span className={className + ' cursor-text hover:opacity-75'} style={style}
-      onClick={() => { setDraft(value); setEditing(true) }} title="Click to rename">
+      onClick={(e) => { e.stopPropagation(); setDraft(value); setEditing(true) }} title="Click to rename">
       {value}
     </span>
   )
@@ -48,8 +49,8 @@ const Editable = memo(function Editable({ value, onSave, className, style, maxLe
 const ColorDot = memo(function ColorDot({ color, onChange }) {
   const [open, setOpen] = useState(false)
   return (
-    <div className="relative flex-shrink-0">
-      <button onClick={() => setOpen((o) => !o)}
+    <div className="relative flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+      <button onClick={(e) => { e.stopPropagation(); setOpen((o) => !o) }}
         className="w-3 h-3 rounded-full ring-1 ring-offset-1 ring-offset-transparent hover:scale-125 transition-transform"
         style={{ background: color, ringColor: color }} title="Change colour" />
       {open && (
@@ -58,7 +59,7 @@ const ColorDot = memo(function ColorDot({ color, onChange }) {
           <div className="absolute top-5 left-0 z-50 p-2 rounded-xl flex flex-wrap gap-1.5"
             style={{ background: '#1a1025', border: '1px solid rgba(255,255,255,0.12)', width: '120px', boxShadow: '0 16px 48px rgba(0,0,0,0.6)' }}>
             {PROJECT_COLORS.map((c) => (
-              <button key={c} onClick={() => { onChange(c); setOpen(false) }}
+              <button key={c} onClick={(e) => { e.stopPropagation(); onChange(c); setOpen(false) }}
                 className="w-5 h-5 rounded-full hover:scale-125 transition-transform"
                 style={{ background: c, outline: c === color ? `2px solid ${c}` : 'none', outlineOffset: '2px' }} />
             ))}
@@ -167,6 +168,17 @@ const ProjectPanel = memo(function ProjectPanel({ project, depth = 0 }) {
     setSubName(''); setAddingSub(false)
   }
 
+  const openTaskComposer = () => {
+    setActiveProject(project.id)
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('taskflow:quick-add', {
+          detail: { type: 'task', projectId: project.id, programId: project.programId ?? '' },
+        })
+      )
+    }
+  }
+
   // Also get sub-projects from allProjects that reference this project
   const childProjects = allProjects.filter((p) => p.parentId === project.id)
 
@@ -177,10 +189,14 @@ const ProjectPanel = memo(function ProjectPanel({ project, depth = 0 }) {
       marginLeft: depth > 0 ? '0' : '0',
     }}>
       {/* Project header */}
-      <div className="relative group flex items-center gap-2.5 px-4 py-3" style={{ background: `${project.color}08`, borderBottom: expanded ? `1px solid ${project.color}18` : 'none' }}>
-        <button onClick={() => setExpanded((e) => !e)} className="flex-shrink-0 transition-transform" style={{ color: 'var(--text-secondary)' }}>
+      <div
+        onClick={() => setExpanded((e) => !e)}
+        className="relative group flex items-center gap-2.5 px-4 py-3 cursor-pointer"
+        style={{ background: `${project.color}08`, borderBottom: expanded ? `1px solid ${project.color}18` : 'none' }}
+      >
+        <span className="flex-shrink-0 transition-transform" style={{ color: 'var(--text-secondary)' }}>
           {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-        </button>
+        </span>
 
         <ColorDot color={project.color} onChange={(c) => updateProject(project.id, { color: c })} />
 
@@ -224,7 +240,7 @@ const ProjectPanel = memo(function ProjectPanel({ project, depth = 0 }) {
         {expanded && total > 0 && (
           <div className="flex items-center gap-0.5 rounded-lg p-0.5" style={{ background: 'rgba(255,255,255,0.06)' }}>
             {[['list', LayoutList], ['board', Kanban]].map(([v, Icon]) => (
-              <button key={v} onClick={() => setView(v)}
+              <button key={v} onClick={(e) => { e.stopPropagation(); setView(v) }}
                 className="p-1 rounded-md transition-colors"
                 style={view === v ? { background: 'var(--accent)', color: '#fff' } : { color: 'var(--text-secondary)' }}>
                 <Icon size={12} />
@@ -234,7 +250,7 @@ const ProjectPanel = memo(function ProjectPanel({ project, depth = 0 }) {
         )}
 
         <button
-          onClick={() => setShowShare(true)}
+          onClick={(e) => { e.stopPropagation(); setShowShare(true) }}
           className="p-1 rounded-lg hover:bg-white/8 transition-colors"
           style={{ color: 'var(--text-secondary)' }}
           title="Share project"
@@ -244,7 +260,7 @@ const ProjectPanel = memo(function ProjectPanel({ project, depth = 0 }) {
 
         <div className="relative">
           <button
-            onClick={() => setShowMenu((v) => !v)}
+            onClick={(e) => { e.stopPropagation(); setShowMenu((v) => !v) }}
             className="p-1 rounded-lg hover:bg-white/8 transition-colors opacity-80 group-hover:opacity-100"
             style={{ color: 'var(--text-secondary)' }}
             title="Project actions"
@@ -259,7 +275,7 @@ const ProjectPanel = memo(function ProjectPanel({ project, depth = 0 }) {
                 style={{ background: '#1a1025', border: '1px solid rgba(255,255,255,0.12)', boxShadow: '0 16px 48px rgba(0,0,0,0.5)', minWidth: '160px' }}
               >
                 <button
-                  onClick={() => { setShowMovePicker((v) => !v); setShowMenu(false) }}
+                  onClick={(e) => { e.stopPropagation(); setShowMovePicker((v) => !v); setShowMenu(false) }}
                   className="w-full text-left px-3 py-2 text-xs hover:bg-white/5 transition-colors"
                   style={{ color: 'var(--text-secondary)' }}
                 >
@@ -273,15 +289,15 @@ const ProjectPanel = memo(function ProjectPanel({ project, depth = 0 }) {
         {/* Delete */}
         {confirmDel ? (
           <div className="flex items-center gap-1">
-            <button onClick={() => deleteProject(project.id)} className="p-1 rounded-lg" style={{ background: 'rgba(239,68,68,0.15)', color: '#ef4444' }}>
+            <button onClick={(e) => { e.stopPropagation(); deleteProject(project.id) }} className="p-1 rounded-lg" style={{ background: 'rgba(239,68,68,0.15)', color: '#ef4444' }}>
               <Check size={12} />
             </button>
-            <button onClick={() => setConfirmDel(false)} className="p-1 rounded-lg" style={{ color: 'var(--text-secondary)' }}>
+            <button onClick={(e) => { e.stopPropagation(); setConfirmDel(false) }} className="p-1 rounded-lg" style={{ color: 'var(--text-secondary)' }}>
               <X size={12} />
             </button>
           </div>
         ) : (
-          <button onClick={() => setConfirmDel(true)} className="p-1 rounded-lg hover:bg-red-500/10 transition-colors flex-shrink-0"
+          <button onClick={(e) => { e.stopPropagation(); setConfirmDel(true) }} className="p-1 rounded-lg hover:bg-red-500/10 transition-colors flex-shrink-0"
             style={{ color: 'var(--text-secondary)' }}>
             <Trash2 size={13} />
           </button>
@@ -323,7 +339,7 @@ const ProjectPanel = memo(function ProjectPanel({ project, depth = 0 }) {
           {total === 0 ? (
             <p className="text-xs text-center py-3" style={{ color: 'var(--text-secondary)' }}>
               No tasks yet —{' '}
-              <button onClick={() => setActiveProject(project.id)} className="underline" style={{ color: 'var(--accent)' }}>
+              <button onClick={openTaskComposer} className="underline" style={{ color: 'var(--accent)' }}>
                 add one
               </button>
             </p>
