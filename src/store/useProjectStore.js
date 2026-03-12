@@ -199,6 +199,29 @@ const useProjectStore = create(
         }
       },
 
+      moveProgram: (id, beforeProgramId = null) => {
+        set((s) => {
+          const fromIndex = s.programs.findIndex((p) => p.id === id)
+          if (fromIndex === -1) return
+
+          const [program] = s.programs.splice(fromIndex, 1)
+          let insertIndex = s.programs.length
+
+          if (beforeProgramId) {
+            const targetIndex = s.programs.findIndex((p) => p.id === beforeProgramId)
+            if (targetIndex !== -1) insertIndex = targetIndex
+          }
+
+          s.programs.splice(insertIndex, 0, program)
+        })
+
+        const updated = get().programs.find((p) => p.id === id)
+        const { workspaceId, userId } = getSyncContext()
+        if (workspaceId && updated) {
+          void supabase.from('programs').upsert(toProgramRow(updated, workspaceId, userId))
+        }
+      },
+
       deleteProgram: (id) => {
         set((s) => {
           s.programs = s.programs.filter((p) => p.id !== id)
@@ -242,6 +265,43 @@ const useProjectStore = create(
         set((s) => {
           const project = s.projects.find((p) => p.id === id)
           if (project) Object.assign(project, updates)
+        })
+
+        const updated = get().projects.find((p) => p.id === id)
+        const { workspaceId, userId } = getSyncContext()
+        if (workspaceId && updated) {
+          void supabase.from('projects').upsert(toProjectRow(updated, workspaceId, userId))
+        }
+      },
+
+      moveProject: (id, options = {}) => {
+        const nextProgramId = options.programId ?? null
+        const nextParentId = options.parentId ?? null
+        const beforeProjectId = options.beforeProjectId ?? null
+
+        set((s) => {
+          const fromIndex = s.projects.findIndex((p) => p.id === id)
+          if (fromIndex === -1) return
+
+          const [project] = s.projects.splice(fromIndex, 1)
+          project.programId = nextProgramId
+          project.parentId = nextParentId
+
+          let insertIndex = s.projects.length
+          if (beforeProjectId) {
+            const targetIndex = s.projects.findIndex((p) => p.id === beforeProjectId)
+            if (targetIndex !== -1) insertIndex = targetIndex
+          } else {
+            for (let i = s.projects.length - 1; i >= 0; i -= 1) {
+              const current = s.projects[i]
+              if ((current.programId ?? null) === nextProgramId && (current.parentId ?? null) === nextParentId) {
+                insertIndex = i + 1
+                break
+              }
+            }
+          }
+
+          s.projects.splice(insertIndex, 0, project)
         })
 
         const updated = get().projects.find((p) => p.id === id)

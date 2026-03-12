@@ -182,6 +182,41 @@ const useTaskStore = create(
         }
       },
 
+      moveTask: (id, options = {}) => {
+        const nextProjectId = options.projectId ?? null
+        const beforeTaskId = options.beforeTaskId ?? null
+
+        set((state) => {
+          const fromIndex = state.tasks.findIndex((t) => t.id === id)
+          if (fromIndex === -1) return
+
+          const [task] = state.tasks.splice(fromIndex, 1)
+          task.projectId = nextProjectId
+          task.updatedAt = now()
+
+          let insertIndex = state.tasks.length
+          if (beforeTaskId) {
+            const targetIndex = state.tasks.findIndex((t) => t.id === beforeTaskId)
+            if (targetIndex !== -1) insertIndex = targetIndex
+          } else {
+            for (let i = state.tasks.length - 1; i >= 0; i -= 1) {
+              if ((state.tasks[i].projectId ?? null) === nextProjectId) {
+                insertIndex = i + 1
+                break
+              }
+            }
+          }
+
+          state.tasks.splice(insertIndex, 0, task)
+        })
+
+        const updated = get().tasks.find((t) => t.id === id)
+        const { workspaceId, userId } = getSyncContext()
+        if (workspaceId && updated) {
+          void supabase.from('tasks').upsert(toTaskRow(updated, workspaceId, userId))
+        }
+      },
+
       deleteTask: (id) => {
         set((state) => {
           state.tasks = state.tasks.filter((t) => t.id !== id)

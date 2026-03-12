@@ -2,12 +2,12 @@ import { memo, useEffect, useState } from 'react'
 import {
   Plus, Folder, FolderOpen, CheckCircle2, Clock, AlertTriangle,
   Trash2, Check, X, ChevronDown, ChevronRight, LayoutList, Kanban,
-  Calendar, GitBranch, MoreHorizontal, Share2,
+  Calendar, GitBranch, MoreHorizontal, Share2, GripVertical,
 } from 'lucide-react'
 import GlassCard from '../components/common/GlassCard'
 import InfoTooltip from '../components/common/InfoTooltip'
 import ShareModal from '../components/ShareModal'
-import { ProgramStatusBadge, STATUS_OPTIONS } from '../components/common/ProgramStatusBadge'
+import { ProgramStatusBadge, STATUS_CONFIG, STATUS_OPTIONS } from '../components/common/ProgramStatusBadge'
 import MilestonePanel from '../components/projects/MilestonePanel'
 import useProjectStore, { PROJECT_COLORS } from '../store/useProjectStore'
 import useTaskStore from '../store/useTaskStore'
@@ -17,6 +17,26 @@ import useSettingsStore from '../store/useSettingsStore'
 const PRIORITY_COLOR = { critical: '#ef4444', high: '#f97316', medium: '#f59e0b', low: '#94a3b8' }
 const STATUS_LABEL   = { todo: 'To Do', 'in-progress': 'Active', review: 'Review', done: 'Done', blocked: 'Blocked' }
 const STATUS_COLOR   = { todo: '#94a3b8', 'in-progress': '#22d3ee', review: '#f59e0b', done: '#10b981', blocked: '#ef4444' }
+const DND_MIME = 'application/x-taskflow-dnd'
+let activeDragPayload = null
+
+const writeDragPayload = (event, payload) => {
+  activeDragPayload = payload
+  const raw = JSON.stringify(payload)
+  event.dataTransfer.setData(DND_MIME, raw)
+  event.dataTransfer.setData('text/plain', raw)
+  event.dataTransfer.effectAllowed = 'move'
+}
+
+const readDragPayload = (event) => {
+  const raw = event.dataTransfer.getData(DND_MIME) || event.dataTransfer.getData('text/plain')
+  if (!raw) return activeDragPayload
+  try {
+    return JSON.parse(raw)
+  } catch {
+    return activeDragPayload
+  }
+}
 
 // ── Inline editable text ──────────────────────────────────────────────────────
 const Editable = memo(function Editable({ value, onSave, className, style, maxLength = 60 }) {
@@ -71,7 +91,7 @@ const ColorDot = memo(function ColorDot({ color, onChange }) {
 })
 
 // ── Task row (list view) ──────────────────────────────────────────────────────
-const TaskRow = memo(function TaskRow({ task }) {
+const TaskRow = memo(function TaskRow({ task, onDragStart, onDragOver, onDrop }) {
   const selectTask = useSettingsStore((s) => s.selectTask)
   const now = new Date()
   const isOverdue = task.dueDate && new Date(task.dueDate) < now && task.status !== 'done'
@@ -79,6 +99,10 @@ const TaskRow = memo(function TaskRow({ task }) {
   return (
     <button
       onClick={() => selectTask(task.id)}
+      draggable
+      onDragStart={(event) => onDragStart?.(event, task)}
+      onDragOver={(event) => onDragOver?.(event, task)}
+      onDrop={(event) => onDrop?.(event, task)}
       className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-colors hover:bg-white/5 group"
       style={{ border: '1px solid rgba(255,255,255,0.04)' }}
     >
@@ -135,7 +159,9 @@ const KANBAN_COLS = [
 
 const ProjectPanel = memo(function ProjectPanel({ project, depth = 0 }) {
   const tasks            = useTaskStore((s) => s.tasks)
+  const moveTask         = useTaskStore((s) => s.moveTask)
   const updateProject    = useProjectStore((s) => s.updateProject)
+  const moveProject      = useProjectStore((s) => s.moveProject)
   const deleteProject    = useProjectStore((s) => s.deleteProject)
   const addProject       = useProjectStore((s) => s.addProject)
   const programs         = useProjectStore((s) => s.programs)
@@ -182,12 +208,91 @@ const ProjectPanel = memo(function ProjectPanel({ project, depth = 0 }) {
   // Also get sub-projects from allProjects that reference this project
   const childProjects = allProjects.filter((p) => p.parentId === project.id)
 
+  const handleProjectDragStart = (event) => {
+    if (depth > 0) return
+    event.stopPropagation()
+    writeDragPayload(event, {
+      type: 'project',
+      id: project.id,
+      programId: project.programId ?? null,
+      parentId: project.parentId ?? null,
+    })
+  }
+
+  const handleProjectDrop = (event) => {
+    const payload = readDragPayload(event)
+    if (!payload) return
+
+    if (payload.type === 'project' && depth === 0) {
+      event.preventDefault()
+      event.stopPropagation()
+      if (payload.id !== project.id) {
+        moveProject(payload.id, {
+          programId: project.programId ?? null,
+          parentId: project.parentId ?? null,
+          beforeProjectId: project.id,
+        })
+      }
+      return
+    }
+
+    if (payload.type === 'task' && payload.id) {
+      event.preventDefault()
+      event.stopPropagation()
+      moveTask(payload.id, { projectId: project.id })
+    }
+  }
+
+  const handleProjectDragOver = (event) => {
+    const payload = readDragPayload(event)
+    if (!payload) return
+    if (payload.type === 'project' && depth === 0) {
+      event.preventDefault()
+      event.dataTransfer.dropEffect = 'move'
+    }
+    if (payload.type === 'task') {
+      event.preventDefault()
+      event.dataTransfer.dropEffect = 'move'
+    }
+  }
+
+  const handleTaskDragStart = (event, task) => {
+    event.stopPropagation()
+    writeDragPayload(event, {
+      type: 'task',
+      id: task.id,
+      projectId: task.projectId ?? null,
+    })
+  }
+
+  const handleTaskDragOver = (event, task) => {
+    const payload = readDragPayload(event)
+    if (!payload || payload.type !== 'task' || payload.id === task.id) return
+    event.preventDefault()
+    event.stopPropagation()
+    event.dataTransfer.dropEffect = 'move'
+  }
+
+  const handleTaskDrop = (event, task) => {
+    const payload = readDragPayload(event)
+    if (!payload || payload.type !== 'task' || payload.id === task.id) return
+    event.preventDefault()
+    event.stopPropagation()
+    moveTask(payload.id, { projectId: project.id, beforeTaskId: task.id })
+  }
+
   return (
-    <div className="rounded-2xl overflow-hidden" data-project-id={project.id} style={{
-      border: `1px solid ${project.color}${depth > 0 ? '20' : '25'}`,
-      background: depth > 0 ? 'rgba(255,255,255,0.015)' : 'rgba(255,255,255,0.02)',
-      marginLeft: depth > 0 ? '0' : '0',
-    }}>
+    <div
+      className="rounded-2xl overflow-hidden"
+      data-project-id={project.id}
+      onDragOver={handleProjectDragOver}
+      onDrop={handleProjectDrop}
+      style={{
+        border: `1px solid ${project.color}${depth > 0 ? '20' : '25'}`,
+        background: depth > 0 ? 'rgba(255,255,255,0.015)' : 'rgba(255,255,255,0.02)',
+        marginLeft: depth > 0 ? '0' : '0',
+      }}
+    >
       {/* Project header */}
       <div
         onClick={() => setExpanded((e) => !e)}
@@ -197,6 +302,19 @@ const ProjectPanel = memo(function ProjectPanel({ project, depth = 0 }) {
         <span className="flex-shrink-0 transition-transform" style={{ color: 'var(--text-secondary)' }}>
           {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
         </span>
+
+        {depth === 0 && (
+          <button
+            draggable
+            onDragStart={handleProjectDragStart}
+            onClick={(e) => e.stopPropagation()}
+            className="p-0.5 rounded hover:bg-white/8 cursor-grab active:cursor-grabbing"
+            style={{ color: 'var(--text-secondary)' }}
+            title="Drag to reorder or move project"
+          >
+            <GripVertical size={12} />
+          </button>
+        )}
 
         <ColorDot color={project.color} onChange={(c) => updateProject(project.id, { color: c })} />
 
@@ -309,7 +427,7 @@ const ProjectPanel = memo(function ProjectPanel({ project, depth = 0 }) {
           <select
             value={project.programId ?? ''}
             onChange={(e) => {
-              updateProject(project.id, { programId: e.target.value || null })
+              moveProject(project.id, { programId: e.target.value || null, parentId: project.parentId ?? null })
               setShowMovePicker(false)
             }}
             className="w-full text-xs px-2.5 py-1.5 rounded-lg"
@@ -345,7 +463,15 @@ const ProjectPanel = memo(function ProjectPanel({ project, depth = 0 }) {
             </p>
           ) : view === 'list' ? (
             <div className="space-y-1">
-              {projectTasks.map((t) => <TaskRow key={t.id} task={t} />)}
+              {projectTasks.map((t) => (
+                <TaskRow
+                  key={t.id}
+                  task={t}
+                  onDragStart={handleTaskDragStart}
+                  onDragOver={handleTaskDragOver}
+                  onDrop={handleTaskDrop}
+                />
+              ))}
             </div>
           ) : (
             <div className="flex gap-2 overflow-x-auto pb-2 snap-x">
@@ -441,8 +567,10 @@ const ProjectPanel = memo(function ProjectPanel({ project, depth = 0 }) {
 // ── Program section ───────────────────────────────────────────────────────────
 const ProgramSection = memo(function ProgramSection({ program, projects }) {
   const updateProgram = useProjectStore((s) => s.updateProgram)
+  const moveProgram   = useProjectStore((s) => s.moveProgram)
   const deleteProgram = useProjectStore((s) => s.deleteProgram)
   const addProject    = useProjectStore((s) => s.addProject)
+  const moveProject   = useProjectStore((s) => s.moveProject)
   const tasks         = useTaskStore((s) => s.tasks)
   const activeProgramId = useSettingsStore((s) => s.activeProgramId)
   const activeProjectId = useSettingsStore((s) => s.activeProjectId)
@@ -481,12 +609,58 @@ const ProgramSection = memo(function ProgramSection({ program, projects }) {
     }
   }, [activeProgramId, containsActiveProject, program.id])
 
+  const handleProgramDragStart = (event) => {
+    event.stopPropagation()
+    writeDragPayload(event, { type: 'program', id: program.id })
+  }
+
+  const handleProgramDragOver = (event) => {
+    const payload = readDragPayload(event)
+    if (!payload) return
+    if (payload.type === 'program' && payload.id !== program.id) {
+      event.preventDefault()
+      event.dataTransfer.dropEffect = 'move'
+    }
+    if (payload.type === 'project') {
+      event.preventDefault()
+      event.dataTransfer.dropEffect = 'move'
+    }
+  }
+
+  const handleProgramDrop = (event) => {
+    const payload = readDragPayload(event)
+    if (!payload) return
+
+    if (payload.type === 'program' && payload.id !== program.id) {
+      event.preventDefault()
+      event.stopPropagation()
+      moveProgram(payload.id, program.id)
+      return
+    }
+
+    if (payload.type === 'project') {
+      event.preventDefault()
+      event.stopPropagation()
+      moveProject(payload.id, { programId: program.id, parentId: null })
+    }
+  }
+
   return (
-    <div className="mb-6" data-program-id={program.id}>
+    <div className="mb-6" data-program-id={program.id} onDragOver={handleProgramDragOver} onDrop={handleProgramDrop}>
       {/* Program header */}
       <div className="flex items-center gap-2.5 mb-3 px-1">
         <button onClick={() => setCollapsed((c) => !c)} style={{ color: 'var(--text-secondary)' }}>
           {collapsed ? <ChevronRight size={15} /> : <ChevronDown size={15} />}
+        </button>
+        <button
+          draggable
+          onDragStart={handleProgramDragStart}
+          onClick={(event) => event.stopPropagation()}
+          className="p-0.5 rounded hover:bg-white/8 cursor-grab active:cursor-grabbing"
+          style={{ color: 'var(--text-secondary)' }}
+          title="Drag to reorder program"
+        >
+          <GripVertical size={13} />
         </button>
         <div className="w-3 h-3 rounded flex-shrink-0" style={{ background: program.color, boxShadow: `0 0 8px ${program.color}60` }} />
         <Editable value={program.name} onSave={(n) => updateProgram(program.id, { name: n })}
@@ -503,15 +677,18 @@ const ProgramSection = memo(function ProgramSection({ program, projects }) {
               <div className="fixed inset-0 z-40" onClick={() => setShowStatusPicker(false)} />
               <div className="absolute top-full left-0 mt-1 z-50 rounded-xl overflow-hidden"
                 style={{ background: '#1a1025', border: '1px solid rgba(255,255,255,0.12)', boxShadow: '0 16px 48px rgba(0,0,0,0.5)', minWidth: '140px' }}>
-                {STATUS_OPTIONS.map(({ value, label, color }) => (
-                  <button key={value}
+                {STATUS_OPTIONS.map((value) => {
+                  const cfg = STATUS_CONFIG[value]
+                  return (
+                    <button key={value}
                     onClick={() => { updateProgram(program.id, { status: value }); setShowStatusPicker(false) }}
                     className="w-full flex items-center gap-2 px-3 py-2 text-xs text-left hover:bg-white/5 transition-colors"
-                    style={(program.status || 'planning') === value ? { color, background: `${color}12` } : { color: 'var(--text-secondary)' }}>
-                    <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: color }} />
-                    {label}
+                    style={(program.status || 'planning') === value ? { color: cfg.color, background: `${cfg.color}12` } : { color: 'var(--text-secondary)' }}>
+                    <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: cfg.color }} />
+                    {cfg.label}
                   </button>
-                ))}
+                  )
+                })}
               </div>
             </>
           )}
@@ -629,12 +806,29 @@ const ProgramSection = memo(function ProgramSection({ program, projects }) {
 
 // ── Unassigned projects section ───────────────────────────────────────────────
 const UnassignedSection = memo(function UnassignedSection({ projects }) {
+  const moveProject = useProjectStore((s) => s.moveProject)
   const [collapsed, setCollapsed] = useState(false)
   // Only top-level
   const topLevel = projects.filter((p) => !p.parentId)
   if (topLevel.length === 0) return null
+
+  const handleUnassignedDragOver = (event) => {
+    const payload = readDragPayload(event)
+    if (!payload || payload.type !== 'project') return
+    event.preventDefault()
+    event.dataTransfer.dropEffect = 'move'
+  }
+
+  const handleUnassignedDrop = (event) => {
+    const payload = readDragPayload(event)
+    if (!payload || payload.type !== 'project') return
+    event.preventDefault()
+    event.stopPropagation()
+    moveProject(payload.id, { programId: null, parentId: null })
+  }
+
   return (
-    <div className="mb-6">
+    <div className="mb-6" onDragOver={handleUnassignedDragOver} onDrop={handleUnassignedDrop}>
       <div className="flex items-center gap-2.5 mb-3 px-1">
         <button onClick={() => setCollapsed((c) => !c)} style={{ color: 'var(--text-secondary)' }}>
           {collapsed ? <ChevronRight size={15} /> : <ChevronDown size={15} />}
