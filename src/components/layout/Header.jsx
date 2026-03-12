@@ -9,7 +9,7 @@ const PAGE_TITLES = {
   projects:            'Projects',
   settings:            'Settings',
   'program-dashboard': 'Analytics',
-  timeline:            'Timeline',
+  timeline:            'Gantt Chart',
 }
 
 const Header = memo(function Header({ showViewToggle = false, showFilter = false, onFilter }) {

@@ -1,26 +1,17 @@
 import { memo } from 'react'
-import { AlertTriangle, CalendarClock, ChevronLeft, ChevronRight, GitBranch, Link2, Plus, Target } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Filter, Plus, Target } from 'lucide-react'
 import { ZOOM_CONFIGS } from './timelineConfig'
-
-const quickFilterStyle = (active, accent) => (active
-  ? { background: `${accent}24`, color: accent, border: `1px solid ${accent}55` }
-  : { background: 'rgba(255,255,255,0.04)', color: 'var(--text-secondary)', border: '1px solid rgba(255,255,255,0.1)' })
 
 const TimelineToolbar = memo(function TimelineToolbar({
   zoom,
   rangeLabel,
   stats,
-  onlyDelayed,
-  onlyCritical,
-  onlyDependencyRisk,
-  showDependencies,
+  activeFilterCount,
+  filterPanelOpen,
   onChangeZoom,
   onShiftRange,
   onResetToToday,
-  onToggleOnlyDelayed,
-  onToggleOnlyCritical,
-  onToggleOnlyDependencyRisk,
-  onToggleShowDependencies,
+  onToggleFilterPanel,
   onAddTask,
 }) {
   return (
@@ -83,39 +74,22 @@ const TimelineToolbar = memo(function TimelineToolbar({
         </button>
 
         <button
-          onClick={onToggleOnlyDelayed}
+          onClick={onToggleFilterPanel}
           className="text-[11px] px-2.5 py-1 rounded-full transition-colors flex items-center gap-1"
-          style={quickFilterStyle(onlyDelayed, '#f97316')}
+          style={filterPanelOpen
+            ? { background: 'rgba(var(--accent-rgb),0.15)', color: 'var(--accent)', border: '1px solid rgba(var(--accent-rgb),0.45)' }
+            : { background: 'rgba(255,255,255,0.04)', color: 'var(--text-secondary)', border: '1px solid rgba(255,255,255,0.1)' }}
         >
-          <CalendarClock size={11} />
-          Only delayed
-        </button>
-
-        <button
-          onClick={onToggleOnlyCritical}
-          className="text-[11px] px-2.5 py-1 rounded-full transition-colors flex items-center gap-1"
-          style={quickFilterStyle(onlyCritical, '#ef4444')}
-        >
-          <AlertTriangle size={11} />
-          Only critical
-        </button>
-
-        <button
-          onClick={onToggleOnlyDependencyRisk}
-          className="text-[11px] px-2.5 py-1 rounded-full transition-colors flex items-center gap-1"
-          style={quickFilterStyle(onlyDependencyRisk, '#38bdf8')}
-        >
-          <Link2 size={11} />
-          Dependency risk
-        </button>
-
-        <button
-          onClick={onToggleShowDependencies}
-          className="text-[11px] px-2.5 py-1 rounded-full transition-colors flex items-center gap-1"
-          style={quickFilterStyle(showDependencies, '#7dd3fc')}
-        >
-          <GitBranch size={11} />
-          Dependencies
+          <Filter size={11} />
+          Filters
+          {activeFilterCount > 0 && (
+            <span
+              className="text-[10px] px-1 rounded-full"
+              style={{ background: 'rgba(var(--accent-rgb),0.18)', color: 'var(--accent)' }}
+            >
+              {activeFilterCount}
+            </span>
+          )}
         </button>
 
         <div className="ml-auto flex items-center gap-1.5 text-[11px]" style={{ color: 'var(--text-secondary)' }}>
@@ -127,12 +101,6 @@ const TimelineToolbar = memo(function TimelineToolbar({
           </span>
           <span className="px-2 py-0.5 rounded-full" style={{ background: 'rgba(249,115,22,0.15)', color: '#fb923c' }}>
             {stats.delayedCount} delayed
-          </span>
-          <span className="px-2 py-0.5 rounded-full" style={{ background: 'rgba(239,68,68,0.15)', color: '#f87171' }}>
-            {stats.criticalCount} critical
-          </span>
-          <span className="px-2 py-0.5 rounded-full" style={{ background: 'rgba(56,189,248,0.16)', color: '#7dd3fc' }}>
-            {stats.dependencyRiskCount} dep risk
           </span>
         </div>
       </div>

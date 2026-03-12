@@ -2,6 +2,7 @@ import { memo } from 'react'
 import { ChevronDown, ChevronRight, GitBranch, Link2, Plus } from 'lucide-react'
 import { ROW_HEIGHT, STATUS_COLOR } from './timelineConfig'
 import { clamp, diffDays, startOfDay, toDisplayDate } from './timelineUtils'
+import TimelineProjectBar from './TimelineProjectBar'
 import TimelineTaskBar from './TimelineTaskBar'
 
 const getItemRange = (item) => {
@@ -26,6 +27,7 @@ const TimelineRow = memo(function TimelineRow({
   onToggleProject,
   onSelectTask,
   onUpdateTaskSchedule,
+  onUpdateProjectSchedule,
   onQuickAddTask,
 }) {
   const height = ROW_HEIGHT[row.type] ?? 36
@@ -156,6 +158,21 @@ const TimelineRow = memo(function TimelineRow({
                 cellWidth={cellWidth}
                 onSelectTask={onSelectTask}
                 onUpdateTaskSchedule={onUpdateTaskSchedule}
+              />
+            )
+          }
+
+          if (isProject && row.projectId) {
+            return (
+              <TimelineProjectBar
+                key={`${row.id}-${item.id}`}
+                projectId={row.projectId}
+                item={item}
+                rowColor={row.color}
+                startDate={startDate}
+                days={days}
+                cellWidth={cellWidth}
+                onUpdateProjectSchedule={onUpdateProjectSchedule}
               />
             )
           }

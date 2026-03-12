@@ -22,6 +22,21 @@ const STATUS_COLOR   = { todo: '#94a3b8', 'in-progress': '#22d3ee', review: '#f5
 const DND_MIME = 'application/x-taskflow-dnd'
 let activeDragPayload = null
 
+const toDueTimestamp = (value) => {
+  if (!value) return null
+  const ts = new Date(value).getTime()
+  return Number.isNaN(ts) ? null : ts
+}
+
+const sortTasksByDueDate = (items = []) => [...items].sort((a, b) => {
+  const dueA = toDueTimestamp(a.dueDate)
+  const dueB = toDueTimestamp(b.dueDate)
+  if (dueA === dueB) return 0
+  if (dueA === null) return 1
+  if (dueB === null) return -1
+  return dueA - dueB
+})
+
 const writeDragPayload = (event, payload) => {
   activeDragPayload = payload
   const raw = JSON.stringify(payload)
@@ -38,6 +53,16 @@ const readDragPayload = (event) => {
   } catch {
     return activeDragPayload
   }
+}
+
+const createsProjectCycle = (projects, movingProjectId, nextParentId) => {
+  let cursorId = nextParentId
+  while (cursorId) {
+    if (cursorId === movingProjectId) return true
+    const cursor = projects.find((project) => project.id === cursorId)
+    cursorId = cursor?.parentId ?? null
+  }
+  return false
 }
 
 // ── Inline editable text ──────────────────────────────────────────────────────
@@ -256,7 +281,7 @@ const ProjectPanel = memo(function ProjectPanel({ project, depth = 0 }) {
   const [showMovePicker, setShowMovePicker] = useState(false)
   const [showShare, setShowShare]     = useState(false)
 
-  const projectTasks = tasks.filter((t) => t.projectId === project.id)
+  const projectTasks = sortTasksByDueDate(tasks.filter((t) => t.projectId === project.id))
   const total      = projectTasks.length
   const done       = projectTasks.filter((t) => t.status === 'done').length
   const inProgress = projectTasks.filter((t) => t.status === 'in-progress').length
@@ -286,7 +311,6 @@ const ProjectPanel = memo(function ProjectPanel({ project, depth = 0 }) {
   const childProjects = allProjects.filter((p) => p.parentId === project.id)
 
   const handleProjectDragStart = (event) => {
-    if (depth > 0) return
     event.stopPropagation()
     writeDragPayload(event, {
       type: 'project',
@@ -300,13 +324,15 @@ const ProjectPanel = memo(function ProjectPanel({ project, depth = 0 }) {
     const payload = readDragPayload(event)
     if (!payload) return
 
-    if (payload.type === 'project' && depth === 0) {
+    if (payload.type === 'project') {
       event.preventDefault()
       event.stopPropagation()
       if (payload.id !== project.id) {
+        const nextParentId = project.parentId ?? null
+        if (createsProjectCycle(allProjects, payload.id, nextParentId)) return
         moveProject(payload.id, {
           programId: project.programId ?? null,
-          parentId: project.parentId ?? null,
+          parentId: nextParentId,
           beforeProjectId: project.id,
         })
       }
@@ -323,7 +349,7 @@ const ProjectPanel = memo(function ProjectPanel({ project, depth = 0 }) {
   const handleProjectDragOver = (event) => {
     const payload = readDragPayload(event)
     if (!payload) return
-    if (payload.type === 'project' && depth === 0) {
+    if (payload.type === 'project') {
       event.preventDefault()
       event.dataTransfer.dropEffect = 'move'
     }
@@ -380,18 +406,16 @@ const ProjectPanel = memo(function ProjectPanel({ project, depth = 0 }) {
           {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
         </span>
 
-        {depth === 0 && (
-          <button
-            draggable
-            onDragStart={handleProjectDragStart}
-            onClick={(e) => e.stopPropagation()}
-            className="p-0.5 rounded hover:bg-white/8 cursor-grab active:cursor-grabbing"
-            style={{ color: 'var(--text-secondary)' }}
-            title="Drag to reorder or move project"
-          >
-            <GripVertical size={12} />
-          </button>
-        )}
+        <button
+          draggable
+          onDragStart={handleProjectDragStart}
+          onClick={(e) => e.stopPropagation()}
+          className="p-0.5 rounded hover:bg-white/8 cursor-grab active:cursor-grabbing"
+          style={{ color: 'var(--text-secondary)' }}
+          title="Drag to reorder or move project"
+        >
+          <GripVertical size={12} />
+        </button>
 
         <ColorDot color={project.color} onChange={(c) => updateProject(project.id, { color: c })} />
 

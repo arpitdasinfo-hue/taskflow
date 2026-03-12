@@ -13,7 +13,7 @@ const STATUS_LABEL = {
 const hasSchedule = (item) => !!(item?.startDate || item?.dueDate)
 
 const getTaskSortValue = (task) => {
-  const date = toDisplayDate(task.startDate) || toDisplayDate(task.dueDate)
+  const date = toDisplayDate(task.dueDate) || toDisplayDate(task.startDate)
   return date ? date.getTime() : Number.MAX_SAFE_INTEGER
 }
 

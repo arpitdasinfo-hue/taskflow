@@ -25,6 +25,7 @@ const QuickAdd = memo(function QuickAdd() {
   const [programId, setProgramId] = useState('')
   const [filterProgramId, setFilterProgramId] = useState('')
   const [selectedProjectId, setSelectedProjectId] = useState('')
+  const [selectedSubProjectId, setSelectedSubProjectId] = useState('')
 
   const addTask = useTaskStore((s) => s.addTask)
   const addProgram = useProjectStore((s) => s.addProgram)
@@ -34,17 +35,57 @@ const QuickAdd = memo(function QuickAdd() {
   const activeProjectId = useSettingsStore((s) => s.activeProjectId)
   const inputRef = useRef()
 
-  const filteredProjects = useMemo(
-    () => (filterProgramId ? projects.filter((p) => p.programId === filterProgramId) : projects),
-    [filterProgramId, projects]
+  const deriveTaskSelection = useCallback((projectId) => {
+    if (!projectId) return { nextProgramId: '', nextProjectId: '', nextSubProjectId: '' }
+    const target = projects.find((project) => project.id === projectId)
+    if (!target) return { nextProgramId: '', nextProjectId: '', nextSubProjectId: '' }
+    if (target.parentId) {
+      const parent = projects.find((project) => project.id === target.parentId)
+      return {
+        nextProgramId: target.programId ?? parent?.programId ?? '',
+        nextProjectId: parent?.id ?? '',
+        nextSubProjectId: target.id,
+      }
+    }
+    return {
+      nextProgramId: target.programId ?? '',
+      nextProjectId: target.id,
+      nextSubProjectId: '',
+    }
+  }, [projects])
+
+  const topLevelProjects = useMemo(
+    () => projects.filter((project) => !project.parentId && (!filterProgramId || project.programId === filterProgramId)),
+    [projects, filterProgramId]
+  )
+
+  const subProjects = useMemo(
+    () => (selectedProjectId ? projects.filter((project) => project.parentId === selectedProjectId) : []),
+    [projects, selectedProjectId]
+  )
+
+  const selectedProgram = useMemo(
+    () => programs.find((program) => program.id === filterProgramId) ?? null,
+    [programs, filterProgramId]
+  )
+
+  const selectedProject = useMemo(
+    () => projects.find((project) => project.id === selectedProjectId) ?? null,
+    [projects, selectedProjectId]
+  )
+
+  const selectedSubProject = useMemo(
+    () => projects.find((project) => project.id === selectedSubProjectId) ?? null,
+    [projects, selectedSubProjectId]
   )
 
   useEffect(() => {
     if (!open) return
-    const active = projects.find((p) => p.id === activeProjectId)
-    setSelectedProjectId(activeProjectId ?? '')
-    setFilterProgramId(active?.programId ?? '')
-  }, [open, activeProjectId, projects])
+    const { nextProgramId, nextProjectId, nextSubProjectId } = deriveTaskSelection(activeProjectId)
+    setSelectedProjectId(nextProjectId)
+    setSelectedSubProjectId(nextSubProjectId)
+    setFilterProgramId(nextProgramId)
+  }, [open, activeProjectId, deriveTaskSelection])
 
   useEffect(() => {
     if (!open) return
@@ -56,12 +97,22 @@ const QuickAdd = memo(function QuickAdd() {
     const project = projects.find((p) => p.id === selectedProjectId)
     if (!project) {
       setSelectedProjectId('')
+      setSelectedSubProjectId('')
       return
     }
     if (filterProgramId && project.programId !== filterProgramId) {
       setSelectedProjectId('')
+      setSelectedSubProjectId('')
     }
   }, [filterProgramId, selectedProjectId, projects])
+
+  useEffect(() => {
+    if (!selectedSubProjectId) return
+    const subProject = projects.find((project) => project.id === selectedSubProjectId)
+    if (!subProject || subProject.parentId !== selectedProjectId) {
+      setSelectedSubProjectId('')
+    }
+  }, [selectedSubProjectId, selectedProjectId, projects])
 
   const handleClose = useCallback(() => {
     setOpen(false)
@@ -74,6 +125,7 @@ const QuickAdd = memo(function QuickAdd() {
     setProgramId('')
     setFilterProgramId('')
     setSelectedProjectId('')
+    setSelectedSubProjectId('')
   }, [])
 
   useEffect(() => {
@@ -88,7 +140,11 @@ const QuickAdd = memo(function QuickAdd() {
       const detail = event.detail ?? {}
       const requestedType = detail.type ?? 'task'
       const requestedProjectId = detail.projectId ?? ''
-      const project = projects.find((p) => p.id === requestedProjectId)
+      const {
+        nextProgramId,
+        nextProjectId,
+        nextSubProjectId,
+      } = deriveTaskSelection(requestedProjectId)
 
       setOpen(true)
       setType(requestedType)
@@ -99,8 +155,9 @@ const QuickAdd = memo(function QuickAdd() {
       setDueDate('')
 
       if (requestedType === 'task') {
-        setSelectedProjectId(requestedProjectId)
-        setFilterProgramId(detail.programId ?? project?.programId ?? '')
+        setSelectedProjectId(nextProjectId)
+        setSelectedSubProjectId(nextSubProjectId)
+        setFilterProgramId(detail.programId ?? nextProgramId)
       }
 
       if (requestedType === 'project') {
@@ -110,7 +167,7 @@ const QuickAdd = memo(function QuickAdd() {
 
     window.addEventListener('taskflow:quick-add', onQuickAddRequest)
     return () => window.removeEventListener('taskflow:quick-add', onQuickAddRequest)
-  }, [projects])
+  }, [deriveTaskSelection])
 
   const handleSubmit = useCallback(() => {
     if (!name.trim()) return
@@ -135,11 +192,11 @@ const QuickAdd = memo(function QuickAdd() {
     addTask({
       title: name.trim(),
       priority,
-      projectId: selectedProjectId || null,
+      projectId: selectedSubProjectId || selectedProjectId || null,
       dueDate: dueDate ? new Date(dueDate).toISOString() : null,
     })
     handleClose()
-  }, [name, type, desc, color, addProgram, handleClose, addProject, programId, addTask, priority, selectedProjectId, dueDate])
+  }, [name, type, desc, color, addProgram, handleClose, addProject, programId, addTask, priority, selectedProjectId, selectedSubProjectId, dueDate])
 
   const submitLabel = type === 'task' ? 'Add task' : 'Create'
 
@@ -266,7 +323,7 @@ const QuickAdd = memo(function QuickAdd() {
               )}
 
               {type === 'task' && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                   <div>
                     <label className="text-xs mb-1.5 flex items-center gap-1.5" style={{ color: 'var(--text-secondary)' }}>
                       <Layers3 size={11} />
@@ -274,7 +331,11 @@ const QuickAdd = memo(function QuickAdd() {
                     </label>
                     <select
                       value={filterProgramId}
-                      onChange={(e) => setFilterProgramId(e.target.value)}
+                      onChange={(e) => {
+                        setFilterProgramId(e.target.value)
+                        setSelectedProjectId('')
+                        setSelectedSubProjectId('')
+                      }}
                       className="w-full text-sm px-3 py-2 rounded-xl"
                       style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-primary)' }}
                     >
@@ -291,15 +352,50 @@ const QuickAdd = memo(function QuickAdd() {
                     </label>
                     <select
                       value={selectedProjectId}
-                      onChange={(e) => setSelectedProjectId(e.target.value)}
+                      onChange={(e) => {
+                        const nextProjectId = e.target.value
+                        setSelectedProjectId(nextProjectId)
+                        setSelectedSubProjectId('')
+                        if (!nextProjectId) return
+                        const project = projects.find((entry) => entry.id === nextProjectId)
+                        if (project?.programId && project.programId !== filterProgramId) {
+                          setFilterProgramId(project.programId)
+                        }
+                      }}
                       className="w-full text-sm px-3 py-2 rounded-xl"
                       style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-primary)' }}
                     >
                       <option value="">None</option>
-                      {filteredProjects.map((project) => (
+                      {topLevelProjects.map((project) => (
                         <option key={project.id} value={project.id}>{project.name}</option>
                       ))}
                     </select>
+                  </div>
+                  <div>
+                    <label className="text-xs mb-1.5 flex items-center gap-1.5" style={{ color: 'var(--text-secondary)' }}>
+                      <Folder size={11} />
+                      Sub-project
+                    </label>
+                    <select
+                      value={selectedSubProjectId}
+                      onChange={(e) => setSelectedSubProjectId(e.target.value)}
+                      className="w-full text-sm px-3 py-2 rounded-xl"
+                      style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-primary)' }}
+                      disabled={!selectedProjectId}
+                    >
+                      <option value="">None</option>
+                      {subProjects.map((project) => (
+                        <option key={project.id} value={project.id}>{project.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="sm:col-span-3 text-[11px] px-2.5 py-2 rounded-xl"
+                    style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: 'var(--text-secondary)' }}>
+                    Program: <span style={{ color: 'var(--text-primary)' }}>{selectedProgram?.name ?? 'Unassigned'}</span>
+                    {' · '}
+                    Project: <span style={{ color: 'var(--text-primary)' }}>{selectedProject?.name ?? 'None'}</span>
+                    {' · '}
+                    Sub-project: <span style={{ color: 'var(--text-primary)' }}>{selectedSubProject?.name ?? 'None'}</span>
                   </div>
                 </div>
               )}

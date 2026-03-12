@@ -1,4 +1,4 @@
-import { memo, useState } from 'react'
+import { memo, useEffect, useRef, useState } from 'react'
 import Header from '../components/layout/Header'
 import TimelineToolbar from '../components/timeline/TimelineToolbar'
 import TimelineFilterBar from '../components/timeline/TimelineFilterBar'
@@ -15,6 +15,7 @@ const Timeline = memo(function Timeline() {
   const programs = useProjectStore((s) => s.programs)
   const projects = useProjectStore((s) => s.projects)
   const milestones = useProjectStore((s) => s.milestones)
+  const updateProject = useProjectStore((s) => s.updateProject)
   const tasks = useTaskStore((s) => s.tasks)
   const updateTask = useTaskStore((s) => s.updateTask)
   const selectTask = useSettingsStore((s) => s.selectTask)
@@ -26,6 +27,23 @@ const Timeline = memo(function Timeline() {
   const [onlyCritical, setOnlyCritical] = useState(false)
   const [onlyDependencyRisk, setOnlyDependencyRisk] = useState(false)
   const [showDependencies, setShowDependencies] = useState(true)
+  const [showFilterPanel, setShowFilterPanel] = useState(false)
+  const initializedExpandedRef = useRef(false)
+
+  useEffect(() => {
+    if (initializedExpandedRef.current || projects.length === 0 || tasks.length === 0) return
+    const projectIdsWithTasks = new Set(
+      tasks
+        .map((task) => task.projectId)
+        .filter(Boolean)
+    )
+    setExpandedProjectIds(new Set(
+      projects
+        .filter((project) => projectIdsWithTasks.has(project.id))
+        .map((project) => project.id)
+    ))
+    initializedExpandedRef.current = true
+  }, [projects, tasks])
 
   const {
     zoom,
@@ -86,6 +104,7 @@ const Timeline = memo(function Timeline() {
     setOnlyDelayed(false)
     setOnlyCritical(false)
     setOnlyDependencyRisk(false)
+    setShowDependencies(true)
   }
 
   const openTimelineTaskComposer = ({ projectId = '', programId = '' } = {}) => {
@@ -104,6 +123,13 @@ const Timeline = memo(function Timeline() {
     onlyCritical ||
     onlyDependencyRisk
 
+  const activeFilterCount =
+    filteredProgramIds.size +
+    filteredProjectIds.size +
+    Number(onlyDelayed) +
+    Number(onlyCritical) +
+    Number(onlyDependencyRisk)
+
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       <Header />
@@ -112,29 +138,33 @@ const Timeline = memo(function Timeline() {
         zoom={zoom}
         rangeLabel={rangeLabel}
         stats={stats}
-        onlyDelayed={onlyDelayed}
-        onlyCritical={onlyCritical}
-        onlyDependencyRisk={onlyDependencyRisk}
-        showDependencies={showDependencies}
+        activeFilterCount={activeFilterCount}
+        filterPanelOpen={showFilterPanel}
         onChangeZoom={changeZoom}
         onShiftRange={shiftRange}
         onResetToToday={resetToToday}
-        onToggleOnlyDelayed={() => setOnlyDelayed((value) => !value)}
-        onToggleOnlyCritical={() => setOnlyCritical((value) => !value)}
-        onToggleOnlyDependencyRisk={() => setOnlyDependencyRisk((value) => !value)}
-        onToggleShowDependencies={() => setShowDependencies((value) => !value)}
+        onToggleFilterPanel={() => setShowFilterPanel((value) => !value)}
         onAddTask={() => openTimelineTaskComposer()}
       />
 
-      {programs.length > 0 && (
+      {showFilterPanel && (
         <TimelineFilterBar
           programs={programs}
           projects={projects}
           filteredProgramIds={filteredProgramIds}
           filteredProjectIds={filteredProjectIds}
+          onlyDelayed={onlyDelayed}
+          onlyCritical={onlyCritical}
+          onlyDependencyRisk={onlyDependencyRisk}
+          showDependencies={showDependencies}
           onToggleProgram={toggleProgram}
           onToggleProject={toggleProject}
+          onToggleOnlyDelayed={() => setOnlyDelayed((value) => !value)}
+          onToggleOnlyCritical={() => setOnlyCritical((value) => !value)}
+          onToggleOnlyDependencyRisk={() => setOnlyDependencyRisk((value) => !value)}
+          onToggleShowDependencies={() => setShowDependencies((value) => !value)}
           onClear={clearFilters}
+          onClose={() => setShowFilterPanel(false)}
         />
       )}
 
@@ -152,6 +182,7 @@ const Timeline = memo(function Timeline() {
           onToggleProject={toggleExpandedProject}
           onSelectTask={selectTask}
           onUpdateTaskSchedule={(taskId, updates) => updateTask(taskId, updates)}
+          onUpdateProjectSchedule={(projectId, updates) => updateProject(projectId, updates)}
           onQuickAddTask={openTimelineTaskComposer}
           showDependencies={showDependencies}
           onlyDependencyRisk={onlyDependencyRisk}

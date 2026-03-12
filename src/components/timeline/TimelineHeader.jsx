@@ -48,7 +48,7 @@ const TimelineHeader = memo(function TimelineHeader({ startDate, days, cellWidth
       <div className="flex" style={{ background: 'rgba(8,20,35,0.92)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
         <div className="flex-shrink-0 border-r px-3 py-1.5" style={{ width: leftColumnWidth, borderColor: 'rgba(255,255,255,0.08)' }}>
           <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
-            Timeline
+            Gantt
           </span>
         </div>
         <div className="flex">
