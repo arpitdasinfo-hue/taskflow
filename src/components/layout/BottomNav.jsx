@@ -15,6 +15,8 @@ const NAV_ITEMS = [
 const BottomNav = memo(function BottomNav() {
   const activePage = useSettingsStore((s) => s.activePage)
   const setPage    = useSettingsStore((s) => s.setPage)
+  const setActiveProject = useSettingsStore((s) => s.setActiveProject)
+  const setActiveProgram = useSettingsStore((s) => s.setActiveProgram)
   const { overdue } = useTaskStats()
 
   return (
@@ -29,12 +31,20 @@ const BottomNav = memo(function BottomNav() {
     >
       <div className="flex items-stretch h-[60px]">
         {NAV_ITEMS.map(({ id, label, icon: Icon }) => {
-          const isActive = activePage === id
+          const isActive = id === 'projects'
+            ? activePage === 'projects'
+            : activePage === id
           const showDot = id === 'today' && overdue > 0
           return (
             <button
               key={id}
-              onClick={() => setPage(id)}
+              onClick={() => {
+                setPage(id)
+                if (id === 'projects') {
+                  setActiveProject(null)
+                  setActiveProgram(null)
+                }
+              }}
               className="flex-1 flex flex-col items-center justify-center gap-0.5 relative no-select"
               style={{ color: isActive ? 'var(--accent)' : 'var(--text-secondary)' }}
             >

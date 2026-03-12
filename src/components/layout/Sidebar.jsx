@@ -211,7 +211,9 @@ const Sidebar = memo(function Sidebar() {
       {/* Main nav */}
       <nav className="px-2 space-y-0.5 mb-2">
         {NAV_ITEMS.map(({ id, label, icon: Icon }) => {
-          const isActive = activePage === id && !activeProjectId && !activeProgramId
+          const isActive = id === 'projects'
+            ? activePage === 'projects'
+            : activePage === id && !activeProjectId && !activeProgramId
           const badge = id === 'today' && overdue > 0 ? overdue
             : id === 'tasks' && inProgress > 0 ? inProgress
             : null
@@ -249,10 +251,14 @@ const Sidebar = memo(function Sidebar() {
       <div className="flex-1 overflow-y-auto px-2">
         {!sidebarCollapsed && (
           <div className="px-1 mb-2">
-            <span className="text-[10px] font-semibold uppercase tracking-wider"
-              style={{ color: 'var(--text-secondary)' }}>
+            <button
+              onClick={() => { setPage('projects'); setActiveProject(null); setActiveProgram(null) }}
+              className="text-[10px] font-semibold uppercase tracking-wider hover:opacity-80 transition-opacity"
+              style={{ color: 'var(--text-secondary)' }}
+              title="Show all programs"
+            >
               Programs
-            </span>
+            </button>
           </div>
         )}
 

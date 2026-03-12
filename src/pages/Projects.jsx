@@ -899,9 +899,28 @@ const Projects = memo(function Projects() {
   const activeProgramId = useSettingsStore((s) => s.activeProgramId)
   const [addingProgram, setAddingProgram] = useState(false)
 
-  const unassignedProjects = projects.filter((p) => !p.programId || !programs.find((prog) => prog.id === p.programId))
-  const totalTasks = tasks.length
-  const doneTasks  = tasks.filter((t) => t.status === 'done').length
+  const activeProject = projects.find((p) => p.id === activeProjectId) ?? null
+  const focusedProgramId = activeProgramId ?? activeProject?.programId ?? null
+  const focusedProgram = focusedProgramId
+    ? programs.find((p) => p.id === focusedProgramId) ?? null
+    : null
+
+  const visiblePrograms = focusedProgram ? [focusedProgram] : programs
+  const visibleProjects = focusedProgram
+    ? projects.filter((p) => p.programId === focusedProgram.id)
+    : projects
+
+  const unassignedProjects = focusedProgram
+    ? []
+    : projects.filter((p) => !p.programId || !programs.find((prog) => prog.id === p.programId))
+
+  const visibleTasks = focusedProgram
+    ? tasks.filter((t) => visibleProjects.some((p) => p.id === t.projectId))
+    : tasks
+  const totalTasks = visibleTasks.length
+  const doneTasks  = visibleTasks.filter((t) => t.status === 'done').length
+  const projectCount = focusedProgram ? visibleProjects.filter((p) => !p.parentId).length : projects.length
+  const headerTitle = focusedProgram ? focusedProgram.name : 'Programs'
 
   useEffect(() => {
     const selector = activeProjectId
@@ -929,9 +948,9 @@ const Projects = memo(function Projects() {
       {/* Page header */}
       <div className="flex items-center justify-between py-4 mb-4">
         <div>
-          <h1 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>Programs & Projects</h1>
+          <h1 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>{headerTitle}</h1>
           <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>
-            {programs.length} programs · {projects.length} projects · {doneTasks}/{totalTasks} tasks done
+            {focusedProgram ? `${projectCount} projects` : `${programs.length} programs · ${projectCount} projects`} · {doneTasks}/{totalTasks} tasks done
           </p>
         </div>
         <button onClick={() => setAddingProgram(true)} className="btn-accent flex items-center gap-1.5 px-3 py-2 text-xs">
@@ -958,14 +977,14 @@ const Projects = memo(function Projects() {
         </div>
       ) : (
         <>
-          {programs.map((program) => (
+          {visiblePrograms.map((program) => (
             <ProgramSection
               key={program.id}
               program={program}
-              projects={projects.filter((p) => p.programId === program.id)}
+              projects={visibleProjects.filter((p) => p.programId === program.id)}
             />
           ))}
-          <UnassignedSection projects={unassignedProjects} />
+          {!focusedProgram && <UnassignedSection projects={unassignedProjects} />}
         </>
       )}
     </div>
