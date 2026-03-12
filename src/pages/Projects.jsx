@@ -1,4 +1,5 @@
-import { memo, useEffect, useState } from 'react'
+import { memo, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import {
   Plus, Folder, FolderOpen, CheckCircle2, Clock, AlertTriangle,
   Trash2, Check, X, ChevronDown, ChevronRight, LayoutList, Kanban,
@@ -69,9 +70,66 @@ const Editable = memo(function Editable({ value, onSave, className, style, maxLe
 // ── Color swatch picker ───────────────────────────────────────────────────────
 const ColorDot = memo(function ColorDot({ color, onChange }) {
   const [open, setOpen] = useState(false)
+  const [menuPos, setMenuPos] = useState({ top: 0, left: 0 })
+  const buttonRef = useRef(null)
+  const menuRef = useRef(null)
+
+  useLayoutEffect(() => {
+    if (!open || typeof window === 'undefined' || !buttonRef.current) return
+
+    const updatePosition = () => {
+      if (!buttonRef.current) return
+      const rect = buttonRef.current.getBoundingClientRect()
+      const menuWidth = menuRef.current?.offsetWidth ?? 178
+      const menuHeight = menuRef.current?.offsetHeight ?? 180
+      const viewportPadding = 8
+      const gap = 8
+
+      let left = rect.left
+      let top = rect.bottom + gap
+
+      if (left + menuWidth > window.innerWidth - viewportPadding) {
+        left = window.innerWidth - menuWidth - viewportPadding
+      }
+      if (left < viewportPadding) {
+        left = viewportPadding
+      }
+
+      if (top + menuHeight > window.innerHeight - viewportPadding) {
+        top = rect.top - menuHeight - gap
+      }
+      if (top < viewportPadding) {
+        top = viewportPadding
+      }
+
+      setMenuPos({ top, left })
+    }
+
+    updatePosition()
+    window.addEventListener('resize', updatePosition)
+    window.addEventListener('scroll', updatePosition, true)
+
+    return () => {
+      window.removeEventListener('resize', updatePosition)
+      window.removeEventListener('scroll', updatePosition, true)
+    }
+  }, [open])
+
+  useEffect(() => {
+    if (!open) return
+    const onMouseDown = (event) => {
+      const target = event.target
+      if (buttonRef.current?.contains(target) || menuRef.current?.contains(target)) return
+      setOpen(false)
+    }
+    document.addEventListener('mousedown', onMouseDown)
+    return () => document.removeEventListener('mousedown', onMouseDown)
+  }, [open])
+
   return (
     <div className="relative flex-shrink-0" onClick={(e) => e.stopPropagation()}>
       <button
+        ref={buttonRef}
         onClick={(e) => { e.stopPropagation(); setOpen((o) => !o) }}
         className="w-5 h-5 rounded-full p-[2px] hover:scale-105 transition-transform"
         style={{
@@ -83,12 +141,13 @@ const ColorDot = memo(function ColorDot({ color, onChange }) {
       >
         <span className="w-full h-full rounded-full block" style={{ background: color }} />
       </button>
-      {open && (
+      {open && typeof document !== 'undefined' && createPortal(
         <>
-          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div className="fixed inset-0 z-[90]" onClick={() => setOpen(false)} />
           <div
-            className="absolute top-full left-0 mt-2 z-50 w-[178px]"
-            style={{ boxShadow: '0 16px 48px rgba(0,0,0,0.6)' }}
+            ref={menuRef}
+            className="fixed z-[100] w-[178px]"
+            style={{ top: `${menuPos.top}px`, left: `${menuPos.left}px`, boxShadow: '0 16px 48px rgba(0,0,0,0.6)' }}
           >
             <ColorPalettePicker
               colors={PROJECT_COLORS}
@@ -101,7 +160,8 @@ const ColorDot = memo(function ColorDot({ color, onChange }) {
               }}
             />
           </div>
-        </>
+        </>,
+        document.body
       )}
     </div>
   )
