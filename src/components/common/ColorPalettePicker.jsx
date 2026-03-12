@@ -1,4 +1,4 @@
-import { memo, useMemo } from 'react'
+import { memo, useMemo, useRef } from 'react'
 import { Check } from 'lucide-react'
 
 const chunkColors = (colors, perRow) => {
@@ -15,34 +15,45 @@ const ColorPalettePicker = memo(function ColorPalettePicker({
   autoLabel = 'Auto',
   compact = false,
 }) {
-  const rows = useMemo(() => chunkColors(colors, compact ? 8 : 10), [colors, compact])
-  const swatchSize = compact ? 18 : 22
+  const colorInputRef = useRef(null)
+  const palette = useMemo(() => {
+    if (value && !colors.includes(value)) return [value, ...colors]
+    return colors
+  }, [colors, value])
+  const rows = useMemo(() => chunkColors(palette, compact ? 6 : 10), [palette, compact])
+  const swatchSize = compact ? 20 : 24
 
   return (
     <div
       className="rounded-xl p-2.5"
-      style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)' }}
+      style={{
+        background: compact ? 'rgba(8,16,30,0.95)' : 'rgba(255,255,255,0.03)',
+        border: '1px solid rgba(255,255,255,0.1)',
+        backdropFilter: 'blur(12px)',
+      }}
     >
-      <div className="flex items-center justify-between mb-2 gap-2">
-        <span className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>
-          Selected
-        </span>
-        {value ? (
-          <div className="flex items-center gap-1.5 text-[10px]" style={{ color: 'var(--text-secondary)' }}>
-            <span
-              className="w-2 h-2 rounded-full flex-shrink-0"
-              style={{ background: value, boxShadow: `0 0 8px ${value}80` }}
-            />
-            {value.toUpperCase()}
-          </div>
-        ) : (
-          allowAuto && (
-            <span className="text-[10px]" style={{ color: 'var(--text-secondary)' }}>
-              {autoLabel}
-            </span>
-          )
-        )}
-      </div>
+      {!compact && (
+        <div className="flex items-center justify-between mb-2 gap-2">
+          <span className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>
+            Selected
+          </span>
+          {value ? (
+            <div className="flex items-center gap-1.5 text-[10px]" style={{ color: 'var(--text-secondary)' }}>
+              <span
+                className="w-2 h-2 rounded-full flex-shrink-0"
+                style={{ background: value, boxShadow: `0 0 8px ${value}80` }}
+              />
+              {value.toUpperCase()}
+            </div>
+          ) : (
+            allowAuto && (
+              <span className="text-[10px]" style={{ color: 'var(--text-secondary)' }}>
+                {autoLabel}
+              </span>
+            )
+          )}
+        </div>
+      )}
 
       {allowAuto && (
         <button
@@ -79,13 +90,38 @@ const ColorPalettePicker = memo(function ColorPalettePicker({
                   aria-label={`Select ${color}`}
                   title={color}
                 >
-                  {active && <Check size={10} color="#fff" strokeWidth={3} className="mx-auto" />}
+                  {active && <Check size={compact ? 9 : 10} color="#fff" strokeWidth={3} className="mx-auto" />}
                 </button>
               )
             })}
           </div>
         ))}
       </div>
+
+      <div className={`flex items-center ${compact ? 'justify-end mt-2' : 'justify-between mt-2.5'}`}>
+        {!compact && (
+          <span className="text-[10px]" style={{ color: 'var(--text-secondary)' }}>
+            Need another shade?
+          </span>
+        )}
+        <button
+          type="button"
+          onClick={() => colorInputRef.current?.click()}
+          className="text-[10px] px-2 py-1 rounded-lg border transition-colors hover:bg-white/5"
+          style={{ borderColor: 'rgba(255,255,255,0.16)', color: 'var(--text-secondary)' }}
+        >
+          Custom
+        </button>
+      </div>
+
+      <input
+        ref={colorInputRef}
+        type="color"
+        value={value ?? '#22d3ee'}
+        onChange={(event) => onChange?.(event.target.value)}
+        className="sr-only"
+        aria-label="Pick custom color"
+      />
     </div>
   )
 })

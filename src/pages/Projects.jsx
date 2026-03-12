@@ -71,14 +71,23 @@ const ColorDot = memo(function ColorDot({ color, onChange }) {
   const [open, setOpen] = useState(false)
   return (
     <div className="relative flex-shrink-0" onClick={(e) => e.stopPropagation()}>
-      <button onClick={(e) => { e.stopPropagation(); setOpen((o) => !o) }}
-        className="w-3 h-3 rounded-full ring-1 ring-offset-1 ring-offset-transparent hover:scale-125 transition-transform"
-        style={{ background: color, ringColor: color }} title="Change colour" />
+      <button
+        onClick={(e) => { e.stopPropagation(); setOpen((o) => !o) }}
+        className="w-5 h-5 rounded-full p-[2px] hover:scale-105 transition-transform"
+        style={{
+          background: 'rgba(255,255,255,0.04)',
+          border: open ? `1px solid ${color}` : '1px solid rgba(255,255,255,0.16)',
+          boxShadow: open ? `0 0 0 2px ${color}33` : 'none',
+        }}
+        title="Change color"
+      >
+        <span className="w-full h-full rounded-full block" style={{ background: color }} />
+      </button>
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
           <div
-            className="absolute top-5 left-0 z-50 w-[196px]"
+            className="absolute top-full left-0 mt-2 z-50 w-[178px]"
             style={{ boxShadow: '0 16px 48px rgba(0,0,0,0.6)' }}
           >
             <ColorPalettePicker
