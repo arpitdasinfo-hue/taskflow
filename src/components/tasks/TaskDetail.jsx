@@ -14,7 +14,7 @@ const STATUSES   = ['todo', 'in-progress', 'review', 'done', 'blocked']
 const PRIORITIES = ['critical', 'high', 'medium', 'low']
 const STATUS_LABELS = { 'todo': 'To Do', 'in-progress': 'In Progress', 'review': 'In Review', 'done': 'Done', 'blocked': 'Blocked' }
 
-const SelectField = memo(function SelectField({ label, value, options, onChange, renderOption }) {
+const SelectField = memo(function SelectField({ value, options, onChange, renderOption }) {
   const [open, setOpen] = useState(false)
   return (
     <div className="relative">
@@ -72,7 +72,7 @@ const TaskDetail = memo(function TaskDetail() {
       setTitleValue(task.title)
       setDescValue(task.description || '')
     }
-  }, [task?.id])
+  }, [task])
 
   // Close on Escape
   useEffect(() => {
@@ -84,12 +84,12 @@ const TaskDetail = memo(function TaskDetail() {
   const saveTitle = useCallback(() => {
     if (task?.id && titleValue.trim()) updateTask(task.id, { title: titleValue.trim() })
     setEditingTitle(false)
-  }, [titleValue, task?.id, updateTask])
+  }, [titleValue, task, updateTask])
 
   const saveDesc = useCallback(() => {
     if (task?.id) updateTask(task.id, { description: descValue })
     setEditingDesc(false)
-  }, [descValue, task?.id, updateTask])
+  }, [descValue, task, updateTask])
 
   const handleAddTag = useCallback((e) => {
     if ((e.key === 'Enter' || e.key === ',') && tagInput.trim() && task?.id) {
@@ -98,16 +98,16 @@ const TaskDetail = memo(function TaskDetail() {
       if (tag && !task.tags.includes(tag)) updateTask(task.id, { tags: [...task.tags, tag] })
       setTagInput('')
     }
-  }, [tagInput, task?.id, task?.tags, updateTask])
+  }, [tagInput, task, updateTask])
 
   const removeTag = useCallback((tag) => {
     if (task?.id) updateTask(task.id, { tags: task.tags.filter((t) => t !== tag) })
-  }, [task?.id, task?.tags, updateTask])
+  }, [task, updateTask])
 
   const handleDelete = useCallback(() => {
     if (task?.id) deleteTask(task.id)
     closeTask()
-  }, [task?.id, deleteTask, closeTask])
+  }, [task, deleteTask, closeTask])
 
   if (!task) return null
 

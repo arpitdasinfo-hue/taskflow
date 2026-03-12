@@ -26,14 +26,6 @@ const QuickAdd = memo(function QuickAdd() {
     if (open) setTimeout(() => inputRef.current?.focus(), 50)
   }, [open])
 
-  // Close on Escape
-  useEffect(() => {
-    if (!open) return
-    const onKey = (e) => { if (e.key === 'Escape') handleClose() }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [open])
-
   const handleClose = useCallback(() => {
     setOpen(false)
     setTitle('')
@@ -41,6 +33,14 @@ const QuickAdd = memo(function QuickAdd() {
     setDueDate('')
     setShowMore(false)
   }, [])
+
+  // Close on Escape
+  useEffect(() => {
+    if (!open) return
+    const onKey = (e) => { if (e.key === 'Escape') handleClose() }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [open, handleClose])
 
   const handleSubmit = useCallback(() => {
     if (!title.trim()) return

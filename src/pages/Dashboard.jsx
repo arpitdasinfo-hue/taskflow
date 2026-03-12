@@ -69,7 +69,6 @@ const Dashboard = memo(function Dashboard() {
   const { total, inProgress, done, blocked, overdue, critical, completion } = useTaskStats()
   const tasks    = useFilteredTasks()
   const setPage  = useSettingsStore((s) => s.setPage)
-  const selectTask = useSettingsStore((s) => s.selectTask)
   const programs = useProjectStore((s) => s.programs)
   const allTasks = useTaskStore((s) => s.tasks)
 

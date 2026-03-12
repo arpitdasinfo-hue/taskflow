@@ -130,7 +130,7 @@ const KANBAN_COLS = [
   { id: 'blocked',     label: 'Blocked',     color: '#ef4444' },
 ]
 
-const ProjectPanel = memo(function ProjectPanel({ project, subProjects = [], depth = 0 }) {
+const ProjectPanel = memo(function ProjectPanel({ project, depth = 0 }) {
   const tasks            = useTaskStore((s) => s.tasks)
   const updateProject    = useProjectStore((s) => s.updateProject)
   const deleteProject    = useProjectStore((s) => s.deleteProject)

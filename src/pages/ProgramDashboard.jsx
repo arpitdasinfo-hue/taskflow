@@ -130,7 +130,6 @@ const ProgramCard = memo(function ProgramCard({ program, stats }) {
 const OverallSummary = memo(function OverallSummary({ allStats, programs }) {
   const total    = Object.values(allStats).reduce((s, st) => s + st.total, 0)
   const done     = Object.values(allStats).reduce((s, st) => s + st.done, 0)
-  const blocked  = Object.values(allStats).reduce((s, st) => s + st.blocked, 0)
   const overdue  = Object.values(allStats).reduce((s, st) => s + st.overdue, 0)
   const completion = total ? Math.round((done / total) * 100) : 0
 

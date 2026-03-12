@@ -30,10 +30,7 @@ const PROGRAM_STATUS_COLORS = {
 const ProgramGroup = memo(function ProgramGroup({ program, projects, collapsed }) {
   const [open, setOpen]      = useState(true)
   const activeProjectId      = useSettingsStore((s) => s.activeProjectId)
-  const activeProgramId      = useSettingsStore((s) => s.activeProgramId)
   const setActiveProject     = useSettingsStore((s) => s.setActiveProject)
-  const setActiveProgram     = useSettingsStore((s) => s.setActiveProgram)
-  const setPage              = useSettingsStore((s) => s.setPage)
   const tasks                = useTaskStore((s) => s.tasks)
   const allProjects          = useProjectStore((s) => s.projects)
   const taskCount = (pid) => tasks.filter((t) => t.projectId === pid && t.status !== 'done').length
@@ -42,13 +39,6 @@ const ProgramGroup = memo(function ProgramGroup({ program, projects, collapsed }
   const handleProgramClick = () => {
     if (collapsed) return
     setOpen((o) => !o)
-  }
-
-  const handleProgramFilter = (e) => {
-    e.stopPropagation()
-    const isActive = activeProgramId === program.id
-    setActiveProgram(isActive ? null : program.id)
-    setPage('tasks')
   }
 
   if (collapsed) {

@@ -14,7 +14,7 @@ const DependencyList = memo(function DependencyList({ taskId }) {
   const [showPicker, setShowPicker] = useState(false)
 
   const task = tasks.find((t) => t.id === taskId)
-  const dependsOn = task?.dependsOn ?? []
+  const dependsOn = useMemo(() => task?.dependsOn ?? [], [task])
 
   // Tasks this task depends on
   const depTasks = useMemo(

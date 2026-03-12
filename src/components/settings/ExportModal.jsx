@@ -108,11 +108,6 @@ function buildCSV(tasks, projects, programs, columns, includeSubtasks, includeMi
 
 function buildPDF(tasks, projects, programs, milestones, include) {
   const getProject = (id) => projects.find((p) => p.id === id)
-  const getProgram = (projectId) => {
-    const proj = getProject(projectId)
-    if (!proj?.programId) return null
-    return programs.find((p) => p.id === proj.programId)
-  }
 
   const now = new Date()
   const totalTasks   = tasks.length
