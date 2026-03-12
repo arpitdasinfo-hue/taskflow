@@ -1,4 +1,5 @@
-import { useEffect, lazy, Suspense, Component, useState } from 'react'
+import { useEffect, lazy, Suspense, Component, useRef, useState } from 'react'
+import { registerSW } from 'virtual:pwa-register'
 import Sidebar from './components/layout/Sidebar'
 import BottomNav from './components/layout/BottomNav'
 import TaskDetail from './components/tasks/TaskDetail'
@@ -76,6 +77,42 @@ function PageRouter({ page }) {
   )
 }
 
+function PWAUpdateBanner({ needRefresh, offlineReady, onReload, onDismiss }) {
+  if (!needRefresh && !offlineReady) return null
+
+  return (
+    <div className="fixed left-3 right-3 bottom-16 md:bottom-4 z-50">
+      <div
+        className="glass rounded-2xl px-4 py-3 flex items-center gap-3"
+        style={{ border: '1px solid var(--glass-border)' }}
+      >
+        <div className="flex-1 min-w-0">
+          <p className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>
+            {needRefresh ? 'New version available' : 'App ready for offline use'}
+          </p>
+          <p className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>
+            {needRefresh ? 'Refresh to load the latest build.' : 'You can continue using TaskFlow without internet.'}
+          </p>
+        </div>
+
+        {needRefresh ? (
+          <button onClick={onReload} className="btn-accent px-3 py-1.5 text-xs">
+            Refresh
+          </button>
+        ) : null}
+
+        <button
+          onClick={onDismiss}
+          className="btn-ghost px-2 py-1.5 text-xs"
+          style={{ color: 'var(--text-secondary)' }}
+        >
+          Dismiss
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export default function App() {
   useTheme() // Initialises CSS variables + auto-rotation on mount
 
@@ -90,12 +127,26 @@ export default function App() {
   const loadProjectsFromSupabase = useProjectStore((s) => s.loadFromSupabase)
   const loadTasksFromSupabase = useTaskStore((s) => s.loadFromSupabase)
   const [syncReady, setSyncReady] = useState(false)
+  const [needRefresh, setNeedRefresh] = useState(false)
+  const [offlineReady, setOfflineReady] = useState(false)
+  const updateServiceWorkerRef = useRef(() => {})
 
   const shareToken = window.location.pathname.startsWith('/share/')
     ? window.location.pathname.split('/share/')[1]
     : ''
 
   useEffect(() => { init() }, [init])
+
+  useEffect(() => {
+    const updateServiceWorker = registerSW({
+      immediate: true,
+      onNeedRefresh: () => setNeedRefresh(true),
+      onOfflineReady: () => setOfflineReady(true),
+      onRegisterError: () => {},
+    })
+
+    updateServiceWorkerRef.current = updateServiceWorker
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -248,6 +299,16 @@ export default function App() {
 
       {/* Floating action button */}
       <QuickAdd />
+
+      <PWAUpdateBanner
+        needRefresh={needRefresh}
+        offlineReady={offlineReady}
+        onReload={() => updateServiceWorkerRef.current(true)}
+        onDismiss={() => {
+          setNeedRefresh(false)
+          setOfflineReady(false)
+        }}
+      />
     </div>
   )
 }
