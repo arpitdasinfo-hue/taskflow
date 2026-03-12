@@ -4,14 +4,17 @@ import useAuthStore from '../store/useAuthStore'
 
 export default function Auth() {
   const [mode,    setMode]    = useState('signin') // signin | signup
+  const [step,    setStep]    = useState('email') // email | code
   const [email,   setEmail]   = useState('')
+  const [code,    setCode]    = useState('')
   const [sent,    setSent]    = useState(false)
   const [loading, setLoading] = useState(false)
   const [error,   setError]   = useState('')
 
   const signInWithEmail = useAuthStore((s) => s.signInWithEmail)
+  const verifyEmailOtp  = useAuthStore((s) => s.verifyEmailOtp)
 
-  const handleSubmit = async (e) => {
+  const handleSendCode = async (e) => {
     e.preventDefault()
     if (!email.trim()) return
     setLoading(true)
@@ -31,7 +34,33 @@ export default function Auth() {
       return
     }
 
+    setStep('code')
+    setCode('')
     setSent(true)
+  }
+
+  const handleVerifyCode = async (e) => {
+    e.preventDefault()
+    const token = code.trim()
+    if (!token) return
+
+    setLoading(true)
+    setError('')
+    const { error } = await verifyEmailOtp(email.trim().toLowerCase(), token)
+    setLoading(false)
+
+    if (error) {
+      setError(error.message || 'Invalid code. Please try again.')
+    }
+  }
+
+  const handleResendCode = async () => {
+    if (!email.trim()) return
+    setLoading(true)
+    setError('')
+    const { error } = await signInWithEmail(email.trim().toLowerCase(), mode)
+    setLoading(false)
+    if (error) setError(error.message || 'Unable to resend code.')
   }
 
   return (
@@ -56,9 +85,9 @@ export default function Auth() {
 
         {/* Card */}
         <div className="glass rounded-2xl p-6">
-          {sent ? (
+          {sent && step === 'code' ? (
             /* ── Success state ── */
-            <div className="text-center py-2">
+            <div className="py-2">
               <div
                 className="w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-4"
                 style={{ background: 'rgba(16,185,129,0.15)' }}
@@ -66,20 +95,61 @@ export default function Auth() {
                 <CheckCircle2 size={22} style={{ color: '#10b981' }} />
               </div>
               <p className="text-base font-bold mb-1" style={{ color: 'var(--text-primary)' }}>
-                Check your email
+                Enter verification code
               </p>
               <p className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-                We sent a {mode === 'signup' ? 'sign-up' : 'sign-in'} link to{' '}
+                We sent a code to{' '}
                 <strong style={{ color: 'var(--text-primary)' }}>{email}</strong>.
-                {' '}Open it to continue — no password needed.
+                {' '}Enter it below to continue.
               </p>
-              <button
-                onClick={() => { setSent(false); setEmail(''); setError('') }}
-                className="mt-5 text-xs underline transition-opacity hover:opacity-70"
-                style={{ color: 'var(--text-secondary)' }}
-              >
-                Use a different email
-              </button>
+
+              <form onSubmit={handleVerifyCode} className="mt-4 flex flex-col gap-3">
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  value={code}
+                  onChange={(e) => setCode(e.target.value.replace(/\s+/g, ''))}
+                  placeholder="Enter code"
+                  className="w-full text-sm px-3 py-2.5 rounded-xl"
+                  style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-primary)' }}
+                />
+
+                {error && (
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-xl"
+                    style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)' }}>
+                    <AlertCircle size={13} style={{ color: '#ef4444', flexShrink: 0 }} />
+                    <p className="text-xs" style={{ color: '#ef4444' }}>{error}</p>
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={loading || !code.trim()}
+                  className="flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-opacity hover:opacity-85 disabled:opacity-40"
+                  style={{ background: 'var(--accent)', color: '#fff' }}
+                >
+                  {loading ? 'Verifying…' : 'Verify and continue'}
+                </button>
+              </form>
+
+              <div className="mt-4 flex items-center justify-between">
+                <button
+                  onClick={handleResendCode}
+                  disabled={loading}
+                  className="text-xs underline transition-opacity hover:opacity-70 disabled:opacity-40"
+                  style={{ color: 'var(--text-secondary)' }}
+                >
+                  Resend code
+                </button>
+                <button
+                  onClick={() => { setStep('email'); setSent(false); setCode(''); setError('') }}
+                  className="text-xs underline transition-opacity hover:opacity-70"
+                  style={{ color: 'var(--text-secondary)' }}
+                >
+                  Use different email
+                </button>
+              </div>
             </div>
           ) : (
             /* ── Sign-in form ── */
@@ -88,7 +158,7 @@ export default function Auth() {
                 style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}>
                 <button
                   type="button"
-                  onClick={() => { setMode('signin'); setError('') }}
+                  onClick={() => { setMode('signin'); setError(''); setStep('email'); setSent(false); setCode('') }}
                   className="flex-1 py-1.5 rounded-lg text-xs font-semibold transition-colors"
                   style={mode === 'signin'
                     ? { background: 'var(--accent)', color: '#fff' }
@@ -98,7 +168,7 @@ export default function Auth() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => { setMode('signup'); setError('') }}
+                  onClick={() => { setMode('signup'); setError(''); setStep('email'); setSent(false); setCode('') }}
                   className="flex-1 py-1.5 rounded-lg text-xs font-semibold transition-colors"
                   style={mode === 'signup'
                     ? { background: 'var(--accent)', color: '#fff' }
@@ -113,11 +183,11 @@ export default function Auth() {
               </p>
               <p className="text-sm mb-5" style={{ color: 'var(--text-secondary)' }}>
                 {mode === 'signup'
-                  ? "New here? Enter your email and we'll send a sign-up link."
-                  : "Already have an account? Enter your email and we'll send a sign-in link."}
+                  ? "New here? Enter your email and we'll send a sign-up code."
+                  : "Already have an account? Enter your email and we'll send a sign-in code."}
               </p>
 
-              <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+              <form onSubmit={handleSendCode} className="flex flex-col gap-3">
                 {/* Email input */}
                 <div
                   className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl transition-all"
@@ -157,7 +227,7 @@ export default function Auth() {
                 >
                   {loading
                     ? 'Sending…'
-                    : <><span>{mode === 'signup' ? 'Send sign-up link' : 'Send sign-in link'}</span><ArrowRight size={14} /></>}
+                    : <><span>{mode === 'signup' ? 'Send sign-up code' : 'Send sign-in code'}</span><ArrowRight size={14} /></>}
                 </button>
               </form>
             </>

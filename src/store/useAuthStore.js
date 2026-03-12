@@ -16,7 +16,7 @@ const useAuthStore = create((set) => ({
     })
   },
 
-  /** Send magic link to email (signin: existing users only, signup: allow create) */
+  /** Send OTP email (signin: existing users only, signup: allow create) */
   signInWithEmail: async (email, mode = 'signin') => {
     const { error } = await supabase.auth.signInWithOtp({
       email,
@@ -24,6 +24,16 @@ const useAuthStore = create((set) => ({
         emailRedirectTo: window.location.origin,
         shouldCreateUser: mode === 'signup',
       },
+    })
+    return { error }
+  },
+
+  /** Verify OTP code entered in-app */
+  verifyEmailOtp: async (email, token) => {
+    const { error } = await supabase.auth.verifyOtp({
+      email,
+      token,
+      type: 'email',
     })
     return { error }
   },
