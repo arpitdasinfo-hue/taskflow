@@ -16,6 +16,7 @@ const Timeline = memo(function Timeline() {
   const projects = useProjectStore((s) => s.projects)
   const milestones = useProjectStore((s) => s.milestones)
   const tasks = useTaskStore((s) => s.tasks)
+  const updateTask = useTaskStore((s) => s.updateTask)
   const selectTask = useSettingsStore((s) => s.selectTask)
 
   const [filteredProgramIds, setFilteredProgramIds] = useState(() => new Set())
@@ -131,6 +132,7 @@ const Timeline = memo(function Timeline() {
           zoom={zoom}
           onToggleProject={toggleExpandedProject}
           onSelectTask={selectTask}
+          onUpdateTaskSchedule={(taskId, updates) => updateTask(taskId, updates)}
         />
       )}
     </div>

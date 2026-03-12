@@ -30,6 +30,9 @@ const TimelineLegend = memo(function TimelineLegend() {
           <span>◆</span>
           Milestone
         </span>
+        <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--text-secondary)' }}>
+          Drag bars to move. Drag edges to resize.
+        </span>
       </div>
     </div>
   )
