@@ -180,7 +180,12 @@ const useProjectStore = create(
 
         const { workspaceId, userId } = getSyncContext()
         if (workspaceId) {
-          void supabase.from('programs').upsert(toProgramRow(created, workspaceId, userId))
+          void supabase
+            .from('programs')
+            .upsert(toProgramRow(created, workspaceId, userId))
+            .then(({ error }) => {
+              if (error) console.error('[sync] Failed to persist program:', error)
+            })
         }
 
         return created
@@ -255,7 +260,12 @@ const useProjectStore = create(
 
         const { workspaceId, userId } = getSyncContext()
         if (workspaceId) {
-          void supabase.from('projects').upsert(toProjectRow(created, workspaceId, userId))
+          void supabase
+            .from('projects')
+            .upsert(toProjectRow(created, workspaceId, userId))
+            .then(({ error }) => {
+              if (error) console.error('[sync] Failed to persist project:', error)
+            })
         }
 
         return created

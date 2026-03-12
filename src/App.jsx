@@ -113,6 +113,36 @@ function PWAUpdateBanner({ needRefresh, offlineReady, onReload, onDismiss }) {
   )
 }
 
+function SyncIssueBanner({ message, onDismiss }) {
+  if (!message) return null
+
+  return (
+    <div className="fixed left-3 right-3 top-3 md:left-auto md:right-4 md:w-[420px] z-50">
+      <div
+        className="glass rounded-2xl px-4 py-3 flex items-start gap-3"
+        style={{ border: '1px solid rgba(239,68,68,0.35)' }}
+      >
+        <div className="flex-1 min-w-0">
+          <p className="text-xs font-semibold" style={{ color: '#fca5a5' }}>
+            Cloud Sync Paused
+          </p>
+          <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-secondary)' }}>
+            {message}
+          </p>
+        </div>
+
+        <button
+          onClick={onDismiss}
+          className="btn-ghost px-2 py-1 text-xs"
+          style={{ color: 'var(--text-secondary)' }}
+        >
+          Dismiss
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export default function App() {
   useTheme() // Initialises CSS variables + auto-rotation on mount
 
@@ -124,6 +154,7 @@ export default function App() {
   const init           = useAuthStore((s) => s.init)
   const loadOrCreateWorkspace = useWorkspaceStore((s) => s.loadOrCreateWorkspace)
   const resetWorkspace = useWorkspaceStore((s) => s.reset)
+  const workspaceError = useWorkspaceStore((s) => s.error)
   const loadProjectsFromSupabase = useProjectStore((s) => s.loadFromSupabase)
   const loadTasksFromSupabase = useTaskStore((s) => s.loadFromSupabase)
   const [syncReady, setSyncReady] = useState(false)
@@ -299,6 +330,11 @@ export default function App() {
 
       {/* Floating action button */}
       <QuickAdd />
+
+      <SyncIssueBanner
+        message={workspaceError}
+        onDismiss={() => useWorkspaceStore.setState({ error: '' })}
+      />
 
       <PWAUpdateBanner
         needRefresh={needRefresh}

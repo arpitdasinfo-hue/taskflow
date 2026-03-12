@@ -162,7 +162,12 @@ const useTaskStore = create(
 
         const { workspaceId, userId } = getSyncContext()
         if (workspaceId) {
-          void supabase.from('tasks').upsert(toTaskRow(created, workspaceId, userId))
+          void supabase
+            .from('tasks')
+            .upsert(toTaskRow(created, workspaceId, userId))
+            .then(({ error }) => {
+              if (error) console.error('[sync] Failed to persist task:', error)
+            })
         }
 
         return created

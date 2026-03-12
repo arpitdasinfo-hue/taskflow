@@ -14,9 +14,26 @@ create policy "own membership" on workspace_members for all
   with check (user_id = auth.uid());
 
 drop policy if exists "workspace access" on workspaces;
-create policy "workspace access" on workspaces for all
+drop policy if exists "workspace read" on workspaces;
+drop policy if exists "workspace insert" on workspaces;
+drop policy if exists "workspace update" on workspaces;
+drop policy if exists "workspace delete" on workspaces;
+
+create policy "workspace read" on workspaces for select
+  using (
+    created_by = auth.uid()
+    or id in (select workspace_id from workspace_members where user_id = auth.uid())
+  );
+
+create policy "workspace insert" on workspaces for insert
+  with check (created_by = auth.uid());
+
+create policy "workspace update" on workspaces for update
   using (id in (select workspace_id from workspace_members where user_id = auth.uid()))
   with check (id in (select workspace_id from workspace_members where user_id = auth.uid()));
+
+create policy "workspace delete" on workspaces for delete
+  using (created_by = auth.uid());
 
 drop policy if exists "programs access" on programs;
 create policy "programs access" on programs for all

@@ -58,6 +58,7 @@ const useWorkspaceStore = create((set) => ({
       .order('joined_at', { ascending: true })
 
     if (membershipError) {
+      console.error('[sync] Failed to load workspace memberships:', membershipError)
       set({ loading: false, error: membershipError.message })
       return null
     }
@@ -75,7 +76,12 @@ const useWorkspaceStore = create((set) => ({
       .single()
 
     if (workspaceError || !workspace?.id) {
-      set({ loading: false, error: workspaceError?.message || 'Unable to create workspace.' })
+      const rawMessage = workspaceError?.message || 'Unable to create workspace.'
+      const friendlyMessage = rawMessage.toLowerCase().includes('row-level security')
+        ? 'Workspace creation blocked by Supabase RLS policy. Please run the latest scripts/supabase_policies.sql in Supabase SQL Editor.'
+        : rawMessage
+      console.error('[sync] Failed to create workspace:', workspaceError)
+      set({ loading: false, error: friendlyMessage })
       return null
     }
 
@@ -84,6 +90,7 @@ const useWorkspaceStore = create((set) => ({
       .insert({ workspace_id: workspace.id, user_id: userId, role: 'owner' })
 
     if (memberInsertError) {
+      console.error('[sync] Failed to create workspace membership:', memberInsertError)
       set({ loading: false, error: memberInsertError.message })
       return null
     }
