@@ -10,12 +10,14 @@ const TimelineFilterBar = memo(function TimelineFilterBar({
   projects,
   filteredProgramIds,
   filteredProjectIds,
+  filteredSubProjectIds,
   onlyDelayed,
   onlyCritical,
   onlyDependencyRisk,
   showDependencies,
   onToggleProgram,
   onToggleProject,
+  onToggleSubProject,
   onToggleOnlyDelayed,
   onToggleOnlyCritical,
   onToggleOnlyDependencyRisk,
@@ -26,6 +28,7 @@ const TimelineFilterBar = memo(function TimelineFilterBar({
   const hasFilter =
     filteredProgramIds.size > 0 ||
     filteredProjectIds.size > 0 ||
+    filteredSubProjectIds.size > 0 ||
     onlyDelayed ||
     onlyCritical ||
     onlyDependencyRisk
@@ -35,6 +38,17 @@ const TimelineFilterBar = memo(function TimelineFilterBar({
     if (filteredProgramIds.size === 0) return topLevel
     return topLevel.filter((project) => filteredProgramIds.has(project.programId))
   }, [projects, filteredProgramIds])
+
+  const visibleSubProjectChips = useMemo(() => {
+    const subProjects = projects.filter((project) => project.parentId)
+    if (filteredProjectIds.size > 0) {
+      return subProjects.filter((project) => filteredProjectIds.has(project.parentId))
+    }
+    if (filteredProgramIds.size > 0) {
+      return subProjects.filter((project) => filteredProgramIds.has(project.programId))
+    }
+    return subProjects
+  }, [projects, filteredProjectIds, filteredProgramIds])
 
   return (
     <div className="px-4 md:px-6 pb-2.5">
@@ -140,6 +154,30 @@ const TimelineFilterBar = memo(function TimelineFilterBar({
             })}
           </div>
         </div>
+
+        {visibleSubProjectChips.length > 0 && (
+          <div className="flex items-center gap-2 flex-wrap mt-2">
+            <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
+              Sub-projects
+            </span>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {visibleSubProjectChips.map((project) => {
+                const active = filteredSubProjectIds.has(project.id)
+                return (
+                  <button
+                    key={project.id}
+                    onClick={() => onToggleSubProject(project.id)}
+                    className="text-[11px] px-2 py-0.5 rounded-full transition-colors flex items-center gap-1.5"
+                    style={chipStyle(active, project.color)}
+                  >
+                    <span className="w-1 h-1 rounded-full" style={{ background: project.color }} />
+                    {project.name}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

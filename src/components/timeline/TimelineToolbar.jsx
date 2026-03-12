@@ -1,5 +1,5 @@
 import { memo } from 'react'
-import { ChevronLeft, ChevronRight, Filter, Plus, Target } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Filter, Target } from 'lucide-react'
 import { ZOOM_CONFIGS } from './timelineConfig'
 
 const TimelineToolbar = memo(function TimelineToolbar({
@@ -12,7 +12,6 @@ const TimelineToolbar = memo(function TimelineToolbar({
   onShiftRange,
   onResetToToday,
   onToggleFilterPanel,
-  onAddTask,
 }) {
   return (
     <div className="px-4 md:px-6 pb-2.5">
@@ -63,15 +62,6 @@ const TimelineToolbar = memo(function TimelineToolbar({
         <div className="text-xs px-2 py-1 rounded-lg" style={{ background: 'rgba(255,255,255,0.03)', color: 'var(--text-secondary)' }}>
           {rangeLabel}
         </div>
-
-        <button
-          onClick={onAddTask}
-          className="text-[11px] px-2.5 py-1 rounded-full transition-colors flex items-center gap-1"
-          style={{ background: 'rgba(var(--accent-rgb),0.16)', color: 'var(--accent)', border: '1px solid rgba(var(--accent-rgb),0.45)' }}
-        >
-          <Plus size={11} />
-          Add task
-        </button>
 
         <button
           onClick={onToggleFilterPanel}

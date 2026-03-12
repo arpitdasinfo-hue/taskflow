@@ -1,4 +1,4 @@
-import { memo, useState, useCallback } from 'react'
+import { memo, useCallback, useEffect, useMemo, useState } from 'react'
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
 import TaskCard from '../components/tasks/TaskCard'
 import FilterBar from '../components/tasks/FilterBar'
@@ -9,7 +9,7 @@ import { ListTodo, ChevronRight, CheckSquare } from 'lucide-react'
 import useSettingsStore from '../store/useSettingsStore'
 import useTaskStore from '../store/useTaskStore'
 import useProjectStore from '../store/useProjectStore'
-import { useFilteredTasks, useTasksByStatus } from '../hooks/useFilteredTasks'
+import { useFilteredTasks } from '../hooks/useFilteredTasks'
 
 const PRIORITY_COLOR = { critical: '#ef4444', high: '#f97316', medium: '#f59e0b', low: '#64748b' }
 const STATUS_COLOR   = { todo: '#94a3b8', 'in-progress': '#22d3ee', review: '#f59e0b', done: '#10b981', blocked: '#ef4444' }
@@ -192,8 +192,7 @@ const ListView = memo(function ListView({ tasks, selectMode }) {
 })
 
 // ── Board View ─────────────────────────────────────────────────────────────────
-const BoardView = memo(function BoardView({ selectMode }) {
-  const tasksByStatus = useTasksByStatus()
+const BoardView = memo(function BoardView({ selectMode, tasksByStatus }) {
   const updateTask    = useTaskStore((s) => s.updateTask)
 
   const onDragEnd = useCallback(
@@ -227,10 +226,53 @@ const BoardView = memo(function BoardView({ selectMode }) {
 const Tasks = memo(function Tasks() {
   const [showFilter, setShowFilter] = useState(false)
   const [selectMode, setSelectMode] = useState(false)
+  const [filterProgramId, setFilterProgramId] = useState('')
+  const [filterProjectId, setFilterProjectId] = useState('')
   const view               = useSettingsStore((s) => s.view)
   const selectedTaskIds    = useSettingsStore((s) => s.selectedTaskIds)
   const clearTaskSelection = useSettingsStore((s) => s.clearTaskSelection)
   const tasks              = useFilteredTasks()
+  const programs           = useProjectStore((s) => s.programs)
+  const projects           = useProjectStore((s) => s.projects)
+  const projectById        = useMemo(() => new Map(projects.map((project) => [project.id, project])), [projects])
+
+  const visibleProjects = useMemo(() => {
+    if (!filterProgramId) return projects
+    return projects.filter((project) => project.programId === filterProgramId)
+  }, [projects, filterProgramId])
+
+  useEffect(() => {
+    if (!filterProjectId) return
+    const project = projectById.get(filterProjectId)
+    if (!project || (filterProgramId && project.programId !== filterProgramId)) {
+      setFilterProjectId('')
+    }
+  }, [projectById, filterProgramId, filterProjectId])
+
+  const filteredTasks = useMemo(() => {
+    if (!filterProgramId && !filterProjectId) return tasks
+
+    return tasks.filter((task) => {
+      const project = projectById.get(task.projectId)
+      if (filterProgramId && project?.programId !== filterProgramId) return false
+      if (filterProjectId && task.projectId !== filterProjectId) return false
+      return true
+    })
+  }, [tasks, projectById, filterProgramId, filterProjectId])
+
+  const tasksByStatus = useMemo(() => {
+    const grouped = {
+      todo: [],
+      'in-progress': [],
+      review: [],
+      done: [],
+      blocked: [],
+    }
+    filteredTasks.forEach((task) => {
+      if (grouped[task.status]) grouped[task.status].push(task)
+    })
+    return grouped
+  }, [filteredTasks])
 
   const toggleSelectMode = () => {
     setSelectMode((v) => { if (v) clearTaskSelection(); return !v })
@@ -246,25 +288,67 @@ const Tasks = memo(function Tasks() {
         </div>
       )}
 
-      <div className="px-4 md:px-6 mb-3 flex items-center gap-3">
-        <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-          {tasks.length} {tasks.length === 1 ? 'task' : 'tasks'}
-        </span>
-        <button onClick={toggleSelectMode}
-          className="flex items-center gap-1.5 text-xs px-2 py-1 rounded-lg transition-colors"
-          style={selectMode
-            ? { background: 'rgba(var(--accent-rgb),0.15)', color: 'var(--accent)' }
-            : { color: 'var(--text-secondary)', background: 'rgba(255,255,255,0.04)' }
-          }>
-          <CheckSquare size={12} />
-          {selectMode ? `Selecting (${selectedTaskIds.length})` : 'Select'}
-        </button>
+      <div className="px-4 md:px-6 mb-3 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+            {filteredTasks.length} {filteredTasks.length === 1 ? 'task' : 'tasks'}
+          </span>
+          <button onClick={toggleSelectMode}
+            className="flex items-center gap-1.5 text-xs px-2 py-1 rounded-lg transition-colors"
+            style={selectMode
+              ? { background: 'rgba(var(--accent-rgb),0.15)', color: 'var(--accent)' }
+              : { color: 'var(--text-secondary)', background: 'rgba(255,255,255,0.04)' }
+            }>
+            <CheckSquare size={12} />
+            {selectMode ? `Selecting (${selectedTaskIds.length})` : 'Select'}
+          </button>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <select
+            value={filterProgramId}
+            onChange={(event) => {
+              setFilterProgramId(event.target.value)
+              setFilterProjectId('')
+            }}
+            className="text-xs px-2.5 py-1.5 rounded-lg"
+            style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-primary)' }}
+          >
+            <option value="">All programs</option>
+            {programs.map((program) => (
+              <option key={program.id} value={program.id}>{program.name}</option>
+            ))}
+          </select>
+          <select
+            value={filterProjectId}
+            onChange={(event) => {
+              const nextProjectId = event.target.value
+              setFilterProjectId(nextProjectId)
+              if (!nextProjectId) return
+              const project = projectById.get(nextProjectId)
+              if (project?.programId && project.programId !== filterProgramId) {
+                setFilterProgramId(project.programId)
+              }
+            }}
+            className="text-xs px-2.5 py-1.5 rounded-lg"
+            style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-primary)' }}
+          >
+            <option value="">All projects</option>
+            {visibleProjects.map((project) => {
+              const parent = project.parentId ? projectById.get(project.parentId) : null
+              const label = parent ? `${parent.name} / ${project.name}` : project.name
+              return (
+                <option key={project.id} value={project.id}>{label}</option>
+              )
+            })}
+          </select>
+        </div>
       </div>
 
       <div className={`flex-1 overflow-y-auto px-4 md:px-6 ${view === 'board' ? 'overflow-x-auto' : ''}`}>
         {view === 'list'
-          ? <ListView tasks={tasks} selectMode={selectMode} />
-          : <BoardView selectMode={selectMode} />
+          ? <ListView tasks={filteredTasks} selectMode={selectMode} />
+          : <BoardView selectMode={selectMode} tasksByStatus={tasksByStatus} />
         }
       </div>
 

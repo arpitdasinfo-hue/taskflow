@@ -1,5 +1,5 @@
 import { memo } from 'react'
-import { ChevronDown, ChevronRight, GitBranch, Link2, Plus } from 'lucide-react'
+import { ChevronDown, ChevronRight, GitBranch, Link2 } from 'lucide-react'
 import { ROW_HEIGHT, STATUS_COLOR } from './timelineConfig'
 import { clamp, diffDays, startOfDay, toDisplayDate } from './timelineUtils'
 import TimelineProjectBar from './TimelineProjectBar'
@@ -28,13 +28,11 @@ const TimelineRow = memo(function TimelineRow({
   onSelectTask,
   onUpdateTaskSchedule,
   onUpdateProjectSchedule,
-  onQuickAddTask,
 }) {
   const height = ROW_HEIGHT[row.type] ?? 36
   const todayOffset = diffDays(startDate, startOfDay(new Date()))
   const isProject = row.type === 'project'
   const isTask = row.type === 'task'
-  const isProgram = row.type === 'program'
 
   return (
     <div className="flex" style={{ minHeight: height, borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
@@ -112,18 +110,6 @@ const TimelineRow = memo(function TimelineRow({
           </div>
         )}
 
-        {(isProgram || isProject) && (
-          <div className="flex-shrink-0">
-            <button
-              onClick={() => onQuickAddTask?.({ projectId: isProject ? row.projectId : '', programId: row.programId ?? '' })}
-              className="p-1 rounded-md hover:bg-white/10 transition-colors"
-              style={{ color: 'var(--accent)' }}
-              title={isProject ? 'Add task to this project' : 'Add task in this program'}
-            >
-              <Plus size={12} />
-            </button>
-          </div>
-        )}
       </div>
 
       <div className="relative flex-1" style={{ minWidth: days * cellWidth, height }}>

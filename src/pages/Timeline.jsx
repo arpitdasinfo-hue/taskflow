@@ -22,6 +22,7 @@ const Timeline = memo(function Timeline() {
 
   const [filteredProgramIds, setFilteredProgramIds] = useState(() => new Set())
   const [filteredProjectIds, setFilteredProjectIds] = useState(() => new Set())
+  const [filteredSubProjectIds, setFilteredSubProjectIds] = useState(() => new Set())
   const [expandedProjectIds, setExpandedProjectIds] = useState(() => new Set())
   const [onlyDelayed, setOnlyDelayed] = useState(false)
   const [onlyCritical, setOnlyCritical] = useState(false)
@@ -62,6 +63,7 @@ const Timeline = memo(function Timeline() {
     milestones,
     filteredProgramIds,
     filteredProjectIds,
+    filteredSubProjectIds,
     expandedProjectIds,
     onlyDelayed,
     onlyCritical,
@@ -78,10 +80,21 @@ const Timeline = memo(function Timeline() {
 
     // Keep project filters scoped to latest program choices.
     setFilteredProjectIds(new Set())
+    setFilteredSubProjectIds(new Set())
   }
 
   const toggleProject = (id) => {
     setFilteredProjectIds((previous) => {
+      const next = new Set(previous)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+    setFilteredSubProjectIds(new Set())
+  }
+
+  const toggleSubProject = (id) => {
+    setFilteredSubProjectIds((previous) => {
       const next = new Set(previous)
       if (next.has(id)) next.delete(id)
       else next.add(id)
@@ -101,24 +114,17 @@ const Timeline = memo(function Timeline() {
   const clearFilters = () => {
     setFilteredProgramIds(new Set())
     setFilteredProjectIds(new Set())
+    setFilteredSubProjectIds(new Set())
     setOnlyDelayed(false)
     setOnlyCritical(false)
     setOnlyDependencyRisk(false)
     setShowDependencies(true)
   }
 
-  const openTimelineTaskComposer = ({ projectId = '', programId = '' } = {}) => {
-    if (typeof window === 'undefined') return
-    window.dispatchEvent(
-      new CustomEvent('taskflow:quick-add', {
-        detail: { type: 'task', projectId, programId },
-      })
-    )
-  }
-
   const filtered =
     filteredProgramIds.size > 0 ||
     filteredProjectIds.size > 0 ||
+    filteredSubProjectIds.size > 0 ||
     onlyDelayed ||
     onlyCritical ||
     onlyDependencyRisk
@@ -126,6 +132,7 @@ const Timeline = memo(function Timeline() {
   const activeFilterCount =
     filteredProgramIds.size +
     filteredProjectIds.size +
+    filteredSubProjectIds.size +
     Number(onlyDelayed) +
     Number(onlyCritical) +
     Number(onlyDependencyRisk)
@@ -144,7 +151,6 @@ const Timeline = memo(function Timeline() {
         onShiftRange={shiftRange}
         onResetToToday={resetToToday}
         onToggleFilterPanel={() => setShowFilterPanel((value) => !value)}
-        onAddTask={() => openTimelineTaskComposer()}
       />
 
       {showFilterPanel && (
@@ -153,12 +159,14 @@ const Timeline = memo(function Timeline() {
           projects={projects}
           filteredProgramIds={filteredProgramIds}
           filteredProjectIds={filteredProjectIds}
+          filteredSubProjectIds={filteredSubProjectIds}
           onlyDelayed={onlyDelayed}
           onlyCritical={onlyCritical}
           onlyDependencyRisk={onlyDependencyRisk}
           showDependencies={showDependencies}
           onToggleProgram={toggleProgram}
           onToggleProject={toggleProject}
+          onToggleSubProject={toggleSubProject}
           onToggleOnlyDelayed={() => setOnlyDelayed((value) => !value)}
           onToggleOnlyCritical={() => setOnlyCritical((value) => !value)}
           onToggleOnlyDependencyRisk={() => setOnlyDependencyRisk((value) => !value)}
@@ -183,7 +191,6 @@ const Timeline = memo(function Timeline() {
           onSelectTask={selectTask}
           onUpdateTaskSchedule={(taskId, updates) => updateTask(taskId, updates)}
           onUpdateProjectSchedule={(projectId, updates) => updateProject(projectId, updates)}
-          onQuickAddTask={openTimelineTaskComposer}
           showDependencies={showDependencies}
           onlyDependencyRisk={onlyDependencyRisk}
         />

@@ -88,6 +88,7 @@ const useTimelineRows = ({
   milestones,
   filteredProgramIds,
   filteredProjectIds,
+  filteredSubProjectIds,
   expandedProjectIds,
   onlyDelayed,
   onlyCritical,
@@ -96,6 +97,8 @@ const useTimelineRows = ({
   const today = toDisplayDate(new Date())
   const hasProgramFilter = filteredProgramIds.size > 0
   const hasProjectFilter = filteredProjectIds.size > 0
+  const hasSubProjectFilter = filteredSubProjectIds.size > 0
+  const hasHierarchyFilter = hasProjectFilter || hasSubProjectFilter
   const hasQuickFilter = onlyDelayed || onlyCritical || onlyDependencyRisk
 
   const childProjectsByParent = new Map()
@@ -132,16 +135,29 @@ const useTimelineRows = ({
     milestonesByProject.set(milestone.projectId, bucket)
   })
 
-  const selectedDescendantCache = new Map()
-  const hasSelectedDescendant = (projectId) => {
-    if (selectedDescendantCache.has(projectId)) return selectedDescendantCache.get(projectId)
+  const selectedProjectDescendantCache = new Map()
+  const hasSelectedProjectDescendant = (projectId) => {
+    if (selectedProjectDescendantCache.has(projectId)) return selectedProjectDescendantCache.get(projectId)
 
     const children = childProjectsByParent.get(projectId) ?? []
     const found = children.some((child) =>
-      filteredProjectIds.has(child.id) || hasSelectedDescendant(child.id)
+      filteredProjectIds.has(child.id) || hasSelectedProjectDescendant(child.id)
     )
 
-    selectedDescendantCache.set(projectId, found)
+    selectedProjectDescendantCache.set(projectId, found)
+    return found
+  }
+
+  const selectedSubProjectDescendantCache = new Map()
+  const hasSelectedSubProjectDescendant = (projectId) => {
+    if (selectedSubProjectDescendantCache.has(projectId)) return selectedSubProjectDescendantCache.get(projectId)
+
+    const children = childProjectsByParent.get(projectId) ?? []
+    const found = children.some((child) =>
+      filteredSubProjectIds.has(child.id) || hasSelectedSubProjectDescendant(child.id)
+    )
+
+    selectedSubProjectDescendantCache.set(projectId, found)
     return found
   }
 
@@ -174,12 +190,21 @@ const useTimelineRows = ({
     const programAllowed = !hasProgramFilter || filteredProgramIds.has(project.programId)
     if (!programAllowed) return { rows: [], stats: ZERO_STATS }
 
-    const selectedSelf = filteredProjectIds.has(project.id)
-    const selectedByHierarchy = selectedSelf || ancestorSelected || hasSelectedDescendant(project.id)
-    if (hasProjectFilter && !selectedByHierarchy) return { rows: [], stats: ZERO_STATS }
+    const selectedSelfProject = filteredProjectIds.has(project.id)
+    const selectedSelfSubProject = filteredSubProjectIds.has(project.id)
+    const selectedByHierarchy =
+      selectedSelfProject ||
+      selectedSelfSubProject ||
+      ancestorSelected ||
+      hasSelectedProjectDescendant(project.id) ||
+      hasSelectedSubProjectDescendant(project.id)
+
+    if (hasHierarchyFilter && !selectedByHierarchy) return { rows: [], stats: ZERO_STATS }
 
     const childResults = (childProjectsByParent.get(project.id) ?? []).map((child) =>
-      buildProjectRows(child, depth + 1, { ancestorSelected: ancestorSelected || selectedSelf })
+      buildProjectRows(child, depth + 1, {
+        ancestorSelected: ancestorSelected || selectedSelfProject || selectedSelfSubProject,
+      })
     )
     const childRows = childResults.flatMap((result) => result.rows)
     const childStats = childResults.reduce((acc, result) => mergeStats(acc, result.stats), ZERO_STATS)
@@ -412,6 +437,7 @@ const useTimelineRows = ({
   milestones,
   filteredProgramIds,
   filteredProjectIds,
+  filteredSubProjectIds,
   expandedProjectIds,
   onlyDelayed,
   onlyCritical,

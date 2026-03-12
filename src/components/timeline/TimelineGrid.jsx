@@ -22,7 +22,6 @@ const TimelineGrid = memo(function TimelineGrid({
   onSelectTask,
   onUpdateTaskSchedule,
   onUpdateProjectSchedule,
-  onQuickAddTask,
   showDependencies,
   onlyDependencyRisk,
 }) {
@@ -154,7 +153,6 @@ const TimelineGrid = memo(function TimelineGrid({
               onSelectTask={onSelectTask}
               onUpdateTaskSchedule={onUpdateTaskSchedule}
               onUpdateProjectSchedule={onUpdateProjectSchedule}
-              onQuickAddTask={onQuickAddTask}
             />
           ))}
         </div>
