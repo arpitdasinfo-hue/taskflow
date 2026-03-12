@@ -2,9 +2,13 @@ import { useMemo, useState } from 'react'
 import { DEFAULT_OFFSET_BY_ZOOM, DEFAULT_ZOOM, ZOOM_CONFIGS } from '../components/timeline/timelineConfig'
 import { addDays, formatRangeLabel, startOfDay } from '../components/timeline/timelineUtils'
 
-const useTimelineScale = () => {
-  const [zoom, setZoom] = useState(DEFAULT_ZOOM)
-  const [offsetDays, setOffsetDays] = useState(DEFAULT_OFFSET_BY_ZOOM[DEFAULT_ZOOM])
+const useTimelineScale = ({ initialZoom, initialOffsetDays } = {}) => {
+  const resolvedInitialZoom = ZOOM_CONFIGS[initialZoom] ? initialZoom : DEFAULT_ZOOM
+  const [zoom, setZoom] = useState(resolvedInitialZoom)
+  const [offsetDays, setOffsetDays] = useState(() => {
+    if (Number.isFinite(initialOffsetDays)) return initialOffsetDays
+    return DEFAULT_OFFSET_BY_ZOOM[resolvedInitialZoom] ?? DEFAULT_OFFSET_BY_ZOOM[DEFAULT_ZOOM]
+  })
 
   const config = ZOOM_CONFIGS[zoom]
 

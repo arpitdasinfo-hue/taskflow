@@ -19,17 +19,19 @@ const Timeline = memo(function Timeline() {
   const tasks = useTaskStore((s) => s.tasks)
   const updateTask = useTaskStore((s) => s.updateTask)
   const selectTask = useSettingsStore((s) => s.selectTask)
+  const ganttConfig = useSettingsStore((s) => s.ganttConfig)
+  const setGanttConfig = useSettingsStore((s) => s.setGanttConfig)
 
-  const [filteredProgramIds, setFilteredProgramIds] = useState(() => new Set())
-  const [filteredProjectIds, setFilteredProjectIds] = useState(() => new Set())
-  const [filteredSubProjectIds, setFilteredSubProjectIds] = useState(() => new Set())
-  const [expandedProjectIds, setExpandedProjectIds] = useState(() => new Set())
-  const [onlyDelayed, setOnlyDelayed] = useState(false)
-  const [onlyCritical, setOnlyCritical] = useState(false)
-  const [onlyDependencyRisk, setOnlyDependencyRisk] = useState(false)
-  const [showDependencies, setShowDependencies] = useState(true)
+  const [filteredProgramIds, setFilteredProgramIds] = useState(() => new Set(ganttConfig.filteredProgramIds ?? []))
+  const [filteredProjectIds, setFilteredProjectIds] = useState(() => new Set(ganttConfig.filteredProjectIds ?? []))
+  const [filteredSubProjectIds, setFilteredSubProjectIds] = useState(() => new Set(ganttConfig.filteredSubProjectIds ?? []))
+  const [expandedProjectIds, setExpandedProjectIds] = useState(() => new Set(ganttConfig.expandedProjectIds ?? []))
+  const [onlyDelayed, setOnlyDelayed] = useState(Boolean(ganttConfig.onlyDelayed))
+  const [onlyCritical, setOnlyCritical] = useState(Boolean(ganttConfig.onlyCritical))
+  const [onlyDependencyRisk, setOnlyDependencyRisk] = useState(Boolean(ganttConfig.onlyDependencyRisk))
+  const [showDependencies, setShowDependencies] = useState(ganttConfig.showDependencies ?? true)
   const [showFilterPanel, setShowFilterPanel] = useState(false)
-  const initializedExpandedRef = useRef(false)
+  const initializedExpandedRef = useRef((ganttConfig.expandedProjectIds ?? []).length > 0)
 
   useEffect(() => {
     if (initializedExpandedRef.current || projects.length === 0 || tasks.length === 0) return
@@ -50,11 +52,41 @@ const Timeline = memo(function Timeline() {
     zoom,
     config,
     startDate,
+    endDate,
     rangeLabel,
     changeZoom,
     shiftRange,
     resetToToday,
-  } = useTimelineScale()
+  } = useTimelineScale({ initialZoom: ganttConfig.zoom })
+
+  useEffect(() => {
+    setGanttConfig({
+      zoom,
+      showDependencies,
+      onlyDelayed,
+      onlyCritical,
+      onlyDependencyRisk,
+      filteredProgramIds: [...filteredProgramIds],
+      filteredProjectIds: [...filteredProjectIds],
+      filteredSubProjectIds: [...filteredSubProjectIds],
+      expandedProjectIds: [...expandedProjectIds],
+      rangeStart: startDate?.toISOString?.() ?? null,
+      rangeEnd: endDate?.toISOString?.() ?? null,
+    })
+  }, [
+    zoom,
+    showDependencies,
+    onlyDelayed,
+    onlyCritical,
+    onlyDependencyRisk,
+    filteredProgramIds,
+    filteredProjectIds,
+    filteredSubProjectIds,
+    expandedProjectIds,
+    startDate,
+    endDate,
+    setGanttConfig,
+  ])
 
   const { rows, stats } = useTimelineRows({
     programs,

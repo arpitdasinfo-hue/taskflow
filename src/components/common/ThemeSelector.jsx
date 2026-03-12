@@ -1,15 +1,38 @@
 import { memo } from 'react'
-import { Check, RefreshCw } from 'lucide-react'
-import { THEMES, THEME_ROTATION_DAYS } from '../../themes'
+import { Check, RefreshCw, SunMoon } from 'lucide-react'
+import { THEMES } from '../../themes'
 import useSettingsStore from '../../store/useSettingsStore'
 import { formatDistanceToNow } from 'date-fns'
 
-const ThemeSelector = memo(function ThemeSelector() {
-  const themeIndex      = useSettingsStore((s) => s.themeIndex)
-  const themeLastChanged = useSettingsStore((s) => s.themeLastChanged)
-  const setTheme        = useSettingsStore((s) => s.setTheme)
+const SEGMENT_BASE =
+  'px-2.5 py-1.5 rounded-lg text-[11px] font-semibold transition-colors'
 
-  const nextChange = new Date(new Date(themeLastChanged).getTime() + THEME_ROTATION_DAYS * 86400000)
+const Segment = ({ active, label, onClick }) => (
+  <button
+    onClick={onClick}
+    className={SEGMENT_BASE}
+    style={active
+      ? { background: 'rgba(var(--accent-rgb),0.18)', color: 'var(--accent)', border: '1px solid rgba(var(--accent-rgb),0.32)' }
+      : { background: 'rgba(255,255,255,0.04)', color: 'var(--text-secondary)', border: '1px solid rgba(255,255,255,0.1)' }}
+  >
+    {label}
+  </button>
+)
+
+const ThemeSelector = memo(function ThemeSelector() {
+  const themeIndex = useSettingsStore((s) => s.themeIndex)
+  const themeLastChanged = useSettingsStore((s) => s.themeLastChanged)
+  const themeMode = useSettingsStore((s) => s.themeMode)
+  const themeRotationDays = useSettingsStore((s) => s.themeRotationDays)
+  const contrastMode = useSettingsStore((s) => s.contrastMode)
+  const uiDensity = useSettingsStore((s) => s.uiDensity)
+  const setTheme = useSettingsStore((s) => s.setTheme)
+  const setThemeMode = useSettingsStore((s) => s.setThemeMode)
+  const setThemeRotationDays = useSettingsStore((s) => s.setThemeRotationDays)
+  const setContrastMode = useSettingsStore((s) => s.setContrastMode)
+  const setUiDensity = useSettingsStore((s) => s.setUiDensity)
+
+  const nextChange = new Date(new Date(themeLastChanged).getTime() + themeRotationDays * 86400000)
   const isInFuture = nextChange > new Date()
 
   return (
@@ -19,13 +42,61 @@ const ThemeSelector = memo(function ThemeSelector() {
         className="flex items-center gap-2 px-3 py-2 rounded-xl mb-4 text-xs"
         style={{ background: 'rgba(var(--accent-rgb),0.08)', border: '1px solid rgba(var(--accent-rgb),0.15)', color: 'var(--text-secondary)' }}
       >
-        <RefreshCw size={12} style={{ color: 'var(--accent)' }} />
+        <SunMoon size={12} style={{ color: 'var(--accent)' }} />
         <span>
-          Auto-rotates every {THEME_ROTATION_DAYS} days ·{' '}
-          {isInFuture
-            ? `Next change ${formatDistanceToNow(nextChange, { addSuffix: true })}`
-            : 'Will change on next visit'}
+          {themeMode === 'auto' ? `Auto mode (${themeRotationDays} days)` : 'Manual mode'} ·
+          {' '}
+          {contrastMode === 'high' ? 'High contrast' : 'Standard contrast'} ·
+          {' '}
+          {uiDensity === 'compact' ? 'Compact density' : 'Comfortable density'}
         </span>
+      </div>
+
+      <div className="space-y-3 mb-4">
+        <div className="flex items-center gap-2 flex-wrap">
+          <p className="text-[10px] uppercase tracking-wider min-w-16" style={{ color: 'var(--text-secondary)' }}>
+            Mode
+          </p>
+          <Segment active={themeMode === 'auto'} label="Auto" onClick={() => setThemeMode('auto')} />
+          <Segment active={themeMode === 'manual'} label="Manual" onClick={() => setThemeMode('manual')} />
+          {themeMode === 'auto' && (
+            <>
+              <Segment active={themeRotationDays === 7} label="7d" onClick={() => setThemeRotationDays(7)} />
+              <Segment active={themeRotationDays === 14} label="14d" onClick={() => setThemeRotationDays(14)} />
+              <Segment active={themeRotationDays === 30} label="30d" onClick={() => setThemeRotationDays(30)} />
+            </>
+          )}
+        </div>
+
+        <div className="flex items-center gap-2 flex-wrap">
+          <p className="text-[10px] uppercase tracking-wider min-w-16" style={{ color: 'var(--text-secondary)' }}>
+            Contrast
+          </p>
+          <Segment active={contrastMode === 'standard'} label="Standard" onClick={() => setContrastMode('standard')} />
+          <Segment active={contrastMode === 'high'} label="High" onClick={() => setContrastMode('high')} />
+        </div>
+
+        <div className="flex items-center gap-2 flex-wrap">
+          <p className="text-[10px] uppercase tracking-wider min-w-16" style={{ color: 'var(--text-secondary)' }}>
+            Density
+          </p>
+          <Segment active={uiDensity === 'comfortable'} label="Comfortable" onClick={() => setUiDensity('comfortable')} />
+          <Segment active={uiDensity === 'compact'} label="Compact" onClick={() => setUiDensity('compact')} />
+        </div>
+
+        <div
+          className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs"
+          style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', color: 'var(--text-secondary)' }}
+        >
+          <RefreshCw size={12} style={{ color: 'var(--accent)' }} />
+          <span>
+            {themeMode === 'auto'
+              ? (isInFuture
+                ? `Next change ${formatDistanceToNow(nextChange, { addSuffix: true })}`
+                : 'Will change on next visit')
+              : 'Manual mode keeps current theme until changed'}
+          </span>
+        </div>
       </div>
 
       {/* Grid */}

@@ -1,7 +1,8 @@
 import { memo, useState, useMemo } from 'react'
-import { X, Download, ChevronLeft, ChevronRight, Table, FileText, Check } from 'lucide-react'
+import { X, Download, ChevronLeft, ChevronRight, Table, FileText, FileSpreadsheet, Check } from 'lucide-react'
 import useTaskStore from '../../store/useTaskStore'
 import useProjectStore from '../../store/useProjectStore'
+import useSettingsStore from '../../store/useSettingsStore'
 
 const fmt = (iso) => iso ? new Date(iso).toISOString().split('T')[0] : ''
 const fmtHuman = (iso) => iso ? new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'
@@ -180,6 +181,345 @@ function buildPDF(tasks, projects, programs, milestones, include) {
     </div></body></html>`
 }
 
+const XLSX_COLUMN_LABEL = {
+  id: 'ID',
+  title: 'Title',
+  status: 'Status',
+  priority: 'Priority',
+  project: 'Project',
+  program: 'Program',
+  dueDate: 'Due Date',
+  startDate: 'Start Date',
+  tags: 'Tags',
+  dependencies: 'Dependencies',
+  notes: 'Notes',
+  createdAt: 'Created At',
+}
+
+const TASK_PROGRESS_BY_STATUS = {
+  done: 100,
+  review: 80,
+  'in-progress': 55,
+  blocked: 20,
+  todo: 0,
+}
+
+const getTaskColumnValue = (task, key, getProject, getProgram) => {
+  switch (key) {
+    case 'id': return task.id
+    case 'title': return task.title ?? ''
+    case 'status': return task.status ?? ''
+    case 'priority': return task.priority ?? ''
+    case 'project': return getProject(task.projectId)?.name ?? '—'
+    case 'program': return getProgram(task.projectId)?.name ?? '—'
+    case 'dueDate': return fmt(task.dueDate)
+    case 'startDate': return fmt(task.startDate)
+    case 'tags': return (task.tags ?? []).join(', ')
+    case 'dependencies': return (task.dependsOn ?? []).join(', ')
+    case 'notes': return (task.notes ?? []).map((note) => note.content).join(' | ')
+    case 'createdAt': return fmt(task.createdAt)
+    default: return ''
+  }
+}
+
+const getDateBounds = (items) => {
+  const starts = items.map((item) => item.startDate).filter(Boolean).map((date) => new Date(date).getTime())
+  const ends = items.map((item) => item.dueDate).filter(Boolean).map((date) => new Date(date).getTime())
+  return {
+    start: starts.length ? fmt(new Date(Math.min(...starts)).toISOString()) : '',
+    end: ends.length ? fmt(new Date(Math.max(...ends)).toISOString()) : '',
+  }
+}
+
+const escapeXml = (value) =>
+  String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;')
+
+const toSpreadsheetCellXml = (value) => {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return `<Cell><Data ss:Type="Number">${value}</Data></Cell>`
+  }
+  return `<Cell><Data ss:Type="String">${escapeXml(value)}</Data></Cell>`
+}
+
+const rowsToWorksheetXml = (name, rows) => {
+  const safeRows = rows.length ? rows : [{ Note: 'No records found' }]
+  const columns = []
+
+  safeRows.forEach((row) => {
+    Object.keys(row).forEach((key) => {
+      if (!columns.includes(key)) columns.push(key)
+    })
+  })
+
+  const headerRow = `<Row>${columns.map((key) => `<Cell><Data ss:Type="String">${escapeXml(key)}</Data></Cell>`).join('')}</Row>`
+  const dataRows = safeRows
+    .map((row) => `<Row>${columns.map((key) => toSpreadsheetCellXml(row[key] ?? '')).join('')}</Row>`)
+    .join('')
+
+  return `<Worksheet ss:Name="${escapeXml(name)}"><Table>${headerRow}${dataRows}</Table></Worksheet>`
+}
+
+const buildWorkbookXml = (sheets) => `<?xml version="1.0"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+  xmlns:o="urn:schemas-microsoft-com:office:office"
+  xmlns:x="urn:schemas-microsoft-com:office:excel"
+  xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
+  ${sheets.map((sheet) => rowsToWorksheetXml(sheet.name, sheet.rows)).join('\n')}
+</Workbook>`
+
+function buildExcelWorkbookXml({
+  tasks,
+  projects,
+  programs,
+  milestones,
+  columns,
+  include,
+  ganttConfig,
+  scope,
+}) {
+  const getProject = (id) => projects.find((project) => project.id === id)
+  const getProgram = (projectId) => {
+    const project = getProject(projectId)
+    if (!project?.programId) return null
+    return programs.find((program) => program.id === project.programId)
+  }
+
+  const selectedColumnKeys = Object.keys(columns).filter((key) => columns[key])
+  const selectedTemplate = Object.fromEntries(
+    selectedColumnKeys.map((key) => [XLSX_COLUMN_LABEL[key] ?? key, ''])
+  )
+
+  const taskRows = tasks.map((task) => {
+    const project = getProject(task.projectId)
+    const parentProject = project?.parentId ? getProject(project.parentId) : null
+    const selectedValues = Object.fromEntries(
+      selectedColumnKeys.map((key) => [XLSX_COLUMN_LABEL[key] ?? key, getTaskColumnValue(task, key, getProject, getProgram)])
+    )
+    return {
+      ...selectedTemplate,
+      'Row Type': 'Task',
+      Program: getProgram(task.projectId)?.name ?? 'Unassigned',
+      Project: parentProject ? parentProject.name : project?.name ?? '—',
+      'Sub-project': parentProject ? project?.name ?? '' : '',
+      'Item Name': task.title,
+      'Item ID': task.id,
+      'Parent ID': task.projectId ?? '',
+      Start: fmt(task.startDate),
+      Due: fmt(task.dueDate),
+      'Progress %': TASK_PROGRESS_BY_STATUS[task.status] ?? 0,
+      'Dependency IDs': (task.dependsOn ?? []).join(', '),
+      ...selectedValues,
+    }
+  })
+
+  const topLevelProjects = projects.filter((project) => !project.parentId)
+  const subProjectsByParent = projects.reduce((acc, project) => {
+    if (!project.parentId) return acc
+    if (!acc.has(project.parentId)) acc.set(project.parentId, [])
+    acc.get(project.parentId).push(project)
+    return acc
+  }, new Map())
+
+  const hierarchyRows = []
+  programs.forEach((program) => {
+    const programProjects = topLevelProjects.filter((project) => project.programId === program.id)
+    const programProjectIds = new Set(
+      programProjects.flatMap((project) => [project.id, ...(subProjectsByParent.get(project.id) ?? []).map((sub) => sub.id)])
+    )
+    const programTasks = tasks.filter((task) => task.projectId && programProjectIds.has(task.projectId))
+    const programDone = programTasks.filter((task) => task.status === 'done').length
+    const programProgress = programTasks.length ? Math.round((programDone / programTasks.length) * 100) : 0
+    const bounds = getDateBounds(programTasks)
+
+    hierarchyRows.push({
+      ...selectedTemplate,
+      'Row Type': 'Program',
+      Program: program.name,
+      Project: '',
+      'Sub-project': '',
+      'Item Name': program.name,
+      'Item ID': program.id,
+      'Parent ID': '',
+      Start: bounds.start,
+      Due: bounds.end,
+      'Progress %': programProgress,
+      'Dependency IDs': '',
+    })
+
+    programProjects.forEach((project) => {
+      const children = subProjectsByParent.get(project.id) ?? []
+      const projectIds = new Set([project.id, ...children.map((sub) => sub.id)])
+      const projectTasks = tasks.filter((task) => task.projectId && projectIds.has(task.projectId))
+      const projectDone = projectTasks.filter((task) => task.status === 'done').length
+      const projectProgress = projectTasks.length ? Math.round((projectDone / projectTasks.length) * 100) : 0
+      const projectBounds = getDateBounds(projectTasks)
+
+      hierarchyRows.push({
+        ...selectedTemplate,
+        'Row Type': 'Project',
+        Program: program.name,
+        Project: project.name,
+        'Sub-project': '',
+        'Item Name': project.name,
+        'Item ID': project.id,
+        'Parent ID': program.id,
+        Start: projectBounds.start || fmt(project.startDate),
+        Due: projectBounds.end || fmt(project.dueDate),
+        'Progress %': projectProgress,
+        'Dependency IDs': '',
+      })
+
+      children.forEach((subProject) => {
+        const subTasks = tasks.filter((task) => task.projectId === subProject.id)
+        const subDone = subTasks.filter((task) => task.status === 'done').length
+        const subProgress = subTasks.length ? Math.round((subDone / subTasks.length) * 100) : 0
+        const subBounds = getDateBounds(subTasks)
+
+        hierarchyRows.push({
+          ...selectedTemplate,
+          'Row Type': 'Sub-project',
+          Program: program.name,
+          Project: project.name,
+          'Sub-project': subProject.name,
+          'Item Name': subProject.name,
+          'Item ID': subProject.id,
+          'Parent ID': project.id,
+          Start: subBounds.start || fmt(subProject.startDate),
+          Due: subBounds.end || fmt(subProject.dueDate),
+          'Progress %': subProgress,
+          'Dependency IDs': '',
+        })
+      })
+    })
+  })
+
+  const unassignedProjects = topLevelProjects.filter((project) => !project.programId)
+  unassignedProjects.forEach((project) => {
+    const children = subProjectsByParent.get(project.id) ?? []
+    const projectIds = new Set([project.id, ...children.map((sub) => sub.id)])
+    const projectTasks = tasks.filter((task) => task.projectId && projectIds.has(task.projectId))
+    const projectDone = projectTasks.filter((task) => task.status === 'done').length
+    const projectProgress = projectTasks.length ? Math.round((projectDone / projectTasks.length) * 100) : 0
+    const projectBounds = getDateBounds(projectTasks)
+
+    hierarchyRows.push({
+      ...selectedTemplate,
+      'Row Type': 'Project',
+      Program: 'Unassigned',
+      Project: project.name,
+      'Sub-project': '',
+      'Item Name': project.name,
+      'Item ID': project.id,
+      'Parent ID': '',
+      Start: projectBounds.start || fmt(project.startDate),
+      Due: projectBounds.end || fmt(project.dueDate),
+      'Progress %': projectProgress,
+      'Dependency IDs': '',
+    })
+
+    children.forEach((subProject) => {
+      const subTasks = tasks.filter((task) => task.projectId === subProject.id)
+      const subDone = subTasks.filter((task) => task.status === 'done').length
+      const subProgress = subTasks.length ? Math.round((subDone / subTasks.length) * 100) : 0
+      const subBounds = getDateBounds(subTasks)
+
+      hierarchyRows.push({
+        ...selectedTemplate,
+        'Row Type': 'Sub-project',
+        Program: 'Unassigned',
+        Project: project.name,
+        'Sub-project': subProject.name,
+        'Item Name': subProject.name,
+        'Item ID': subProject.id,
+        'Parent ID': project.id,
+        Start: subBounds.start || fmt(subProject.startDate),
+        Due: subBounds.end || fmt(subProject.dueDate),
+        'Progress %': subProgress,
+        'Dependency IDs': '',
+      })
+    })
+  })
+
+  const workItemsRows = [...hierarchyRows, ...taskRows]
+  const sheets = [
+    {
+      name: 'Work_Items',
+      rows: workItemsRows.length ? workItemsRows : [{ 'Row Type': 'Info', 'Item Name': 'No matching work items' }],
+    },
+  ]
+
+  if (include.milestones) {
+    const milestoneRows = milestones.map((milestone) => {
+      const project = getProject(milestone.projectId)
+      const parentProject = project?.parentId ? getProject(project.parentId) : null
+      const program = project?.programId ? programs.find((item) => item.id === project.programId) : null
+      return {
+        Milestone: milestone.name,
+        Program: program?.name ?? '—',
+        Project: parentProject ? parentProject.name : project?.name ?? '—',
+        'Sub-project': parentProject ? project?.name ?? '' : '',
+        'Due Date': fmt(milestone.dueDate),
+        Status: milestone.status,
+      }
+    })
+    sheets.push({
+      name: 'Milestones',
+      rows: milestoneRows.length ? milestoneRows : [{ Milestone: 'No milestones in selected scope' }],
+    })
+  }
+
+  if (include.summaries) {
+    const done = tasks.filter((task) => task.status === 'done').length
+    const blocked = tasks.filter((task) => task.status === 'blocked').length
+    const overdue = tasks.filter((task) => task.dueDate && new Date(task.dueDate) < new Date() && task.status !== 'done').length
+    sheets.push({
+      name: 'Summary',
+      rows: [
+        { Metric: 'Generated At', Value: fmtHuman(new Date().toISOString()) },
+        { Metric: 'Scope', Value: scope },
+        { Metric: 'Programs', Value: programs.length },
+        { Metric: 'Projects', Value: projects.filter((project) => !project.parentId).length },
+        { Metric: 'Sub-projects', Value: projects.filter((project) => project.parentId).length },
+        { Metric: 'Tasks', Value: tasks.length },
+        { Metric: 'Done Tasks', Value: done },
+        { Metric: 'Blocked Tasks', Value: blocked },
+        { Metric: 'Overdue Tasks', Value: overdue },
+      ],
+    })
+  }
+
+  if (include.ganttConfig) {
+    const programNameById = new Map(programs.map((program) => [program.id, program.name]))
+    const projectNameById = new Map(projects.map((project) => [project.id, project.name]))
+    const ganttRows = [
+      { Setting: 'view_start', Value: fmt(ganttConfig.rangeStart), Note: 'Initial visible timeline start date' },
+      { Setting: 'view_end', Value: fmt(ganttConfig.rangeEnd), Note: 'Initial visible timeline end date' },
+      { Setting: 'zoom', Value: ganttConfig.zoom ?? 'month', Note: 'week | month | quarter' },
+      { Setting: 'show_dependencies', Value: String(ganttConfig.showDependencies ?? true), Note: 'Render dependency links' },
+      { Setting: 'only_delayed', Value: String(Boolean(ganttConfig.onlyDelayed)), Note: 'Filter delayed rows only' },
+      { Setting: 'only_critical', Value: String(Boolean(ganttConfig.onlyCritical)), Note: 'Filter critical rows only' },
+      { Setting: 'only_dependency_risk', Value: String(Boolean(ganttConfig.onlyDependencyRisk)), Note: 'Filter dependency risk rows only' },
+      { Setting: 'filtered_program_ids', Value: (ganttConfig.filteredProgramIds ?? []).join(', '), Note: 'Comma-separated program ids' },
+      { Setting: 'filtered_program_names', Value: (ganttConfig.filteredProgramIds ?? []).map((id) => programNameById.get(id) ?? id).join(', '), Note: 'Program labels for filters' },
+      { Setting: 'filtered_project_ids', Value: (ganttConfig.filteredProjectIds ?? []).join(', '), Note: 'Comma-separated project ids' },
+      { Setting: 'filtered_project_names', Value: (ganttConfig.filteredProjectIds ?? []).map((id) => projectNameById.get(id) ?? id).join(', '), Note: 'Project labels for filters' },
+      { Setting: 'filtered_sub_project_ids', Value: (ganttConfig.filteredSubProjectIds ?? []).join(', '), Note: 'Comma-separated sub-project ids' },
+      { Setting: 'filtered_sub_project_names', Value: (ganttConfig.filteredSubProjectIds ?? []).map((id) => projectNameById.get(id) ?? id).join(', '), Note: 'Sub-project labels for filters' },
+      { Setting: 'expanded_project_ids', Value: (ganttConfig.expandedProjectIds ?? []).join(', '), Note: 'Expanded project rows in tree' },
+      { Setting: 'export_scope', Value: scope, Note: 'Export modal scope option' },
+    ]
+    sheets.push({ name: 'Gantt_Config', rows: ganttRows })
+  }
+
+  return buildWorkbookXml(sheets)
+}
+
 // ── ExportModal ───────────────────────────────────────────────────────────────
 const COLUMN_OPTIONS = [
   { key: 'id',          label: 'ID'           },
@@ -199,13 +539,14 @@ const COLUMN_OPTIONS = [
 const DEFAULT_COLUMNS = { id: false, title: true, status: true, priority: true, project: true,
   program: true, dueDate: true, startDate: false, tags: false, dependencies: false, notes: false, createdAt: false }
 
-const DEFAULT_INCLUDE = { tasks: true, subtasks: false, milestones: false, summaries: true }
+const DEFAULT_INCLUDE = { tasks: true, subtasks: false, milestones: false, summaries: true, ganttConfig: true }
 
 const ExportModal = memo(function ExportModal({ onClose }) {
   const tasks      = useTaskStore((s) => s.tasks)
   const projects   = useProjectStore((s) => s.projects)
   const programs   = useProjectStore((s) => s.programs)
   const milestones = useProjectStore((s) => s.milestones)
+  const ganttConfig = useSettingsStore((s) => s.ganttConfig)
 
   const [step, setStep]     = useState(1)
   const [format, setFormat] = useState('csv')
@@ -237,19 +578,49 @@ const ExportModal = memo(function ExportModal({ onClose }) {
   }, [scope, selProgramIds, selProjectIds, tasks, projects, milestones])
 
   const taskCount = scopedData.tasks.length
+  const scopedPrograms = useMemo(() => {
+    if (scope === 'all') return programs
+    if (scope === 'programs' && selProgramIds.size > 0) {
+      return programs.filter((program) => selProgramIds.has(program.id))
+    }
+    const relevantProgramIds = new Set(
+      scopedData.projects
+        .map((project) => project.programId)
+        .filter(Boolean)
+    )
+    return programs.filter((program) => relevantProgramIds.has(program.id))
+  }, [scope, selProgramIds, scopedData.projects, programs])
 
   const runExport = () => {
     setExporting(true)
     try {
       if (format === 'csv') {
-        const csv  = buildCSV(scopedData.tasks, projects, programs, columns, include.subtasks, include.milestones, scopedData.milestones)
+        const csv  = buildCSV(scopedData.tasks, scopedData.projects, scopedPrograms, columns, include.subtasks, include.milestones, scopedData.milestones)
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
         const url  = URL.createObjectURL(blob)
         const a    = document.createElement('a')
         a.href = url; a.download = `taskflow-${new Date().toISOString().split('T')[0]}.csv`
         a.click(); URL.revokeObjectURL(url)
+      } else if (format === 'xlsx') {
+        const workbookXml = buildExcelWorkbookXml({
+          tasks: include.tasks ? scopedData.tasks : [],
+          projects: scopedData.projects,
+          programs: scopedPrograms,
+          milestones: scopedData.milestones,
+          columns,
+          include,
+          ganttConfig,
+          scope,
+        })
+        const blob = new Blob([workbookXml], { type: 'application/vnd.ms-excel;charset=utf-8;' })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `taskflow-${new Date().toISOString().split('T')[0]}.xls`
+        a.click()
+        URL.revokeObjectURL(url)
       } else {
-        const html = buildPDF(scopedData.tasks, projects, programs, scopedData.milestones, include)
+        const html = buildPDF(scopedData.tasks, scopedData.projects, scopedPrograms, scopedData.milestones, include)
         const w    = window.open('', '_blank')
         if (w) { w.document.write(html); w.document.close() }
       }
@@ -337,7 +708,7 @@ const ExportModal = memo(function ExportModal({ onClose }) {
               <div>
                 <SectionLabel>Include</SectionLabel>
                 <div className="grid grid-cols-2 gap-1.5">
-                  {[['tasks', 'Tasks'], ['subtasks', 'Subtasks'], ['milestones', 'Milestones'], ['summaries', 'Summary stats']].map(([key, label]) => (
+                  {[['tasks', 'Tasks'], ['subtasks', 'Subtasks'], ['milestones', 'Milestones'], ['summaries', 'Summary stats'], ['ganttConfig', 'Gantt config']].map(([key, label]) => (
                     <ColCheck key={key} label={label} active={include[key]} onChange={() => toggleInclude(key)} />
                   ))}
                 </div>
@@ -354,6 +725,13 @@ const ExportModal = memo(function ExportModal({ onClose }) {
                       : { background: 'rgba(255,255,255,0.04)', color: 'var(--text-secondary)', border: '1px solid rgba(255,255,255,0.08)' }}>
                     <Table size={14} /> CSV Spreadsheet
                   </button>
+                  <button onClick={() => setFormat('xlsx')}
+                    className="flex-1 flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium transition-all"
+                    style={format === 'xlsx'
+                      ? { background: 'rgba(16,185,129,0.12)', color: '#34d399', border: '1px solid rgba(16,185,129,0.3)' }
+                      : { background: 'rgba(255,255,255,0.04)', color: 'var(--text-secondary)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                    <FileSpreadsheet size={14} /> Excel Workbook
+                  </button>
                   <button onClick={() => setFormat('pdf')}
                     className="flex-1 flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium transition-all"
                     style={format === 'pdf'
@@ -365,7 +743,7 @@ const ExportModal = memo(function ExportModal({ onClose }) {
               </div>
             </div>
           ) : (
-            // Step 2: Column selector (CSV only)
+            // Step 2: Column selector (CSV/XLSX)
             <div>
               <div className="flex items-center justify-between mb-3">
                 <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
@@ -391,7 +769,7 @@ const ExportModal = memo(function ExportModal({ onClose }) {
         <div className="flex items-center gap-2 px-5 py-3 border-t" style={{ borderColor: 'rgba(255,255,255,0.07)' }}>
           <button onClick={onClose} className="btn-ghost py-2 text-xs px-3">Cancel</button>
           <div className="flex-1" />
-          {format === 'csv' && step === 1 ? (
+          {(format === 'csv' || format === 'xlsx') && step === 1 ? (
             <button onClick={() => setStep(2)}
               className="flex items-center gap-1.5 btn-accent py-2 text-xs px-4">
               Select columns <ChevronRight size={12} />
@@ -401,7 +779,11 @@ const ExportModal = memo(function ExportModal({ onClose }) {
               className="flex items-center gap-1.5 btn-accent py-2 text-xs px-4"
               style={exporting ? { opacity: 0.6 } : {}}>
               <Download size={12} />
-              {format === 'csv' ? `Export CSV (${taskCount})` : 'Export PDF'}
+              {format === 'csv'
+                ? `Export CSV (${taskCount})`
+                : format === 'xlsx'
+                  ? `Export Excel (${taskCount})`
+                  : 'Export PDF'}
             </button>
           )}
         </div>

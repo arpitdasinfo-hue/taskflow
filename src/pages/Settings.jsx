@@ -80,7 +80,7 @@ const Settings = memo(function Settings() {
               id="theme"
               icon={Palette}
               title="Theme"
-              description="Pick your visual style."
+              description="Control visual style, contrast, and density."
               open={openSections.theme}
               onToggle={toggleSection}
             >
@@ -91,12 +91,12 @@ const Settings = memo(function Settings() {
               id="export"
               icon={Download}
               title="Export"
-              description="Generate CSV/PDF exports from your workspace."
+              description="Generate CSV, PDF, and Excel exports from your workspace."
               open={openSections.export}
               onToggle={toggleSection}
             >
               <p className="text-xs mb-3" style={{ color: 'var(--text-secondary)' }}>
-                Export your tasks and projects data for backup or analysis.
+                Export tasks, projects, and Gantt configuration for backup or analysis.
               </p>
               <button
                 onClick={() => setShowExport(true)}
@@ -106,9 +106,9 @@ const Settings = memo(function Settings() {
                   color: 'var(--accent)',
                   border: '1px solid rgba(var(--accent-rgb),0.2)',
                 }}
-              >
+                >
                 <Download size={13} />
-                Export Data (CSV / PDF)
+                Export Data (CSV / PDF / Excel)
               </button>
             </Section>
 
