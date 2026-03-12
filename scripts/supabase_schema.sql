@@ -95,7 +95,35 @@ create table if not exists share_links (
   token text unique not null default encode(gen_random_bytes(16), 'hex'),
   resource_type text not null,
   resource_id text not null,
+  workspace_id uuid references workspaces(id) on delete cascade,
+  access_mode text not null default 'view',
+  name text,
+  config jsonb not null default '{}'::jsonb,
+  disabled boolean not null default false,
+  revoked_at timestamptz,
+  last_viewed_at timestamptz,
   created_by uuid references auth.users(id),
   expires_at timestamptz,
   created_at timestamptz default now()
 );
+
+alter table share_links add column if not exists workspace_id uuid references workspaces(id) on delete cascade;
+alter table share_links add column if not exists access_mode text not null default 'view';
+alter table share_links add column if not exists name text;
+alter table share_links add column if not exists config jsonb not null default '{}'::jsonb;
+alter table share_links add column if not exists disabled boolean not null default false;
+alter table share_links add column if not exists revoked_at timestamptz;
+alter table share_links add column if not exists last_viewed_at timestamptz;
+
+create table if not exists share_view_events (
+  id uuid primary key default gen_random_uuid(),
+  share_link_id uuid references share_links(id) on delete cascade,
+  token text not null,
+  viewed_at timestamptz default now(),
+  user_agent text
+);
+
+create index if not exists idx_share_links_workspace_id on share_links(workspace_id);
+create index if not exists idx_share_links_created_by on share_links(created_by);
+create index if not exists idx_share_links_resource on share_links(resource_type, resource_id);
+create index if not exists idx_share_view_events_link on share_view_events(share_link_id);

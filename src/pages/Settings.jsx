@@ -3,12 +3,14 @@ import {
   Palette,
   Info,
   Download,
+  Link2,
   ChevronDown,
   ChevronRight,
 } from 'lucide-react'
 import GlassCard from '../components/common/GlassCard'
 import ThemeSelector from '../components/common/ThemeSelector'
 import ExportModal from '../components/settings/ExportModal'
+import SharedViewsPanel from '../components/settings/SharedViewsPanel'
 import Header from '../components/layout/Header'
 import useSettingsStore from '../store/useSettingsStore'
 
@@ -62,6 +64,7 @@ const Settings = memo(function Settings() {
 
   const [openSections, setOpenSections] = useState({
     theme: false,
+    sharing: false,
     export: false,
     about: false,
   })
@@ -85,6 +88,17 @@ const Settings = memo(function Settings() {
               onToggle={toggleSection}
             >
               <ThemeSelector />
+            </Section>
+
+            <Section
+              id="sharing"
+              icon={Link2}
+              title="Shared Views"
+              description="Create permanent read-only manager dashboards."
+              open={openSections.sharing}
+              onToggle={toggleSection}
+            >
+              <SharedViewsPanel />
             </Section>
 
             <Section

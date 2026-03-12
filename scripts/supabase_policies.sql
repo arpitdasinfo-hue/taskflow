@@ -7,6 +7,7 @@ alter table tasks enable row level security;
 alter table subtasks enable row level security;
 alter table notes enable row level security;
 alter table share_links enable row level security;
+alter table share_view_events enable row level security;
 
 drop policy if exists "own membership" on workspace_members;
 create policy "own membership" on workspace_members for all
@@ -106,23 +107,63 @@ create policy "share_links public read" on share_links for select
   using (true);
 
 drop policy if exists "share_links owner write" on share_links;
-create policy "share_links owner write" on share_links for insert
-  with check (created_by = auth.uid());
+drop policy if exists "share_links owner insert" on share_links;
+create policy "share_links owner insert" on share_links for insert
+  with check (
+    created_by = auth.uid()
+    and access_mode = 'view'
+    and (
+      workspace_id is null
+      or workspace_id in (select workspace_id from workspace_members where user_id = auth.uid())
+    )
+  );
+
+drop policy if exists "share_links owner update" on share_links;
+create policy "share_links owner update" on share_links for update
+  using (created_by = auth.uid())
+  with check (
+    created_by = auth.uid()
+    and access_mode = 'view'
+    and (
+      workspace_id is null
+      or workspace_id in (select workspace_id from workspace_members where user_id = auth.uid())
+    )
+  );
 
 drop policy if exists "share_links owner delete" on share_links;
 create policy "share_links owner delete" on share_links for delete
   using (created_by = auth.uid());
 
--- Public read access for shared links.
+drop policy if exists "share_view_events insert" on share_view_events;
+create policy "share_view_events insert" on share_view_events for insert
+  with check (true);
+
+drop policy if exists "share_view_events owner read" on share_view_events;
+create policy "share_view_events owner read" on share_view_events for select
+  using (
+    exists (
+      select 1
+      from share_links sl
+      where sl.id = share_view_events.share_link_id
+        and sl.created_by = auth.uid()
+    )
+  );
+
+-- Public read access for shared dashboards.
 drop policy if exists "programs shared read" on programs;
 create policy "programs shared read" on programs for select
   using (
     exists (
       select 1
       from share_links sl
-      where sl.resource_type = 'program'
-        and sl.resource_id = programs.id
+      where sl.access_mode = 'view'
+        and coalesce(sl.disabled, false) = false
+        and sl.revoked_at is null
         and (sl.expires_at is null or sl.expires_at > now())
+        and (
+          (sl.resource_type = 'program' and sl.resource_id = programs.id)
+          or (sl.resource_type = 'workspace' and sl.workspace_id = programs.workspace_id)
+        )
     )
   );
 
@@ -132,11 +173,15 @@ create policy "projects shared read" on projects for select
     exists (
       select 1
       from share_links sl
-      where (
-        (sl.resource_type = 'project' and sl.resource_id = projects.id)
-        or (sl.resource_type = 'program' and sl.resource_id = projects.program_id)
-      )
-      and (sl.expires_at is null or sl.expires_at > now())
+      where sl.access_mode = 'view'
+        and coalesce(sl.disabled, false) = false
+        and sl.revoked_at is null
+        and (sl.expires_at is null or sl.expires_at > now())
+        and (
+          (sl.resource_type = 'project' and sl.resource_id = projects.id)
+          or (sl.resource_type = 'program' and sl.resource_id = projects.program_id)
+          or (sl.resource_type = 'workspace' and sl.workspace_id = projects.workspace_id)
+        )
     )
   );
 
@@ -145,12 +190,42 @@ create policy "tasks shared read" on tasks for select
   using (
     exists (
       select 1
+      from share_links sl
+      where sl.access_mode = 'view'
+        and coalesce(sl.disabled, false) = false
+        and sl.revoked_at is null
+        and (sl.expires_at is null or sl.expires_at > now())
+        and (
+          (sl.resource_type = 'workspace' and sl.workspace_id = tasks.workspace_id)
+          or (sl.resource_type = 'project' and sl.resource_id = tasks.project_id)
+          or (
+            sl.resource_type = 'program'
+            and exists (
+              select 1
+              from projects p
+              where p.id = tasks.project_id
+                and p.program_id = sl.resource_id
+            )
+          )
+        )
+    )
+  );
+
+drop policy if exists "milestones shared read" on milestones;
+create policy "milestones shared read" on milestones for select
+  using (
+    exists (
+      select 1
       from projects p
       join share_links sl on (
         (sl.resource_type = 'project' and sl.resource_id = p.id)
         or (sl.resource_type = 'program' and sl.resource_id = p.program_id)
+        or (sl.resource_type = 'workspace' and sl.workspace_id = p.workspace_id)
       )
-      where p.id = tasks.project_id
+      where p.id = milestones.project_id
+        and sl.access_mode = 'view'
+        and coalesce(sl.disabled, false) = false
+        and sl.revoked_at is null
         and (sl.expires_at is null or sl.expires_at > now())
     )
   );
