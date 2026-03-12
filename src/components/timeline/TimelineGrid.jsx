@@ -24,6 +24,7 @@ const TimelineGrid = memo(function TimelineGrid({
   onUpdateProjectSchedule,
   showDependencies,
   onlyDependencyRisk,
+  readOnly = false,
 }) {
   const dependencyLayer = useMemo(() => {
     const rowOffsets = new Map()
@@ -153,6 +154,7 @@ const TimelineGrid = memo(function TimelineGrid({
               onSelectTask={onSelectTask}
               onUpdateTaskSchedule={onUpdateTaskSchedule}
               onUpdateProjectSchedule={onUpdateProjectSchedule}
+              readOnly={readOnly}
             />
           ))}
         </div>

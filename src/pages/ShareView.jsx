@@ -15,8 +15,13 @@ import {
   TASK_STATUS_OPTIONS,
   isShareLinkActive,
   normalizeShareConfig,
-  scopeLabel,
 } from '../lib/share'
+import TimelineToolbar from '../components/timeline/TimelineToolbar'
+import TimelineFilterBar from '../components/timeline/TimelineFilterBar'
+import TimelineGrid from '../components/timeline/TimelineGrid'
+import TimelineLegend from '../components/timeline/TimelineLegend'
+import useTimelineScale from '../hooks/useTimelineScale'
+import useTimelineRows from '../hooks/useTimelineRows'
 
 const PRIORITY_COLOR = {
   critical: '#ef4444',
@@ -48,8 +53,6 @@ const startOfDayTs = (value) => {
   const date = new Date(value)
   return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime()
 }
-
-const addDaysTs = (baseTs, days) => baseTs + days * 86400000
 
 const normalizeScopeType = (value) => {
   const raw = String(value || '').trim().toLowerCase()
@@ -132,258 +135,172 @@ const Section = ({ title, icon: Icon, children }) => (
   </section>
 )
 
-const buildGanttRows = ({ programs, projects, tasks }) => {
-  const childrenByProjectId = new Map()
-  const tasksByProjectId = new Map()
+const ManagerGantt = ({ programs, projects, tasks, milestones }) => {
+  const [filteredProgramIds, setFilteredProgramIds] = useState(() => new Set())
+  const [filteredProjectIds, setFilteredProjectIds] = useState(() => new Set())
+  const [filteredSubProjectIds, setFilteredSubProjectIds] = useState(() => new Set())
+  const [expandedProjectIds, setExpandedProjectIds] = useState(
+    () => new Set(tasks.map((task) => task.projectId).filter(Boolean))
+  )
+  const [onlyDelayed, setOnlyDelayed] = useState(false)
+  const [onlyCritical, setOnlyCritical] = useState(false)
+  const [onlyDependencyRisk, setOnlyDependencyRisk] = useState(false)
+  const [showDependencies, setShowDependencies] = useState(true)
+  const [showFilterPanel, setShowFilterPanel] = useState(true)
 
-  projects.forEach((project) => {
-    if (!project.parentId) return
-    if (!childrenByProjectId.has(project.parentId)) childrenByProjectId.set(project.parentId, [])
-    childrenByProjectId.get(project.parentId).push(project)
+  const {
+    zoom,
+    config,
+    startDate,
+    rangeLabel,
+    changeZoom,
+    shiftRange,
+    resetToToday,
+  } = useTimelineScale({ initialZoom: 'month' })
+
+  const { rows, stats } = useTimelineRows({
+    programs,
+    projects,
+    tasks,
+    milestones,
+    filteredProgramIds,
+    filteredProjectIds,
+    filteredSubProjectIds,
+    expandedProjectIds,
+    onlyDelayed,
+    onlyCritical,
+    onlyDependencyRisk,
   })
-  tasks.forEach((task) => {
-    if (!task.projectId) return
-    if (!tasksByProjectId.has(task.projectId)) tasksByProjectId.set(task.projectId, [])
-    tasksByProjectId.get(task.projectId).push(task)
-  })
 
-  const topProjects = projects.filter((project) => !project.parentId)
-  const projectIdsByProgram = new Map()
-  topProjects.forEach((project) => {
-    const key = project.programId || '__unassigned__'
-    if (!projectIdsByProgram.has(key)) projectIdsByProgram.set(key, [])
-    projectIdsByProgram.get(key).push(project)
-  })
-
-  const rows = []
-
-  const collectTaskDates = (project) => {
-    const directTasks = tasksByProjectId.get(project.id) ?? []
-    const childProjects = childrenByProjectId.get(project.id) ?? []
-    const childTaskDates = childProjects.flatMap(collectTaskDates)
-    const taskDates = [
-      ...directTasks.map((task) => ({
-        start: task.startDate || task.createdAt || task.dueDate || '',
-        end: task.dueDate || task.startDate || '',
-      })),
-      ...childTaskDates,
-    ]
-    return taskDates.filter((item) => isValidDate(item.start || item.end))
-  }
-
-  const computeRange = (project) => {
-    const derived = collectTaskDates(project)
-    const starts = derived.map((item) => item.start).filter(isValidDate).map(startOfDayTs)
-    const ends = derived.map((item) => item.end).filter(isValidDate).map(startOfDayTs)
-    const startTs = starts.length ? Math.min(...starts) : (isValidDate(project.startDate) ? startOfDayTs(project.startDate) : null)
-    const endTs = ends.length ? Math.max(...ends) : (isValidDate(project.dueDate) ? startOfDayTs(project.dueDate) : startTs)
-    return { startTs, endTs }
-  }
-
-  const pushProjectRows = (project, depth, programName) => {
-    const projectTasks = tasksByProjectId.get(project.id) ?? []
-    const projectDone = projectTasks.filter((task) => task.status === 'done').length
-    const progress = projectTasks.length ? Math.round((projectDone / projectTasks.length) * 100) : 0
-    const range = computeRange(project)
-
-    rows.push({
-      id: `project:${project.id}`,
-      type: depth === 0 ? 'project' : 'sub-project',
-      depth,
-      name: project.name,
-      leftLabel: programName,
-      color: project.color || '#22d3ee',
-      startTs: range.startTs,
-      endTs: range.endTs,
-      progress,
-      status: project.status,
+  const toggleProgram = (id) => {
+    setFilteredProgramIds((previous) => {
+      const next = new Set(previous)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
     })
-
-    const childProjects = childrenByProjectId.get(project.id) ?? []
-    childProjects.forEach((child) => pushProjectRows(child, depth + 1, programName))
-
-    projectTasks
-      .slice()
-      .sort((a, b) => {
-        if (!a.dueDate && !b.dueDate) return 0
-        if (!a.dueDate) return 1
-        if (!b.dueDate) return -1
-        return startOfDayTs(a.dueDate) - startOfDayTs(b.dueDate)
-      })
-      .forEach((task) => {
-        const startTs = isValidDate(task.startDate || task.createdAt || task.dueDate)
-          ? startOfDayTs(task.startDate || task.createdAt || task.dueDate)
-          : null
-        const endTs = isValidDate(task.dueDate || task.startDate)
-          ? startOfDayTs(task.dueDate || task.startDate)
-          : startTs
-        rows.push({
-          id: `task:${task.id}`,
-          type: 'task',
-          depth: depth + 1,
-          name: task.title,
-          leftLabel: project.name,
-          color: STATUS_COLOR[task.status] || '#22d3ee',
-          startTs,
-          endTs,
-          progress: task.status === 'done' ? 100 : task.status === 'in-progress' ? 55 : task.status === 'review' ? 80 : 0,
-          status: task.status,
-        })
-      })
+    setFilteredProjectIds(new Set())
+    setFilteredSubProjectIds(new Set())
   }
 
-  programs.forEach((program) => {
-    const programProjects = projectIdsByProgram.get(program.id) ?? []
-    const programTaskRanges = programProjects.map((project) => computeRange(project))
-    const starts = programTaskRanges.map((range) => range.startTs).filter(Boolean)
-    const ends = programTaskRanges.map((range) => range.endTs).filter(Boolean)
-    rows.push({
-      id: `program:${program.id}`,
-      type: 'program',
-      depth: 0,
-      name: program.name,
-      leftLabel: scopeLabel('program'),
-      color: program.color || '#22d3ee',
-      startTs: starts.length ? Math.min(...starts) : (isValidDate(program.startDate) ? startOfDayTs(program.startDate) : null),
-      endTs: ends.length ? Math.max(...ends) : (isValidDate(program.endDate) ? startOfDayTs(program.endDate) : null),
-      progress: 0,
-      status: program.status,
+  const toggleProject = (id) => {
+    setFilteredProjectIds((previous) => {
+      const next = new Set(previous)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
     })
-    programProjects.forEach((project) => pushProjectRows(project, 0, program.name))
-  })
+    setFilteredSubProjectIds(new Set())
+  }
 
-  const unassignedProjects = projectIdsByProgram.get('__unassigned__') ?? []
-  if (unassignedProjects.length > 0) {
-    rows.push({
-      id: 'program:__unassigned__',
-      type: 'program',
-      depth: 0,
-      name: 'Unassigned',
-      leftLabel: 'Program',
-      color: '#94a3b8',
-      startTs: null,
-      endTs: null,
-      progress: 0,
-      status: 'active',
+  const toggleSubProject = (id) => {
+    setFilteredSubProjectIds((previous) => {
+      const next = new Set(previous)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
     })
-    unassignedProjects.forEach((project) => pushProjectRows(project, 0, 'Unassigned'))
   }
 
-  return rows.filter((row) => row.startTs && row.endTs)
-}
-
-const ReadOnlyGantt = ({ rows }) => {
-  const [zoom, setZoom] = useState('month')
-  const [offsetDays, setOffsetDays] = useState(-14)
-
-  if (!rows.length) {
-    return (
-      <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-        No timeline data available for this scope.
-      </p>
-    )
+  const toggleExpandedProject = (projectId) => {
+    setExpandedProjectIds((previous) => {
+      const next = new Set(previous)
+      if (next.has(projectId)) next.delete(projectId)
+      else next.add(projectId)
+      return next
+    })
   }
 
-  const daySpan = zoom === 'week' ? 14 : zoom === 'quarter' ? 112 : 56
-  const todayTs = startOfDayTs(new Date())
-  const windowStartTs = addDaysTs(todayTs, offsetDays)
-  const windowEndTs = addDaysTs(windowStartTs, daySpan - 1)
+  const clearFilters = () => {
+    setFilteredProgramIds(new Set())
+    setFilteredProjectIds(new Set())
+    setFilteredSubProjectIds(new Set())
+    setOnlyDelayed(false)
+    setOnlyCritical(false)
+    setOnlyDependencyRisk(false)
+    setShowDependencies(true)
+  }
 
-  const visibleRows = rows.filter((row) => row.endTs >= windowStartTs && row.startTs <= windowEndTs)
-  const filteredRows = visibleRows.length ? visibleRows : rows
+  const filtered =
+    filteredProgramIds.size > 0 ||
+    filteredProjectIds.size > 0 ||
+    filteredSubProjectIds.size > 0 ||
+    onlyDelayed ||
+    onlyCritical ||
+    onlyDependencyRisk
+
+  const activeFilterCount =
+    filteredProgramIds.size +
+    filteredProjectIds.size +
+    filteredSubProjectIds.size +
+    Number(onlyDelayed) +
+    Number(onlyCritical) +
+    Number(onlyDependencyRisk)
 
   return (
-    <div
-      className="rounded-xl border overflow-x-auto"
-      style={{ borderColor: 'rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.02)' }}
-    >
-      <div className="min-w-[840px]">
-        <div
-          className="flex items-center justify-between gap-2 px-3 py-2 text-[11px] flex-wrap"
-          style={{ color: 'var(--text-secondary)', borderBottom: '1px solid rgba(255,255,255,0.08)' }}
-        >
-          <div className="flex items-center gap-1">
-            {['week', 'month', 'quarter'].map((option) => (
-              <button
-                key={option}
-                onClick={() => setZoom(option)}
-                className="px-2 py-0.5 rounded-md text-[10px]"
-                style={zoom === option
-                  ? { background: 'rgba(var(--accent-rgb),0.2)', color: 'var(--accent)', border: '1px solid rgba(var(--accent-rgb),0.45)' }
-                  : { background: 'rgba(255,255,255,0.04)', color: 'var(--text-secondary)', border: '1px solid rgba(255,255,255,0.08)' }}
-              >
-                {option === 'week' ? '2 Weeks' : option === 'month' ? '2 Months' : 'Quarter'}
-              </button>
-            ))}
-          </div>
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => setOffsetDays((value) => value - Math.round(daySpan / 3))}
-              className="px-2 py-0.5 rounded-md text-[10px]"
-              style={{ background: 'rgba(255,255,255,0.04)', color: 'var(--text-secondary)', border: '1px solid rgba(255,255,255,0.08)' }}
-            >
-              Prev
-            </button>
-            <button
-              onClick={() => setOffsetDays(-14)}
-              className="px-2 py-0.5 rounded-md text-[10px]"
-              style={{ background: 'rgba(var(--accent-rgb),0.14)', color: 'var(--accent)', border: '1px solid rgba(var(--accent-rgb),0.3)' }}
-            >
-              Today
-            </button>
-            <button
-              onClick={() => setOffsetDays((value) => value + Math.round(daySpan / 3))}
-              className="px-2 py-0.5 rounded-md text-[10px]"
-              style={{ background: 'rgba(255,255,255,0.04)', color: 'var(--text-secondary)', border: '1px solid rgba(255,255,255,0.08)' }}
-            >
-              Next
-            </button>
-          </div>
-          <span>{fmtDate(windowStartTs)} - {fmtDate(windowEndTs)}</span>
-        </div>
+    <div className="space-y-2.5">
+      <TimelineToolbar
+        zoom={zoom}
+        rangeLabel={rangeLabel}
+        stats={stats}
+        activeFilterCount={activeFilterCount}
+        filterPanelOpen={showFilterPanel}
+        onChangeZoom={changeZoom}
+        onShiftRange={shiftRange}
+        onResetToToday={resetToToday}
+        onToggleFilterPanel={() => setShowFilterPanel((value) => !value)}
+      />
 
-        <div className="divide-y" style={{ borderColor: 'rgba(255,255,255,0.05)' }}>
-          {filteredRows.map((row) => {
-            const clampedStart = Math.max(row.startTs, windowStartTs)
-            const clampedEnd = Math.min(row.endTs, windowEndTs)
-            const left = ((clampedStart - windowStartTs) / (daySpan * 86400000)) * 100
-            const width = Math.max(1.5, ((clampedEnd - clampedStart + 86400000) / (daySpan * 86400000)) * 100)
-            return (
-              <div key={row.id} className="flex items-center gap-3 px-3 py-2">
-                <div className="w-[290px] min-w-[290px]">
-                  <p
-                    className="text-xs font-semibold truncate"
-                    style={{ color: 'var(--text-primary)', paddingLeft: `${row.depth * 12}px` }}
-                  >
-                    {row.name}
-                  </p>
-                  <p className="text-[10px] truncate" style={{ color: 'var(--text-secondary)', paddingLeft: `${row.depth * 12}px` }}>
-                    {row.type} • {row.leftLabel}
-                  </p>
-                </div>
-                <div
-                  className="flex-1 h-6 rounded-full relative"
-                  style={{
-                    background: 'rgba(255,255,255,0.03)',
-                    backgroundImage: 'repeating-linear-gradient(to right, rgba(255,255,255,0.08) 0px, rgba(255,255,255,0.08) 1px, transparent 1px, transparent 6.25%)',
-                  }}
-                >
-                  <div
-                    className="absolute top-1 bottom-1 rounded-full"
-                    style={{
-                      left: `${left}%`,
-                      width: `${width}%`,
-                      minWidth: '6px',
-                      background: `${row.color}4d`,
-                      border: `1px solid ${row.color}99`,
-                    }}
-                  />
-                </div>
-              </div>
-            )
-          })}
+      {showFilterPanel && (
+        <TimelineFilterBar
+          programs={programs}
+          projects={projects}
+          filteredProgramIds={filteredProgramIds}
+          filteredProjectIds={filteredProjectIds}
+          filteredSubProjectIds={filteredSubProjectIds}
+          onlyDelayed={onlyDelayed}
+          onlyCritical={onlyCritical}
+          onlyDependencyRisk={onlyDependencyRisk}
+          showDependencies={showDependencies}
+          onToggleProgram={toggleProgram}
+          onToggleProject={toggleProject}
+          onToggleSubProject={toggleSubProject}
+          onToggleOnlyDelayed={() => setOnlyDelayed((value) => !value)}
+          onToggleOnlyCritical={() => setOnlyCritical((value) => !value)}
+          onToggleOnlyDependencyRisk={() => setOnlyDependencyRisk((value) => !value)}
+          onToggleShowDependencies={() => setShowDependencies((value) => !value)}
+          onClear={clearFilters}
+          onClose={() => setShowFilterPanel(false)}
+        />
+      )}
+
+      <TimelineLegend readOnly />
+
+      {rows.length === 0 ? (
+        <div className="px-2 py-3 text-xs" style={{ color: 'var(--text-secondary)' }}>
+          {filtered ? 'No timeline items match the selected filters.' : 'No timeline data available for this scope.'}
         </div>
-      </div>
+      ) : (
+        <div
+          className="rounded-xl overflow-hidden border"
+          style={{ borderColor: 'rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.02)' }}
+        >
+          <TimelineGrid
+            rows={rows}
+            startDate={startDate}
+            days={config.days}
+            cellWidth={config.cellWidth}
+            zoom={zoom}
+            onToggleProject={toggleExpandedProject}
+            onSelectTask={() => {}}
+            onUpdateTaskSchedule={() => {}}
+            onUpdateProjectSchedule={() => {}}
+            showDependencies={showDependencies}
+            onlyDependencyRisk={onlyDependencyRisk}
+            readOnly
+          />
+        </div>
+      )}
     </div>
   )
 }
@@ -762,11 +679,6 @@ export default function ShareView({ token }) {
     })
   }, [filteredPrograms, filteredProjects, filteredTasks])
 
-  const ganttRows = useMemo(
-    () => buildGanttRows({ programs: filteredPrograms, projects: filteredProjects, tasks: filteredTasks }),
-    [filteredPrograms, filteredProjects, filteredTasks]
-  )
-
   return (
     <div className="min-h-dvh px-4 py-6 md:py-8" style={{ background: 'var(--bg-gradient)' }}>
       <div className="max-w-6xl mx-auto space-y-4">
@@ -1065,7 +977,12 @@ export default function ShareView({ token }) {
 
             {shareConfig.modules.gantt && (
               <Section title="Read-only Gantt" icon={CalendarClock}>
-                <ReadOnlyGantt rows={ganttRows} />
+                <ManagerGantt
+                  programs={filteredPrograms}
+                  projects={filteredProjects}
+                  tasks={filteredTasks}
+                  milestones={filteredMilestones}
+                />
               </Section>
             )}
           </>

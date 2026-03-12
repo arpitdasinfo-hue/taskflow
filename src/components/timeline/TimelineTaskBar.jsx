@@ -11,6 +11,7 @@ const TimelineTaskBar = memo(function TimelineTaskBar({
   cellWidth,
   onSelectTask,
   onUpdateTaskSchedule,
+  readOnly = false,
 }) {
   const buttonRef = useRef(null)
   const interactionRef = useRef(null)
@@ -38,6 +39,38 @@ const TimelineTaskBar = memo(function TimelineTaskBar({
   const width = Math.max(10, (clampedEnd - clampedStart + 1) * cellWidth - 2)
   const color = STATUS_COLOR[item.status] || rowColor || 'var(--accent)'
   const progress = item.status === 'done' ? 1 : item.status === 'in-progress' ? 0.5 : 0
+
+  if (readOnly) {
+    return (
+      <div
+        className="absolute rounded-full overflow-hidden"
+        style={{
+          left,
+          top: '50%',
+          transform: 'translateY(-50%)',
+          width,
+          height: 18,
+          background: `${color}30`,
+          border: `1px solid ${color}66`,
+          zIndex: 4,
+        }}
+        title={item.title}
+      >
+        <div
+          className="absolute top-0 bottom-0 left-0 rounded-full"
+          style={{ width: `${progress * 100}%`, background: `${color}55` }}
+        />
+        {width > 68 && (
+          <span
+            className="relative z-[2] px-2 text-[9px] font-medium truncate block text-left"
+            style={{ color }}
+          >
+            {item.title}
+          </span>
+        )}
+      </div>
+    )
+  }
 
   const startInteraction = (event, mode) => {
     if (!buttonRef.current) return

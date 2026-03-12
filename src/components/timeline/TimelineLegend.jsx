@@ -1,7 +1,7 @@
 import { memo } from 'react'
 import { STATUS_COLOR } from './timelineConfig'
 
-const TimelineLegend = memo(function TimelineLegend() {
+const TimelineLegend = memo(function TimelineLegend({ readOnly = false }) {
   const entries = [
     ['todo', 'To Do'],
     ['in-progress', 'In Progress'],
@@ -35,7 +35,9 @@ const TimelineLegend = memo(function TimelineLegend() {
           Dependency risk
         </span>
         <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--text-secondary)' }}>
-          Drag bars to move. Drag edges to resize. Use + to add tasks.
+          {readOnly
+            ? 'Read-only timeline view'
+            : 'Drag bars to move. Drag edges to resize. Use + to add tasks.'}
         </span>
       </div>
     </div>

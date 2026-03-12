@@ -28,6 +28,7 @@ const TimelineRow = memo(function TimelineRow({
   onSelectTask,
   onUpdateTaskSchedule,
   onUpdateProjectSchedule,
+  readOnly = false,
 }) {
   const height = ROW_HEIGHT[row.type] ?? 36
   const todayOffset = diffDays(startDate, startOfDay(new Date()))
@@ -142,11 +143,12 @@ const TimelineRow = memo(function TimelineRow({
                 startDate={startDate}
                 days={days}
                 cellWidth={cellWidth}
-                onSelectTask={onSelectTask}
-                onUpdateTaskSchedule={onUpdateTaskSchedule}
-              />
-            )
-          }
+              onSelectTask={onSelectTask}
+              onUpdateTaskSchedule={onUpdateTaskSchedule}
+              readOnly={readOnly}
+            />
+          )
+        }
 
           if (isProject && row.projectId) {
             return (
@@ -157,11 +159,12 @@ const TimelineRow = memo(function TimelineRow({
                 rowColor={row.color}
                 startDate={startDate}
                 days={days}
-                cellWidth={cellWidth}
-                onUpdateProjectSchedule={onUpdateProjectSchedule}
-              />
-            )
-          }
+              cellWidth={cellWidth}
+              onUpdateProjectSchedule={onUpdateProjectSchedule}
+              readOnly={readOnly}
+            />
+          )
+        }
 
           const { start, end } = getItemRange(item)
           if (!start || !end) return null
@@ -225,13 +228,15 @@ const TimelineRow = memo(function TimelineRow({
             }}
           >
             No dates yet
-            <button
-              onClick={() => onSelectTask?.(row.taskId)}
-              className="underline hover:opacity-80"
-              style={{ color: 'var(--accent)' }}
-            >
-              schedule
-            </button>
+            {!readOnly && (
+              <button
+                onClick={() => onSelectTask?.(row.taskId)}
+                className="underline hover:opacity-80"
+                style={{ color: 'var(--accent)' }}
+              >
+                schedule
+              </button>
+            )}
           </div>
         )}
 
