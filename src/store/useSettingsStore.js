@@ -92,7 +92,6 @@ const useSettingsStore = create(
       setActiveProject: (id) => set((s) => {
         s.activeProjectId = id
         s.activeProgramId = null
-        if (id != null) s.activePage = 'tasks'
       }),
 
       // ── Program filter ────────────────────────────────────────────────

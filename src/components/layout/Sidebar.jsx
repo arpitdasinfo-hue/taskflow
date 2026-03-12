@@ -1,7 +1,7 @@
 import { memo, useState } from 'react'
 import {
   LayoutDashboard, ListTodo, CalendarClock, Settings2, FolderKanban,
-  Zap, ChevronLeft, ChevronRight, Plus, Folder, ChevronDown, BarChart3, GanttChart, LogOut,
+  Zap, ChevronLeft, ChevronRight, Folder, ChevronDown, BarChart3, GanttChart, LogOut,
 } from 'lucide-react'
 import useSettingsStore from '../../store/useSettingsStore'
 import useProjectStore from '../../store/useProjectStore'
@@ -32,6 +32,8 @@ const ProgramGroup = memo(function ProgramGroup({ program, projects, collapsed }
   const [open, setOpen]      = useState(true)
   const activeProjectId      = useSettingsStore((s) => s.activeProjectId)
   const setActiveProject     = useSettingsStore((s) => s.setActiveProject)
+  const setActiveProgram     = useSettingsStore((s) => s.setActiveProgram)
+  const setPage              = useSettingsStore((s) => s.setPage)
   const tasks                = useTaskStore((s) => s.tasks)
   const allProjects          = useProjectStore((s) => s.projects)
   const taskCount = (pid) => tasks.filter((t) => t.projectId === pid && t.status !== 'done').length
@@ -39,7 +41,14 @@ const ProgramGroup = memo(function ProgramGroup({ program, projects, collapsed }
 
   const handleProgramClick = () => {
     if (collapsed) return
+    setPage('projects')
+    setActiveProgram(program.id)
     setOpen((o) => !o)
+  }
+
+  const handleProjectClick = (projectId, isActive) => {
+    setPage('projects')
+    setActiveProject(isActive ? null : projectId)
   }
 
   if (collapsed) {
@@ -49,7 +58,7 @@ const ProgramGroup = memo(function ProgramGroup({ program, projects, collapsed }
           const isActive = activeProjectId === p.id
           return (
             <button key={p.id}
-              onClick={() => setActiveProject(isActive ? null : p.id)}
+              onClick={() => handleProjectClick(p.id, isActive)}
               className="w-full flex items-center justify-center py-2 rounded-xl mb-0.5 transition-all"
               style={isActive ? { background: `${p.color}20` } : {}}
               title={p.name}>
@@ -99,7 +108,7 @@ const ProgramGroup = memo(function ProgramGroup({ program, projects, collapsed }
         return (
           <div key={project.id}>
             <button
-              onClick={() => setActiveProject(isActive ? null : project.id)}
+              onClick={() => handleProjectClick(project.id, isActive)}
               className="w-full flex items-center gap-2 pl-5 pr-2 py-1.5 rounded-xl text-xs font-medium transition-all mb-0.5"
               style={isActive
                 ? { background: `${project.color}20`, color: project.color, border: `1px solid ${project.color}30` }
@@ -127,7 +136,10 @@ const ProgramGroup = memo(function ProgramGroup({ program, projects, collapsed }
               const subCount    = taskCount(sub.id)
               return (
                 <button key={sub.id}
-                  onClick={(e) => { e.stopPropagation(); setActiveProject(isSubActive ? null : sub.id) }}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleProjectClick(sub.id, isSubActive)
+                  }}
                   className="w-full flex items-center gap-2 pl-9 pr-2 py-1 rounded-xl text-[11px] font-medium transition-all mb-0.5"
                   style={isSubActive
                     ? { background: `${sub.color}20`, color: sub.color, border: `1px solid ${sub.color}30` }
@@ -236,17 +248,11 @@ const Sidebar = memo(function Sidebar() {
       {/* Programs → Projects tree */}
       <div className="flex-1 overflow-y-auto px-2">
         {!sidebarCollapsed && (
-          <div className="flex items-center justify-between px-1 mb-2">
+          <div className="px-1 mb-2">
             <span className="text-[10px] font-semibold uppercase tracking-wider"
               style={{ color: 'var(--text-secondary)' }}>
               Programs
             </span>
-            <button onClick={() => setPage('projects')}
-              className="p-1 rounded-lg hover:bg-white/10 transition-colors"
-              style={{ color: 'var(--text-secondary)' }}
-              title="Manage programs & projects">
-              <Plus size={12} />
-            </button>
           </div>
         )}
 
@@ -273,7 +279,10 @@ const Sidebar = memo(function Sidebar() {
               const count = tasks.filter((t) => t.projectId === project.id && t.status !== 'done').length
               return (
                 <button key={project.id}
-                  onClick={() => setActiveProject(isActive ? null : project.id)}
+                  onClick={() => {
+                    setPage('projects')
+                    setActiveProject(isActive ? null : project.id)
+                  }}
                   className="w-full flex items-center gap-2 pl-4 pr-2 py-1.5 rounded-xl text-xs font-medium transition-all mb-0.5"
                   style={isActive
                     ? { background: `${project.color}20`, color: project.color, border: `1px solid ${project.color}30` }

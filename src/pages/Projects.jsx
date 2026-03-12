@@ -142,7 +142,7 @@ const ProjectPanel = memo(function ProjectPanel({ project, depth = 0 }) {
   const allProjects      = useProjectStore((s) => s.projects)
 
   const [view, setView]               = useState('list')
-  const [expanded, setExpanded]       = useState(true)
+  const [expanded, setExpanded]       = useState(false)
   const [confirmDel, setConfirmDel]   = useState(false)
   const [addingSub, setAddingSub]     = useState(false)
   const [subName, setSubName]         = useState('')
@@ -171,7 +171,7 @@ const ProjectPanel = memo(function ProjectPanel({ project, depth = 0 }) {
   const childProjects = allProjects.filter((p) => p.parentId === project.id)
 
   return (
-    <div className="rounded-2xl overflow-hidden" style={{
+    <div className="rounded-2xl overflow-hidden" data-project-id={project.id} style={{
       border: `1px solid ${project.color}${depth > 0 ? '20' : '25'}`,
       background: depth > 0 ? 'rgba(255,255,255,0.015)' : 'rgba(255,255,255,0.02)',
       marginLeft: depth > 0 ? '0' : '0',
@@ -428,6 +428,8 @@ const ProgramSection = memo(function ProgramSection({ program, projects }) {
   const deleteProgram = useProjectStore((s) => s.deleteProgram)
   const addProject    = useProjectStore((s) => s.addProject)
   const tasks         = useTaskStore((s) => s.tasks)
+  const activeProgramId = useSettingsStore((s) => s.activeProgramId)
+  const activeProjectId = useSettingsStore((s) => s.activeProjectId)
 
   const [collapsed, setCollapsed]     = useState(false)
   const [addingProject, setAddingProject] = useState(false)
@@ -439,6 +441,7 @@ const ProgramSection = memo(function ProgramSection({ program, projects }) {
 
   // Only top-level projects (no parentId)
   const topLevelProjects = projects.filter((p) => !p.parentId)
+  const containsActiveProject = !!activeProjectId && projects.some((p) => p.id === activeProjectId)
 
   const allTasks   = tasks.filter((t) => projects.some((p) => p.id === t.projectId))
   const totalTasks = allTasks.length
@@ -456,8 +459,14 @@ const ProgramSection = memo(function ProgramSection({ program, projects }) {
     return () => clearTimeout(timeoutId)
   }, [deleteArmed])
 
+  useEffect(() => {
+    if (activeProgramId === program.id || containsActiveProject) {
+      setCollapsed(false)
+    }
+  }, [activeProgramId, containsActiveProject, program.id])
+
   return (
-    <div className="mb-6">
+    <div className="mb-6" data-program-id={program.id}>
       {/* Program header */}
       <div className="flex items-center gap-2.5 mb-3 px-1">
         <button onClick={() => setCollapsed((c) => !c)} style={{ color: 'var(--text-secondary)' }}>
@@ -676,11 +685,34 @@ const Projects = memo(function Projects() {
   const programs = useProjectStore((s) => s.programs)
   const projects = useProjectStore((s) => s.projects)
   const tasks    = useTaskStore((s) => s.tasks)
+  const activeProjectId = useSettingsStore((s) => s.activeProjectId)
+  const activeProgramId = useSettingsStore((s) => s.activeProgramId)
   const [addingProgram, setAddingProgram] = useState(false)
 
   const unassignedProjects = projects.filter((p) => !p.programId || !programs.find((prog) => prog.id === p.programId))
   const totalTasks = tasks.length
   const doneTasks  = tasks.filter((t) => t.status === 'done').length
+
+  useEffect(() => {
+    const selector = activeProjectId
+      ? `[data-project-id="${activeProjectId}"]`
+      : activeProgramId
+        ? `[data-program-id="${activeProgramId}"]`
+        : null
+
+    if (!selector) return
+
+    const scrollToTarget = () => {
+      const target = document.querySelector(selector)
+      if (!target) return false
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      return true
+    }
+
+    if (scrollToTarget()) return
+    const timeoutId = setTimeout(scrollToTarget, 80)
+    return () => clearTimeout(timeoutId)
+  }, [activeProjectId, activeProgramId, programs.length, projects.length])
 
   return (
     <div className="flex-1 overflow-y-auto px-4 md:px-6 pb-24 md:pb-8">
