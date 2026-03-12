@@ -1,5 +1,6 @@
 import { memo, useCallback, useEffect, useMemo, useState } from 'react'
 import { Check, Copy, Link2, RefreshCw, Shield, Trash2, X } from 'lucide-react'
+import { createPortal } from 'react-dom'
 import { supabase } from '../lib/supabase'
 import useAuthStore from '../store/useAuthStore'
 import {
@@ -222,12 +223,15 @@ const ShareModal = memo(function ShareModal({ resourceType, resourceId, resource
   const status = shareStatus(link)
   const isActive = isShareLinkActive(link)
 
-  return (
+  if (typeof document === 'undefined') return null
+
+  return createPortal((
     <>
       <div className="overlay-bg z-50" onClick={onClose} />
       <div
-        className="fixed left-0 right-0 bottom-0 md:left-1/2 md:-translate-x-1/2 md:bottom-8 md:w-[640px] z-[60]
-                   rounded-t-3xl md:rounded-2xl p-5 anim-slide-up safe-bottom"
+        className="fixed inset-x-0 bottom-0 z-[60] rounded-t-3xl p-5 anim-slide-up safe-bottom
+                   md:inset-x-auto md:left-1/2 md:top-1/2 md:bottom-auto md:-translate-x-1/2 md:-translate-y-1/2
+                   md:w-[min(680px,calc(100vw-2rem))] md:max-h-[90vh] md:rounded-2xl"
         style={{
           background: 'rgba(18,8,30,0.96)',
           backdropFilter: 'blur(24px)',
@@ -475,7 +479,7 @@ const ShareModal = memo(function ShareModal({ resourceType, resourceId, resource
         )}
       </div>
     </>
-  )
+  ), document.body)
 })
 
 export default ShareModal
