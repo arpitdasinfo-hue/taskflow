@@ -8,6 +8,7 @@ import { PriorityBadge, StatusBadge, TagBadge } from '../common/Badge'
 import SubtaskList from './SubtaskList'
 import NoteList from './NoteList'
 import DependencyList from './DependencyList'
+import CommitTaskMenu from '../planning/CommitTaskMenu'
 import { useIsBlockedByDependency } from '../../hooks/useBlockedTasks'
 
 const STATUSES   = ['todo', 'in-progress', 'review', 'done', 'blocked']
@@ -214,6 +215,24 @@ const TaskDetail = memo(function TaskDetail() {
               onChange={(v) => updateTask(task.id, { priority: v })}
               renderOption={(v) => <PriorityBadge priority={v} size="xs" />}
             />
+          </div>
+        </div>
+
+        <div>
+          <label className="text-[10px] font-semibold uppercase tracking-wide mb-1.5 block" style={{ color: 'var(--text-secondary)' }}>
+            Planning
+          </label>
+          <div className="flex items-center justify-between gap-3 rounded-2xl px-3 py-3"
+            style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
+            <div>
+              <div className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+                Commit this task into Today, Week, or Month
+              </div>
+              <div className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
+                Planning adds the existing task into your execution workspace. It does not duplicate the task.
+              </div>
+            </div>
+            <CommitTaskMenu taskId={task.id} />
           </div>
         </div>
 

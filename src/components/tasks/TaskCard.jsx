@@ -2,6 +2,7 @@ import { memo, useCallback } from 'react'
 import { Calendar, MessageSquare, CheckSquare } from 'lucide-react'
 import { format, isPast, isToday } from 'date-fns'
 import { PriorityBadge, StatusBadge, TagBadge } from '../common/Badge'
+import CommitTaskMenu from '../planning/CommitTaskMenu'
 import useSettingsStore from '../../store/useSettingsStore'
 import useTaskStore from '../../store/useTaskStore'
 import useProjectStore from '../../store/useProjectStore'
@@ -146,6 +147,7 @@ const TaskCard = memo(function TaskCard({ task, draggable = false }) {
         )}
 
         <div className="flex items-center gap-2.5">
+          <CommitTaskMenu taskId={task.id} compact />
           {task.notes.length > 0 && (
             <span className="flex items-center gap-1 text-[10px]" style={{ color: 'var(--text-secondary)' }}>
               <MessageSquare size={10} />

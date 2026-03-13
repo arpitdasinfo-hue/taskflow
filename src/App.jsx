@@ -9,6 +9,7 @@ import useAuthStore from './store/useAuthStore'
 import useWorkspaceStore from './store/useWorkspaceStore'
 import useProjectStore from './store/useProjectStore'
 import useTaskStore from './store/useTaskStore'
+import usePlanningStore from './store/usePlanningStore'
 import { supabase, subscribeToWorkspaceRealtime } from './lib/supabase'
 import { useTheme } from './hooks/useTheme'
 import Auth from './pages/Auth'
@@ -166,6 +167,8 @@ export default function App() {
   const workspaceError = useWorkspaceStore((s) => s.error)
   const loadProjectsFromSupabase = useProjectStore((s) => s.loadFromSupabase)
   const loadTasksFromSupabase = useTaskStore((s) => s.loadFromSupabase)
+  const loadPlanningFromSupabase = usePlanningStore((s) => s.loadFromSupabase)
+  const resetPlanning = usePlanningStore((s) => s.reset)
   const [syncReady, setSyncReady] = useState(false)
   const [needRefresh, setNeedRefresh] = useState(false)
   const [offlineReady, setOfflineReady] = useState(false)
@@ -286,6 +289,7 @@ export default function App() {
       if (!session || !user?.id) {
         setSyncReady(false)
         resetWorkspace()
+        resetPlanning()
         return
       }
 
@@ -300,6 +304,7 @@ export default function App() {
       await Promise.all([
         loadProjectsFromSupabase(workspaceId),
         loadTasksFromSupabase(workspaceId),
+        loadPlanningFromSupabase(workspaceId),
       ])
 
       if (cancelled) return
@@ -331,6 +336,11 @@ export default function App() {
           const taskStore = useTaskStore.getState()
           if (payload.eventType === 'DELETE') taskStore.removeTaskFromRealtime(payload.old.id)
           else taskStore.upsertTaskFromRealtime(payload.new)
+        },
+        onTaskCommitment: (payload) => {
+          const planningStore = usePlanningStore.getState()
+          if (payload.eventType === 'DELETE') planningStore.removeCommitmentFromRealtime(payload.old.id)
+          else planningStore.upsertCommitmentFromRealtime(payload.new)
         },
         onSubtask: (payload) => {
           const row = payload.eventType === 'DELETE' ? payload.old : payload.new
@@ -368,7 +378,16 @@ export default function App() {
       if (reloadTimer) clearTimeout(reloadTimer)
       if (channel) supabase.removeChannel(channel)
     }
-  }, [session, user?.id, loadOrCreateWorkspace, loadProjectsFromSupabase, loadTasksFromSupabase, resetWorkspace])
+  }, [
+    session,
+    user?.id,
+    loadOrCreateWorkspace,
+    loadProjectsFromSupabase,
+    loadTasksFromSupabase,
+    loadPlanningFromSupabase,
+    resetWorkspace,
+    resetPlanning,
+  ])
 
   if (shareToken) {
     return (

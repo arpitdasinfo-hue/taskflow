@@ -19,7 +19,7 @@ export function useFilteredTasks() {
   const projects        = useProjectStore((s) => s.projects)
 
   return useMemo(() => {
-    let result = [...tasks]
+    let result = tasks.filter((task) => !task.deletedAt)
 
     // Program filter (takes all projects in that program)
     if (activeProgramId) {
@@ -77,10 +77,11 @@ export function useTodayTasks() {
   return useMemo(() => {
     const todayStart = new Date(); todayStart.setHours(0,0,0,0)
     const todayEnd   = new Date(); todayEnd.setHours(23,59,59,999)
-    const overdue = tasks.filter(
+    const activeTasks = tasks.filter((task) => !task.deletedAt)
+    const overdue = activeTasks.filter(
       (t) => t.dueDate && new Date(t.dueDate) < todayStart && t.status !== 'done'
     )
-    const today = tasks.filter(
+    const today = activeTasks.filter(
       (t) => t.dueDate && new Date(t.dueDate) >= todayStart && new Date(t.dueDate) <= todayEnd
     )
     return { today, overdue }
@@ -91,13 +92,14 @@ export function useTodayTasks() {
 export function useTaskStats() {
   const tasks = useTaskStore((s) => s.tasks)
   return useMemo(() => {
-    const total        = tasks.length
-    const inProgress   = tasks.filter((t) => t.status === 'in-progress').length
-    const done         = tasks.filter((t) => t.status === 'done').length
-    const blocked      = tasks.filter((t) => t.status === 'blocked').length
+    const activeTasks  = tasks.filter((task) => !task.deletedAt)
+    const total        = activeTasks.length
+    const inProgress   = activeTasks.filter((t) => t.status === 'in-progress').length
+    const done         = activeTasks.filter((t) => t.status === 'done').length
+    const blocked      = activeTasks.filter((t) => t.status === 'blocked').length
     const now          = new Date()
-    const overdue      = tasks.filter((t) => t.dueDate && new Date(t.dueDate) < now && t.status !== 'done').length
-    const critical     = tasks.filter((t) => t.priority === 'critical' && t.status !== 'done').length
+    const overdue      = activeTasks.filter((t) => t.dueDate && new Date(t.dueDate) < now && t.status !== 'done').length
+    const critical     = activeTasks.filter((t) => t.priority === 'critical' && t.status !== 'done').length
     const completion   = total ? Math.round((done / total) * 100) : 0
     return { total, inProgress, done, blocked, overdue, critical, completion }
   }, [tasks])

@@ -41,6 +41,12 @@ export function subscribeToWorkspaceRealtime(workspaceId, handlers = {}) {
 
   channel.on(
     'postgres_changes',
+    { event: '*', schema: 'public', table: 'task_commitments', filter: `workspace_id=eq.${workspaceId}` },
+    (payload) => handlers.onTaskCommitment?.(payload)
+  )
+
+  channel.on(
+    'postgres_changes',
     { event: '*', schema: 'public', table: 'subtasks' },
     (payload) => handlers.onSubtask?.(payload)
   )

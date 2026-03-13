@@ -96,6 +96,22 @@ const sortTasksByCreatedAt = (tasks = []) =>
 const sortTasksByDeletedAt = (tasks = []) =>
   [...tasks].sort((left, right) => new Date(right.deletedAt ?? right.updatedAt ?? 0) - new Date(left.deletedAt ?? left.updatedAt ?? 0))
 
+const splitDeletedTasks = (tasks = [], trashTasks = []) => {
+  const active = []
+  const trash = []
+
+  ;[...(tasks ?? []), ...(trashTasks ?? [])].forEach((task) => {
+    if (!task?.id) return
+    if (task.deletedAt) trash.push(task)
+    else active.push(task)
+  })
+
+  return {
+    tasks: sortTasksByCreatedAt(active),
+    trashTasks: sortTasksByDeletedAt(trash),
+  }
+}
+
 const detachTaskDependencies = (tasks = [], removedIds = []) => {
   if (!removedIds.length) return
   const removedSet = new Set(removedIds)
@@ -600,8 +616,9 @@ const useTaskStore = create(
           })
 
           set((state) => {
-            state.tasks = sortTasksByCreatedAt(assembled.filter((task) => !task.deletedAt))
-            state.trashTasks = sortTasksByDeletedAt(assembled.filter((task) => task.deletedAt))
+            const sanitized = splitDeletedTasks(assembled, [])
+            state.tasks = sanitized.tasks
+            state.trashTasks = sanitized.trashTasks
           })
         } finally {
           set((s) => { s.syncing = false })
@@ -698,7 +715,7 @@ const useTaskStore = create(
     {
       name: 'taskflow-tasks',
       storage: createJSONStorage(() => localStorage),
-      version: 7,
+      version: 8,
       migrate: (state, version) => {
         let s = state
         if (version < 2) {
@@ -719,6 +736,10 @@ const useTaskStore = create(
             tasks: (s.tasks ?? []).map((task) => ({ ...task, deletedAt: task.deletedAt ?? null })),
             trashTasks: [],
           }
+        }
+        if (version < 8) {
+          const sanitized = splitDeletedTasks(s?.tasks ?? [], s?.trashTasks ?? [])
+          s = { ...s, tasks: sanitized.tasks, trashTasks: sanitized.trashTasks }
         }
         return s
       },

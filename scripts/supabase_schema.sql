@@ -78,6 +78,20 @@ create table if not exists tasks (
 alter table tasks add column if not exists program_id text references programs(id) on delete set null;
 alter table tasks add column if not exists deleted_at timestamptz;
 
+create table if not exists task_commitments (
+  id text primary key,
+  workspace_id uuid references workspaces(id) on delete cascade,
+  task_id text references tasks(id) on delete cascade,
+  period_type text not null,
+  period_start text not null,
+  period_end text,
+  bucket text not null,
+  sort_order integer default 0,
+  created_by uuid references auth.users(id),
+  created_at text,
+  updated_at timestamptz default now()
+);
+
 create table if not exists subtasks (
   id text primary key,
   task_id text references tasks(id) on delete cascade,
@@ -133,3 +147,7 @@ create index if not exists idx_share_links_created_by on share_links(created_by)
 create index if not exists idx_share_links_resource on share_links(resource_type, resource_id);
 create index if not exists idx_share_view_events_link on share_view_events(share_link_id);
 create index if not exists idx_tasks_workspace_deleted_at on tasks(workspace_id, deleted_at);
+create unique index if not exists idx_task_commitments_task_period
+  on task_commitments(task_id, period_type, period_start);
+create index if not exists idx_task_commitments_workspace_period
+  on task_commitments(workspace_id, period_type, period_start, bucket);

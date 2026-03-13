@@ -4,6 +4,7 @@ alter table programs enable row level security;
 alter table projects enable row level security;
 alter table milestones enable row level security;
 alter table tasks enable row level security;
+alter table task_commitments enable row level security;
 alter table subtasks enable row level security;
 alter table notes enable row level security;
 alter table share_links enable row level security;
@@ -48,6 +49,11 @@ create policy "projects access" on projects for all
 
 drop policy if exists "tasks access" on tasks;
 create policy "tasks access" on tasks for all
+  using (workspace_id in (select workspace_id from workspace_members where user_id = auth.uid()))
+  with check (workspace_id in (select workspace_id from workspace_members where user_id = auth.uid()));
+
+drop policy if exists "task commitments access" on task_commitments;
+create policy "task commitments access" on task_commitments for all
   using (workspace_id in (select workspace_id from workspace_members where user_id = auth.uid()))
   with check (workspace_id in (select workspace_id from workspace_members where user_id = auth.uid()));
 

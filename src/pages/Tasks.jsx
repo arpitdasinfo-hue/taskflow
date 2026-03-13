@@ -3,6 +3,7 @@ import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
 import TaskCard from '../components/tasks/TaskCard'
 import FilterBar from '../components/tasks/FilterBar'
 import BulkActionBar from '../components/tasks/BulkActionBar'
+import CommitTaskMenu from '../components/planning/CommitTaskMenu'
 import EmptyState from '../components/common/EmptyState'
 import Header from '../components/layout/Header'
 import { ListTodo, ChevronRight, CheckSquare } from 'lucide-react'
@@ -162,6 +163,8 @@ const TaskRow = memo(function TaskRow({ task, selectMode }) {
         style={{ background: `${STATUS_COLOR[task.status]}18`, color: STATUS_COLOR[task.status] }}>
         {STATUS_LABEL[task.status]}
       </span>
+
+      {!selectMode && <CommitTaskMenu taskId={task.id} compact />}
 
       {!selectMode && (
         <ChevronRight size={12} style={{ color: 'var(--text-secondary)', flexShrink: 0 }}

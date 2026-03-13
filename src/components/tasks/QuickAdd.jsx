@@ -3,6 +3,7 @@ import { Calendar, Folder, Layers3, Plus, X } from 'lucide-react'
 import useTaskStore from '../../store/useTaskStore'
 import useProjectStore, { PROJECT_COLORS } from '../../store/useProjectStore'
 import useSettingsStore from '../../store/useSettingsStore'
+import usePlanningStore from '../../store/usePlanningStore'
 import { PriorityBadge } from '../common/Badge'
 import ColorPalettePicker from '../common/ColorPalettePicker'
 
@@ -13,6 +14,12 @@ const TYPES = [
 ]
 
 const PRIORITIES = ['critical', 'high', 'medium', 'low']
+const PLAN_TARGETS = [
+  { id: 'none', label: 'No plan' },
+  { id: 'day', label: 'Today' },
+  { id: 'week', label: 'Week' },
+  { id: 'month', label: 'Month' },
+]
 
 const QuickAdd = memo(function QuickAdd() {
   const [open, setOpen] = useState(false)
@@ -22,12 +29,14 @@ const QuickAdd = memo(function QuickAdd() {
   const [color, setColor] = useState(null)
   const [priority, setPriority] = useState('medium')
   const [dueDate, setDueDate] = useState('')
+  const [planningTarget, setPlanningTarget] = useState('none')
   const [programId, setProgramId] = useState('')
   const [filterProgramId, setFilterProgramId] = useState('')
   const [selectedProjectId, setSelectedProjectId] = useState('')
   const [selectedSubProjectId, setSelectedSubProjectId] = useState('')
 
   const addTask = useTaskStore((s) => s.addTask)
+  const commitTask = usePlanningStore((s) => s.commitTask)
   const addProgram = useProjectStore((s) => s.addProgram)
   const addProject = useProjectStore((s) => s.addProject)
   const programs = useProjectStore((s) => s.programs)
@@ -122,6 +131,7 @@ const QuickAdd = memo(function QuickAdd() {
     setColor(null)
     setPriority('medium')
     setDueDate('')
+    setPlanningTarget('none')
     setProgramId('')
     setFilterProgramId('')
     setSelectedProjectId('')
@@ -153,6 +163,7 @@ const QuickAdd = memo(function QuickAdd() {
       setColor(null)
       setPriority('medium')
       setDueDate('')
+      setPlanningTarget('none')
 
       if (requestedType === 'task') {
         setSelectedProjectId(nextProjectId)
@@ -189,15 +200,24 @@ const QuickAdd = memo(function QuickAdd() {
       return
     }
 
-    addTask({
+    const createdTask = addTask({
       title: name.trim(),
       priority,
       programId: filterProgramId || null,
       projectId: selectedSubProjectId || selectedProjectId || null,
       dueDate: dueDate ? new Date(dueDate).toISOString() : null,
     })
+
+    if (createdTask?.id && planningTarget !== 'none') {
+      commitTask({
+        taskId: createdTask.id,
+        periodType: planningTarget,
+        bucket: planningTarget === 'day' ? 'focus' : 'must',
+      })
+    }
+
     handleClose()
-  }, [name, type, desc, color, addProgram, handleClose, addProject, programId, addTask, priority, selectedProjectId, selectedSubProjectId, dueDate])
+  }, [name, type, desc, color, addProgram, handleClose, addProject, programId, addTask, priority, selectedProjectId, selectedSubProjectId, dueDate, planningTarget, commitTask, filterProgramId])
 
   const submitLabel = type === 'task' ? 'Add task' : 'Create'
 
@@ -414,6 +434,30 @@ const QuickAdd = memo(function QuickAdd() {
                     className="w-full text-sm px-3 py-2 rounded-xl"
                     style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-primary)', colorScheme: 'dark' }}
                   />
+                </div>
+              )}
+
+              {type === 'task' && (
+                <div>
+                  <label className="text-xs mb-1.5 block" style={{ color: 'var(--text-secondary)' }}>
+                    Add into plan
+                  </label>
+                  <div className="grid grid-cols-4 gap-2">
+                    {PLAN_TARGETS.map((target) => (
+                      <button
+                        key={target.id}
+                        type="button"
+                        onClick={() => setPlanningTarget(target.id)}
+                        className="px-2.5 py-2 rounded-xl text-xs font-semibold transition-colors"
+                        style={planningTarget === target.id
+                          ? { background: 'rgba(var(--accent-rgb),0.16)', color: 'var(--accent)', border: '1px solid rgba(var(--accent-rgb),0.24)' }
+                          : { background: 'rgba(255,255,255,0.04)', color: 'var(--text-secondary)', border: '1px solid rgba(255,255,255,0.08)' }
+                        }
+                      >
+                        {target.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
 
