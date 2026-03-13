@@ -1,7 +1,6 @@
 import { memo, useCallback, useMemo, useState } from 'react'
 import { DragDropContext, Draggable, Droppable } from '@hello-pangea/dnd'
 import {
-  ArrowRight,
   CalendarClock,
   CircleDot,
   ListChecks,
@@ -14,6 +13,7 @@ import { differenceInCalendarDays, format } from 'date-fns'
 import Header from '../components/layout/Header'
 import EmptyState from '../components/common/EmptyState'
 import GlassCard from '../components/common/GlassCard'
+import InfoTooltip from '../components/common/InfoTooltip'
 import CommitTaskMenu from '../components/planning/CommitTaskMenu'
 import useSettingsStore from '../store/useSettingsStore'
 import useTaskStore from '../store/useTaskStore'
@@ -147,6 +147,18 @@ const SummaryCard = memo(function SummaryCard({ label, value, hint, accent }) {
         ) : null}
       </div>
     </GlassCard>
+  )
+})
+
+const InlineInfoTitle = memo(function InlineInfoTitle({ title, info, badge = null, className = '' }) {
+  return (
+    <div className={`flex items-center gap-2 flex-wrap ${className}`}>
+      <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>
+        {title}
+      </span>
+      <InfoTooltip text={info} widthClassName="w-64" />
+      {badge}
+    </div>
   )
 })
 
@@ -303,13 +315,11 @@ const PlanningBucket = memo(function PlanningBucket({
           }}
         >
           <div className="flex items-center justify-between gap-3">
-            <div>
+            <div className="flex items-center gap-2">
               <div className="text-xs font-semibold uppercase tracking-[0.2em]" style={{ color }}>
                 {title}
               </div>
-              <div className="mt-1 text-xs" style={{ color: 'var(--text-secondary)' }}>
-                {hint}
-              </div>
+              <InfoTooltip text={hint} widthClassName="w-56" />
             </div>
             <span
               className="text-[11px] font-semibold px-2 py-1 rounded-full"
@@ -656,12 +666,15 @@ const Today = memo(function Today() {
               <div className="text-[11px] font-semibold uppercase tracking-[0.24em]" style={{ color: 'var(--text-secondary)' }}>
                 Today Workspace
               </div>
-              <h1 className="mt-2 text-2xl md:text-3xl font-bold" style={{ color: 'var(--text-primary)' }}>
-                Plan the work you will actually move
-              </h1>
-              <p className="mt-2 max-w-2xl text-sm" style={{ color: 'var(--text-secondary)' }}>
-                Build a daily focus list, commit the week, and keep the month visible without cluttering the rest of the app.
-              </p>
+              <div className="mt-2 flex items-center gap-2 flex-wrap">
+                <h1 className="text-2xl md:text-3xl font-bold" style={{ color: 'var(--text-primary)' }}>
+                  Plan the work you will actually move
+                </h1>
+                <InfoTooltip
+                  text="Build a daily focus list, commit the week, and keep the month visible without cluttering the rest of the app."
+                  widthClassName="w-72"
+                />
+              </div>
             </div>
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 lg:w-[520px]">
@@ -680,12 +693,11 @@ const Today = memo(function Today() {
                 <div className="text-[11px] font-semibold uppercase tracking-[0.24em]" style={{ color: 'var(--text-secondary)' }}>
                   Quick Capture
                 </div>
-                <h2 className="mt-2 text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
-                  Add work straight into the plan
-                </h2>
-                <p className="mt-1 text-sm" style={{ color: 'var(--text-secondary)' }}>
-                  Capture standalone tasks here, then commit them to Today, Week, or Month in one step.
-                </p>
+                <InlineInfoTitle
+                  title="Add work straight into the plan"
+                  info="Capture standalone tasks here, then commit them to Today, Week, or Month in one step."
+                  className="mt-2 text-lg"
+                />
               </div>
 
               <div className="hidden md:flex items-center gap-2 text-xs" style={{ color: 'var(--text-secondary)' }}>
@@ -744,12 +756,11 @@ const Today = memo(function Today() {
                 <div className="text-[11px] font-semibold uppercase tracking-[0.24em]" style={{ color: 'var(--text-secondary)' }}>
                   Carry Forward
                 </div>
-                <h2 className="mt-2 text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
-                  Pull unfinished commitments into the live plan
-                </h2>
-                <p className="mt-1 text-sm" style={{ color: 'var(--text-secondary)' }}>
-                  Keep the plan honest instead of rebuilding it from memory every week or month.
-                </p>
+                <InlineInfoTitle
+                  title="Pull unfinished commitments into the live plan"
+                  info="Keep the plan honest instead of rebuilding it from memory every week or month."
+                  className="mt-2 text-lg"
+                />
               </div>
             </div>
 
@@ -812,17 +823,16 @@ const Today = memo(function Today() {
                       <Icon size={16} style={{ color: 'var(--accent)' }} />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <h2 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
-                          {meta.title}
-                        </h2>
-                        <span className="text-[11px] px-2 py-1 rounded-full" style={{ background: 'rgba(255,255,255,0.04)', color: 'var(--text-secondary)' }}>
-                          {bounds.label}
-                        </span>
-                      </div>
-                      <p className="mt-1 text-sm" style={{ color: 'var(--text-secondary)' }}>
-                        {meta.description}
-                      </p>
+                      <InlineInfoTitle
+                        title={meta.title}
+                        info={meta.description}
+                        className="text-lg"
+                        badge={(
+                          <span className="text-[11px] px-2 py-1 rounded-full" style={{ background: 'rgba(255,255,255,0.04)', color: 'var(--text-secondary)' }}>
+                            {bounds.label}
+                          </span>
+                        )}
+                      />
                     </div>
                   </div>
 
@@ -860,12 +870,11 @@ const Today = memo(function Today() {
               <div className="text-[11px] font-semibold uppercase tracking-[0.24em]" style={{ color: 'var(--text-secondary)' }}>
                 Candidate Pool
               </div>
-              <h2 className="mt-2 text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
-                Pull the next best work into the plan
-              </h2>
-              <p className="mt-1 text-sm" style={{ color: 'var(--text-secondary)' }}>
-                Recommended tasks are scored by urgency, priority, and current progress. Search if you want something specific.
-              </p>
+              <InlineInfoTitle
+                title="Pull the next best work into the plan"
+                info="Recommended tasks are scored by urgency, priority, and current progress. Search if you want something specific."
+                className="mt-2 text-lg"
+              />
             </div>
 
             <div className="relative w-full lg:w-[360px]">
@@ -905,11 +914,13 @@ const Today = memo(function Today() {
             ))}
           </div>
 
-          <div className="mt-4 flex flex-wrap items-center gap-2 text-xs" style={{ color: 'var(--text-secondary)' }}>
+          <div className="mt-4 flex items-center gap-2 text-xs" style={{ color: 'var(--text-secondary)' }}>
             <CircleDot size={13} />
-            Candidates stay task-based only. Programs, projects, and sub-projects remain context, not separate rows here.
-            <ArrowRight size={12} />
-            Use the plan buttons to commit a task to Today, Week, or Month without duplicating it.
+            <span>Tasks only</span>
+            <InfoTooltip
+              text="Candidates stay task-based only. Programs, projects, and sub-projects remain context, not separate rows here. Use the plan buttons to commit a task to Today, Week, or Month without duplicating it."
+              widthClassName="w-72"
+            />
           </div>
         </GlassCard>
       </div>

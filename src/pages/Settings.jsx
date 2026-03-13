@@ -8,6 +8,7 @@ import {
   ChevronRight,
 } from 'lucide-react'
 import GlassCard from '../components/common/GlassCard'
+import InfoTooltip from '../components/common/InfoTooltip'
 import ThemeSelector from '../components/common/ThemeSelector'
 import ExportModal from '../components/settings/ExportModal'
 import SharedViewsPanel from '../components/settings/SharedViewsPanel'
@@ -37,14 +38,12 @@ const Section = memo(function Section({
             <Icon size={14} style={{ color: 'var(--accent)' }} />
           </div>
           <div className="min-w-0 text-left">
-            <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-              {title}
-            </p>
-            {description && (
-              <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>
-                {description}
+            <div className="flex items-center gap-2">
+              <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                {title}
               </p>
-            )}
+              <InfoTooltip text={description} align="right" widthClassName="w-64" />
+            </div>
           </div>
         </div>
 
@@ -109,9 +108,6 @@ const Settings = memo(function Settings() {
               open={openSections.export}
               onToggle={toggleSection}
             >
-              <p className="text-xs mb-3" style={{ color: 'var(--text-secondary)' }}>
-                Export tasks, projects, and Gantt configuration for backup or analysis.
-              </p>
               <button
                 onClick={() => setShowExport(true)}
                 className="w-full flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-medium transition-colors"

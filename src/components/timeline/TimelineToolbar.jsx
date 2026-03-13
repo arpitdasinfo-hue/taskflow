@@ -9,6 +9,7 @@ import {
   Search,
   Target,
 } from 'lucide-react'
+import InfoTooltip from '../common/InfoTooltip'
 import { TIMELINE_VIEW_MODES, ZOOM_CONFIGS } from './timelineConfig'
 
 const ControlLabel = ({ children }) => (
@@ -131,9 +132,12 @@ const TimelineToolbar = memo(function TimelineToolbar({
               )}
             </div>
 
-            <p className="text-sm md:text-[15px] font-medium mt-2 max-w-2xl" style={{ color: 'var(--text-secondary)' }}>
-              {currentView.description}
-            </p>
+            <div className="flex items-center gap-2 mt-2">
+              <span className="text-sm md:text-[15px] font-medium" style={{ color: 'var(--text-primary)' }}>
+                {readOnly ? `${currentView.label} timeline` : `${currentView.label} focus`}
+              </span>
+              <InfoTooltip text={currentView.description} widthClassName="w-64" />
+            </div>
           </div>
 
           <div className="flex flex-wrap gap-2">

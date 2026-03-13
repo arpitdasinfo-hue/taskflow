@@ -1,5 +1,6 @@
 import { memo, useState } from 'react'
 import { AlertTriangle, Bookmark, ChevronRight, LayoutTemplate, Plus, Trash2 } from 'lucide-react'
+import InfoTooltip from '../common/InfoTooltip'
 
 const CARD_TONE = {
   neutral: {
@@ -65,12 +66,15 @@ const TimelinePlanningPanel = memo(function TimelinePlanningPanel({
         >
           <div className="flex items-start justify-between gap-3 flex-wrap mb-3">
             <div>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.2em]" style={{ color: 'var(--accent)' }}>
-                Saved Views
-              </p>
-              <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
-                Reuse your roadmap, delivery, or risk setups without adding another heavy panel above the chart.
-              </p>
+              <div className="flex items-center gap-2">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.2em]" style={{ color: 'var(--accent)' }}>
+                  Saved Views
+                </p>
+                <InfoTooltip
+                  text="Reuse your roadmap, delivery, or risk setups without adding another heavy panel above the chart."
+                  widthClassName="w-64"
+                />
+              </div>
             </div>
 
             <button
@@ -188,12 +192,15 @@ const TimelinePlanningPanel = memo(function TimelinePlanningPanel({
               <p className="text-[10px] font-semibold uppercase tracking-[0.2em]" style={{ color: 'var(--accent)' }}>
                 Saved Views
               </p>
-              <h3 className="text-sm font-semibold mt-1" style={{ color: 'var(--text-primary)' }}>
-                Reuse planning setups
-              </h3>
-              <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
-                Save the current scope, filters, zoom, and range as a reusable Gantt view.
-              </p>
+              <div className="flex items-center gap-2 mt-1">
+                <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                  Reuse planning setups
+                </h3>
+                <InfoTooltip
+                  text="Save the current scope, filters, zoom, and range as a reusable Gantt view."
+                  widthClassName="w-64"
+                />
+              </div>
             </div>
 
             <button
