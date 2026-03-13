@@ -28,6 +28,7 @@ const QuickAdd = memo(function QuickAdd() {
   const [desc, setDesc] = useState('')
   const [color, setColor] = useState(null)
   const [priority, setPriority] = useState('medium')
+  const [startDate, setStartDate] = useState('')
   const [dueDate, setDueDate] = useState('')
   const [planningTarget, setPlanningTarget] = useState('none')
   const [programId, setProgramId] = useState('')
@@ -130,6 +131,7 @@ const QuickAdd = memo(function QuickAdd() {
     setDesc('')
     setColor(null)
     setPriority('medium')
+    setStartDate('')
     setDueDate('')
     setPlanningTarget('none')
     setProgramId('')
@@ -162,6 +164,7 @@ const QuickAdd = memo(function QuickAdd() {
       setDesc('')
       setColor(null)
       setPriority('medium')
+      setStartDate('')
       setDueDate('')
       setPlanningTarget('none')
 
@@ -205,6 +208,7 @@ const QuickAdd = memo(function QuickAdd() {
       priority,
       programId: filterProgramId || null,
       projectId: selectedSubProjectId || selectedProjectId || null,
+      startDate: startDate ? new Date(startDate).toISOString() : null,
       dueDate: dueDate ? new Date(dueDate).toISOString() : null,
     })
 
@@ -217,7 +221,7 @@ const QuickAdd = memo(function QuickAdd() {
     }
 
     handleClose()
-  }, [name, type, desc, color, addProgram, handleClose, addProject, programId, addTask, priority, selectedProjectId, selectedSubProjectId, dueDate, planningTarget, commitTask, filterProgramId])
+  }, [name, type, desc, color, addProgram, handleClose, addProject, programId, addTask, priority, selectedProjectId, selectedSubProjectId, startDate, dueDate, planningTarget, commitTask, filterProgramId])
 
   const submitLabel = type === 'task' ? 'Add task' : 'Create'
 
@@ -422,18 +426,33 @@ const QuickAdd = memo(function QuickAdd() {
               )}
 
               {type === 'task' && (
-                <div>
-                  <label className="text-xs mb-1.5 flex items-center gap-1.5" style={{ color: 'var(--text-secondary)' }}>
-                    <Calendar size={11} />
-                    Due date
-                  </label>
-                  <input
-                    type="date"
-                    value={dueDate}
-                    onChange={(e) => setDueDate(e.target.value)}
-                    className="w-full text-sm px-3 py-2 rounded-xl"
-                    style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-primary)', colorScheme: 'dark' }}
-                  />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-xs mb-1.5 flex items-center gap-1.5" style={{ color: 'var(--text-secondary)' }}>
+                      <Calendar size={11} />
+                      Start date
+                    </label>
+                    <input
+                      type="date"
+                      value={startDate}
+                      onChange={(e) => setStartDate(e.target.value)}
+                      className="w-full text-sm px-3 py-2 rounded-xl"
+                      style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-primary)', colorScheme: 'dark' }}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs mb-1.5 flex items-center gap-1.5" style={{ color: 'var(--text-secondary)' }}>
+                      <Calendar size={11} />
+                      Due date
+                    </label>
+                    <input
+                      type="date"
+                      value={dueDate}
+                      onChange={(e) => setDueDate(e.target.value)}
+                      className="w-full text-sm px-3 py-2 rounded-xl"
+                      style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-primary)', colorScheme: 'dark' }}
+                    />
+                  </div>
                 </div>
               )}
 

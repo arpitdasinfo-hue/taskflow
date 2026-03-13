@@ -378,6 +378,8 @@ const Today = memo(function Today() {
   const [candidateQuery, setCandidateQuery] = useState('')
   const [captureTitle, setCaptureTitle] = useState('')
   const [captureTarget, setCaptureTarget] = useState('day')
+  const [captureStartDate, setCaptureStartDate] = useState('')
+  const [captureDueDate, setCaptureDueDate] = useState('')
 
   const tasks = useTaskStore((state) => state.tasks)
   const addTask = useTaskStore((state) => state.addTask)
@@ -557,14 +559,20 @@ const Today = memo(function Today() {
     const title = captureTitle.trim()
     if (!title) return
 
-    const created = addTask({ title })
+    const created = addTask({
+      title,
+      startDate: captureStartDate ? new Date(captureStartDate).toISOString() : null,
+      dueDate: captureDueDate ? new Date(captureDueDate).toISOString() : null,
+    })
     if (created?.id) {
       handleAssignTask(created.id, captureTarget)
     }
 
     setCaptureTitle('')
     setCaptureTarget('day')
-  }, [addTask, captureTarget, captureTitle, handleAssignTask])
+    setCaptureStartDate('')
+    setCaptureDueDate('')
+  }, [addTask, captureDueDate, captureStartDate, captureTarget, captureTitle, handleAssignTask])
 
   const handleStatusChange = useCallback((taskId, status) => {
     updateTask(taskId, { status })
@@ -741,6 +749,44 @@ const Today = memo(function Today() {
                   Add
                 </button>
               </div>
+            </div>
+
+            <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
+              <label className="flex flex-col gap-1">
+                <span className="text-[11px] font-semibold uppercase tracking-[0.2em]" style={{ color: 'var(--text-secondary)' }}>
+                  Start Date
+                </span>
+                <input
+                  type="date"
+                  value={captureStartDate}
+                  onChange={(event) => setCaptureStartDate(event.target.value)}
+                  className="w-full text-sm px-4 py-3 rounded-2xl"
+                  style={{
+                    background: 'rgba(255,255,255,0.06)',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    color: 'var(--text-primary)',
+                    colorScheme: 'dark',
+                  }}
+                />
+              </label>
+
+              <label className="flex flex-col gap-1">
+                <span className="text-[11px] font-semibold uppercase tracking-[0.2em]" style={{ color: 'var(--text-secondary)' }}>
+                  Due Date
+                </span>
+                <input
+                  type="date"
+                  value={captureDueDate}
+                  onChange={(event) => setCaptureDueDate(event.target.value)}
+                  className="w-full text-sm px-4 py-3 rounded-2xl"
+                  style={{
+                    background: 'rgba(255,255,255,0.06)',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    color: 'var(--text-primary)',
+                    colorScheme: 'dark',
+                  }}
+                />
+              </label>
             </div>
           </GlassCard>
 

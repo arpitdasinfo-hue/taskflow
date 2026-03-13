@@ -281,19 +281,33 @@ const TaskDetail = memo(function TaskDetail() {
           />
         </div>
 
-        {/* Due date */}
-        <div>
-          <label className="text-[10px] font-semibold uppercase tracking-wide mb-1.5 flex items-center gap-1.5" style={{ color: 'var(--text-secondary)' }}>
-            <Calendar size={10} />
-            Due Date
-          </label>
-          <input
-            type="date"
-            value={task.dueDate ? format(new Date(task.dueDate), 'yyyy-MM-dd') : ''}
-            onChange={(e) => updateTask(task.id, { dueDate: e.target.value ? new Date(e.target.value).toISOString() : null })}
-            className="w-full text-sm px-3 py-2 rounded-xl"
-            style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', color: 'var(--text-primary)', colorScheme: 'dark' }}
-          />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+          <div>
+            <label className="text-[10px] font-semibold uppercase tracking-wide mb-1.5 flex items-center gap-1.5" style={{ color: 'var(--text-secondary)' }}>
+              <Calendar size={10} />
+              Start Date
+            </label>
+            <input
+              type="date"
+              value={task.startDate ? format(new Date(task.startDate), 'yyyy-MM-dd') : ''}
+              onChange={(e) => updateTask(task.id, { startDate: e.target.value ? new Date(e.target.value).toISOString() : null })}
+              className="w-full text-sm px-3 py-2 rounded-xl"
+              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', color: 'var(--text-primary)', colorScheme: 'dark' }}
+            />
+          </div>
+          <div>
+            <label className="text-[10px] font-semibold uppercase tracking-wide mb-1.5 flex items-center gap-1.5" style={{ color: 'var(--text-secondary)' }}>
+              <Calendar size={10} />
+              Due Date
+            </label>
+            <input
+              type="date"
+              value={task.dueDate ? format(new Date(task.dueDate), 'yyyy-MM-dd') : ''}
+              onChange={(e) => updateTask(task.id, { dueDate: e.target.value ? new Date(e.target.value).toISOString() : null })}
+              className="w-full text-sm px-3 py-2 rounded-xl"
+              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', color: 'var(--text-primary)', colorScheme: 'dark' }}
+            />
+          </div>
         </div>
 
         {/* Description */}

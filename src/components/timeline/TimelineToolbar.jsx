@@ -24,7 +24,7 @@ const selectStyle = {
   color: 'var(--text-primary)',
 }
 
-const SummaryChip = ({ label, value, tone = 'neutral' }) => {
+const SummaryChip = ({ label, value, tone = 'neutral', compact = false }) => {
   const tones = {
     neutral: { background: 'rgba(255,255,255,0.04)', color: 'var(--text-primary)', border: 'rgba(255,255,255,0.08)' },
     accent: { background: 'rgba(var(--accent-rgb),0.1)', color: 'var(--accent)', border: 'rgba(var(--accent-rgb),0.24)' },
@@ -35,7 +35,7 @@ const SummaryChip = ({ label, value, tone = 'neutral' }) => {
 
   return (
     <div
-      className="rounded-2xl px-3 py-2 min-w-[96px]"
+      className={`rounded-2xl px-3 py-2 ${compact ? 'min-w-0' : 'min-w-[96px]'}`}
       style={{ background: palette.background, border: `1px solid ${palette.border}` }}
     >
       <p className="text-[10px] uppercase tracking-[0.16em]" style={{ color: 'var(--text-secondary)' }}>
@@ -65,6 +65,7 @@ const TimelineToolbar = memo(function TimelineToolbar({
   visibleCounts = { programs: 0, projects: 0, tasks: 0 },
   expandableProjectCount = 0,
   readOnly = false,
+  compact = false,
   isCustomRange = false,
   customRangeStart = '',
   customRangeEnd = '',
@@ -100,6 +101,36 @@ const TimelineToolbar = memo(function TimelineToolbar({
     if (result !== false) setCustomPickerOpen(false)
   }
 
+  const headerLayoutClass = compact
+    ? 'grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_360px]'
+    : 'flex items-start justify-between gap-4 flex-wrap'
+
+  const summaryLayoutClass = compact
+    ? 'grid grid-cols-2 gap-2 sm:grid-cols-4'
+    : 'flex flex-wrap gap-2'
+
+  const searchScopeLayoutClass = compact
+    ? 'grid grid-cols-1 gap-2.5 md:grid-cols-2 xl:grid-cols-4'
+    : 'grid grid-cols-1 gap-2 lg:grid-cols-[minmax(0,1fr)_repeat(3,minmax(0,0.72fr))]'
+
+  const searchFieldClass = compact ? 'relative block md:col-span-2 xl:col-span-4' : 'relative block'
+
+  const actionLayoutClass = compact
+    ? 'flex flex-wrap items-center gap-2'
+    : 'flex items-end gap-2 flex-wrap xl:justify-end'
+
+  const scopeActionsClass = compact
+    ? 'grid grid-cols-1 gap-3 mb-3'
+    : 'grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_auto] gap-3 mb-3'
+
+  const modeLayoutClass = compact
+    ? 'grid grid-cols-1 gap-3 items-start'
+    : 'grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_auto] gap-3 items-start'
+
+  const viewZoomLayoutClass = compact
+    ? 'grid grid-cols-1 gap-3'
+    : 'grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(320px,0.95fr)] gap-3'
+
   return (
     <div className="px-4 md:px-6 pb-3">
       <div
@@ -110,7 +141,7 @@ const TimelineToolbar = memo(function TimelineToolbar({
           boxShadow: '0 20px 48px rgba(0,0,0,0.2)',
         }}
       >
-        <div className="flex items-start justify-between gap-4 flex-wrap mb-4">
+        <div className={`${headerLayoutClass} mb-4`}>
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--accent)' }}>
@@ -140,17 +171,17 @@ const TimelineToolbar = memo(function TimelineToolbar({
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-2">
-            <SummaryChip label="Scope" value={`${visibleCounts.programs}P · ${visibleCounts.projects}Pr`} tone="accent" />
-            <SummaryChip label="Tasks" value={visibleCounts.tasks} />
-            <SummaryChip label="Late" value={stats.delayedCount} tone="warning" />
-            <SummaryChip label="Unscheduled" value={stats.unscheduledCount} tone="muted" />
+          <div className={summaryLayoutClass}>
+            <SummaryChip label="Scope" value={`${visibleCounts.programs}P · ${visibleCounts.projects}Pr`} tone="accent" compact={compact} />
+            <SummaryChip label="Tasks" value={visibleCounts.tasks} compact={compact} />
+            <SummaryChip label="Late" value={stats.delayedCount} tone="warning" compact={compact} />
+            <SummaryChip label="Unscheduled" value={stats.unscheduledCount} tone="muted" compact={compact} />
           </div>
         </div>
 
-        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_auto] gap-3 mb-3">
-          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_repeat(3,minmax(0,0.72fr))] gap-2">
-            <label className="relative block">
+        <div className={scopeActionsClass}>
+          <div className={searchScopeLayoutClass}>
+            <label className={searchFieldClass}>
               <Search
                 size={14}
                 className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
@@ -216,7 +247,7 @@ const TimelineToolbar = memo(function TimelineToolbar({
             </label>
           </div>
 
-          <div className="flex items-end gap-2 flex-wrap xl:justify-end">
+          <div className={actionLayoutClass}>
             <div className="flex items-center justify-between gap-1 rounded-xl px-2 py-1.5" style={{ background: 'rgba(255,255,255,0.04)' }}>
               <button
                 onClick={() => onShiftRange(-1)}
@@ -288,8 +319,8 @@ const TimelineToolbar = memo(function TimelineToolbar({
           </div>
         </div>
 
-        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_auto] gap-3 items-start">
-          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(320px,0.95fr)] gap-3">
+        <div className={modeLayoutClass}>
+          <div className={viewZoomLayoutClass}>
             <div className="flex flex-col gap-1.5">
               <ControlLabel>View</ControlLabel>
               <div className="flex items-center gap-1 p-1 rounded-xl" style={{ background: 'rgba(255,255,255,0.04)' }}>

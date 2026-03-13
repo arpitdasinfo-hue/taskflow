@@ -382,6 +382,7 @@ const ManagerGantt = ({ programs, projects, tasks, milestones }) => {
         activeFilterCount={activeFilterCount}
         filterPanelOpen={showFilterPanel}
         readOnly
+        compact
         onChangeProgram={setProgramScope}
         onChangeProject={setProjectScope}
         onChangeSubProject={setSubProjectScope}
