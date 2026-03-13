@@ -7,6 +7,8 @@ export const THEMES = [
   {
     id: 'midnight-amethyst',
     name: 'Midnight Amethyst',
+    family: 'Luxe Nocturne',
+    mood: 'Royal glow for strategic work',
     gradient: `radial-gradient(ellipse at 75% 15%, rgba(147,51,234,0.45) 0%, transparent 52%),
       radial-gradient(ellipse at 15% 85%, rgba(79,0,160,0.30) 0%, transparent 48%),
       linear-gradient(160deg, #0a0015 0%, #180430 55%, #0d001e 100%)`,
@@ -26,6 +28,8 @@ export const THEMES = [
   {
     id: 'abyssal-blue',
     name: 'Abyssal Blue',
+    family: 'Oceanic',
+    mood: 'Deep-water focus with cool tension',
     gradient: `radial-gradient(ellipse at 60% 10%, rgba(14,116,144,0.50) 0%, transparent 55%),
       radial-gradient(ellipse at 20% 90%, rgba(8,51,68,0.35) 0%, transparent 50%),
       linear-gradient(160deg, #000b14 0%, #001829 55%, #000d1f 100%)`,
@@ -45,6 +49,8 @@ export const THEMES = [
   {
     id: 'malachite',
     name: 'Malachite',
+    family: 'Mineral',
+    mood: 'Dense green depth with calm energy',
     gradient: `radial-gradient(ellipse at 30% 85%, rgba(6,95,70,0.55) 0%, transparent 55%),
       radial-gradient(ellipse at 80% 15%, rgba(4,60,44,0.35) 0%, transparent 50%),
       linear-gradient(160deg, #001209 0%, #001f0f 55%, #000d07 100%)`,
@@ -64,6 +70,8 @@ export const THEMES = [
   {
     id: 'crimson-velvet',
     name: 'Crimson Velvet',
+    family: 'Editorial',
+    mood: 'Warm, dramatic, and high contrast',
     gradient: `radial-gradient(ellipse at 20% 20%, rgba(190,18,60,0.45) 0%, transparent 52%),
       radial-gradient(ellipse at 80% 80%, rgba(120,0,60,0.30) 0%, transparent 48%),
       linear-gradient(160deg, #16000c 0%, #2a0014 55%, #130008 100%)`,
@@ -83,6 +91,8 @@ export const THEMES = [
   {
     id: 'volcanic-ember',
     name: 'Volcanic Ember',
+    family: 'Furnace',
+    mood: 'Molten orange with sharp urgency',
     gradient: `radial-gradient(ellipse at 50% 20%, rgba(234,88,12,0.45) 0%, transparent 50%),
       radial-gradient(ellipse at 85% 75%, rgba(180,35,0,0.30) 0%, transparent 48%),
       linear-gradient(160deg, #130500 0%, #200a00 55%, #0f0300 100%)`,
@@ -102,6 +112,8 @@ export const THEMES = [
   {
     id: 'glacier',
     name: 'Glacier',
+    family: 'Arctic',
+    mood: 'Icy depth with clean luminous edges',
     gradient: `radial-gradient(ellipse at 50% 0%, rgba(56,189,248,0.40) 0%, transparent 55%),
       radial-gradient(ellipse at 90% 100%, rgba(14,80,120,0.25) 0%, transparent 50%),
       linear-gradient(160deg, #010c18 0%, #001828 55%, #000e1c 100%)`,
@@ -121,6 +133,8 @@ export const THEMES = [
   {
     id: 'amber-noir',
     name: 'Amber Noir',
+    family: 'Noir Gold',
+    mood: 'Low-light warmth with executive restraint',
     gradient: `radial-gradient(ellipse at 70% 15%, rgba(217,119,6,0.45) 0%, transparent 52%),
       radial-gradient(ellipse at 15% 80%, rgba(120,60,0,0.30) 0%, transparent 48%),
       linear-gradient(160deg, #0f0800 0%, #1c1000 55%, #0a0500 100%)`,
@@ -140,6 +154,8 @@ export const THEMES = [
   {
     id: 'ultraviolet',
     name: 'Ultraviolet',
+    family: 'Electric',
+    mood: 'Indigo charge with controlled drama',
     gradient: `radial-gradient(ellipse at 50% 30%, rgba(99,102,241,0.50) 0%, transparent 55%),
       radial-gradient(ellipse at 10% 90%, rgba(55,30,140,0.35) 0%, transparent 50%),
       linear-gradient(160deg, #030010 0%, #0a0520 55%, #050015 100%)`,
@@ -159,6 +175,8 @@ export const THEMES = [
   {
     id: 'sakura-night',
     name: 'Sakura Night',
+    family: 'Bloom',
+    mood: 'Rose-black blend with softer contrast',
     gradient: `radial-gradient(ellipse at 40% 10%, rgba(244,63,94,0.38) 0%, transparent 52%),
       radial-gradient(ellipse at 80% 80%, rgba(168,0,80,0.25) 0%, transparent 48%),
       linear-gradient(160deg, #140008 0%, #220010 55%, #0e0007 100%)`,
@@ -178,6 +196,8 @@ export const THEMES = [
   {
     id: 'neon-abyss',
     name: 'Neon Abyss',
+    family: 'Cyber',
+    mood: 'Dark studio glow with teal accents',
     gradient: `radial-gradient(ellipse at 80% 90%, rgba(8,145,178,0.45) 0%, transparent 55%),
       radial-gradient(ellipse at 20% 20%, rgba(0,60,80,0.30) 0%, transparent 50%),
       linear-gradient(160deg, #000608 0%, #000d0f 55%, #000608 100%)`,
@@ -197,6 +217,8 @@ export const THEMES = [
   {
     id: 'inferno',
     name: 'Inferno',
+    family: 'Burn',
+    mood: 'Red-core intensity for active delivery',
     gradient: `radial-gradient(ellipse at 50% 40%, rgba(220,38,38,0.50) 0%, transparent 52%),
       radial-gradient(ellipse at 10% 10%, rgba(127,0,0,0.30) 0%, transparent 48%),
       linear-gradient(160deg, #0e0000 0%, #1c0000 55%, #080000 100%)`,
@@ -216,6 +238,8 @@ export const THEMES = [
   {
     id: 'obsidian',
     name: 'Obsidian',
+    family: 'Monolith',
+    mood: 'Neutral graphite for quieter reviewing',
     gradient: `radial-gradient(ellipse at 75% 25%, rgba(71,85,105,0.40) 0%, transparent 55%),
       radial-gradient(ellipse at 20% 80%, rgba(30,41,59,0.30) 0%, transparent 48%),
       linear-gradient(160deg, #030508 0%, #08101a 55%, #050810 100%)`,

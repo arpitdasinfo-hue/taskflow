@@ -102,53 +102,93 @@ const ThemeSelector = memo(function ThemeSelector() {
       </div>
 
       {/* Grid */}
-      <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+      <div
+        className="rounded-2xl px-3 py-2.5 mb-4 text-xs"
+        style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', color: 'var(--text-secondary)' }}
+      >
+        Themes now use deeper atmospheric backgrounds with subtle structure overlays, so the canvas feels less flat and more intentional across desktop and mobile.
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
         {THEMES.map((theme, idx) => (
           <button
             key={theme.id}
             onClick={() => setTheme(idx)}
-            className="group relative rounded-2xl overflow-hidden aspect-[4/3] focus-visible:ring-2 transition-transform hover:scale-105"
-            style={{ outline: idx === themeIndex ? `2px solid ${theme.accent}` : 'none', outlineOffset: '2px' }}
+            className="group relative rounded-[26px] overflow-hidden aspect-[5/4] focus-visible:ring-2 transition-transform hover:-translate-y-1"
+            style={{
+              outline: idx === themeIndex ? `2px solid ${theme.accent}` : 'none',
+              outlineOffset: '2px',
+              boxShadow: idx === themeIndex ? `0 18px 42px rgba(${theme.accentRgb},0.22)` : '0 12px 28px rgba(0,0,0,0.18)',
+            }}
             aria-label={`Select ${theme.name} theme`}
             aria-pressed={idx === themeIndex}
           >
-            {/* Gradient bg */}
             <div className="absolute inset-0" style={{ background: theme.gradient }} />
-
-            {/* Glass preview swatch */}
             <div
-              className="absolute inset-2 rounded-xl"
+              className="absolute inset-0 opacity-80"
               style={{
-                background: theme.glassBg,
-                border: `1px solid ${theme.glassBorder}`,
-                backdropFilter: 'blur(8px)',
+                background:
+                  'linear-gradient(180deg, rgba(255,255,255,0.06) 0%, transparent 28%, rgba(0,0,0,0.28) 100%), repeating-linear-gradient(90deg, rgba(255,255,255,0.03) 0 1px, transparent 1px 92px)',
               }}
             />
 
-            {/* Accent dot row */}
-            <div className="absolute bottom-2 left-2 flex gap-1">
-              {theme.preview.map((c, i) => (
-                <span key={i} className="w-2 h-2 rounded-full" style={{ background: c }} />
-              ))}
-            </div>
-
-            {/* Theme name */}
             <div
-              className="absolute top-1.5 left-0 right-0 px-1.5 text-center text-[9px] font-semibold leading-tight"
-              style={{ color: theme.textPrimary, textShadow: '0 1px 4px rgba(0,0,0,0.8)' }}
-            >
-              {theme.name}
+              className="absolute inset-3 rounded-2xl"
+              style={{
+                background: theme.glassBg,
+                border: `1px solid ${theme.glassBorder}`,
+                backdropFilter: 'blur(10px)',
+              }}
+            />
+
+            <div className="absolute inset-3 rounded-2xl border border-white/10 opacity-70" />
+
+            <div className="absolute top-3 left-3 right-3 flex items-start justify-between gap-3">
+              <div
+                className="px-2.5 py-1 rounded-full text-[10px] font-semibold uppercase tracking-[0.16em]"
+                style={{ background: 'rgba(0,0,0,0.24)', color: theme.textSecondary, border: '1px solid rgba(255,255,255,0.08)' }}
+              >
+                {theme.family || 'Theme'}
+              </div>
+              {idx === themeIndex && (
+                <div
+                  className="w-6 h-6 rounded-full flex items-center justify-center"
+                  style={{ background: theme.accent }}
+                >
+                  <Check size={11} color="#fff" strokeWidth={3} />
+                </div>
+              )}
             </div>
 
-            {/* Active check */}
-            {idx === themeIndex && (
+            <div className="absolute left-3 right-3 bottom-3">
               <div
-                className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full flex items-center justify-center"
-                style={{ background: theme.accent }}
+                className="rounded-2xl px-3 py-3 text-left"
+                style={{ background: 'rgba(4,10,18,0.42)', border: '1px solid rgba(255,255,255,0.08)', backdropFilter: 'blur(12px)' }}
               >
-                <Check size={10} color="#fff" strokeWidth={3} />
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <div
+                      className="text-sm font-semibold truncate"
+                      style={{ color: theme.textPrimary, textShadow: '0 1px 4px rgba(0,0,0,0.6)' }}
+                    >
+                      {theme.name}
+                    </div>
+                    <div
+                      className="text-[11px] mt-1 leading-snug line-clamp-2"
+                      style={{ color: theme.textSecondary, textShadow: '0 1px 4px rgba(0,0,0,0.5)' }}
+                    >
+                      {theme.mood || 'Curated atmosphere'}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-3 flex items-center gap-1.5">
+                  {theme.preview.map((c, i) => (
+                    <span key={i} className="w-2.5 h-2.5 rounded-full" style={{ background: c }} />
+                  ))}
+                </div>
               </div>
-            )}
+            </div>
           </button>
         ))}
       </div>

@@ -282,6 +282,8 @@ function buildExcelWorkbookXml({
   include,
   ganttConfig,
   scope,
+  selectedProgramIds = [],
+  selectedProjectIds = [],
 }) {
   const getProject = (id) => projects.find((project) => project.id === id)
   const getProgram = (projectId) => {
@@ -294,6 +296,58 @@ function buildExcelWorkbookXml({
   const selectedTemplate = Object.fromEntries(
     selectedColumnKeys.map((key) => [XLSX_COLUMN_LABEL[key] ?? key, ''])
   )
+  const selectedProgramNames = selectedProgramIds.length > 0
+    ? programs.filter((program) => selectedProgramIds.includes(program.id)).map((program) => program.name)
+    : []
+  const selectedProjectNames = selectedProjectIds.length > 0
+    ? projects.filter((project) => selectedProjectIds.includes(project.id)).map((project) => project.name)
+    : []
+  const selectedSheets = [
+    include.tasks ? 'Work_Items' : null,
+    include.milestones ? 'Milestones' : null,
+    include.summaries ? 'Summary' : null,
+    include.ganttConfig ? 'Gantt_Config' : null,
+  ].filter(Boolean)
+  const scopeLabel = scope === 'programs'
+    ? 'Programs'
+    : scope === 'projects'
+      ? 'Projects'
+      : 'All data'
+
+  const selectionRows = [
+    { Setting: 'generated_at', Value: fmtHuman(new Date().toISOString()), Detail: 'Local export timestamp' },
+    { Setting: 'scope_mode', Value: scopeLabel, Detail: 'Scope chosen in the export modal' },
+    {
+      Setting: 'selected_programs',
+      Value: selectedProgramNames.length > 0 ? selectedProgramNames.join(', ') : (scope === 'programs' ? 'All programs' : 'Not scoped by program'),
+      Detail: 'Program filters included in this workbook',
+    },
+    {
+      Setting: 'selected_projects',
+      Value: selectedProjectNames.length > 0 ? selectedProjectNames.join(', ') : (scope === 'projects' ? 'All top-level projects' : 'Not scoped by project'),
+      Detail: 'Project filters included in this workbook',
+    },
+    {
+      Setting: 'included_sheets',
+      Value: selectedSheets.length > 0 ? selectedSheets.join(', ') : 'None',
+      Detail: 'Workbook sections included in this export',
+    },
+    {
+      Setting: 'selected_columns',
+      Value: selectedColumnKeys.length > 0
+        ? selectedColumnKeys.map((key) => XLSX_COLUMN_LABEL[key] ?? key).join(', ')
+        : 'None',
+      Detail: 'Task columns selected in step 2',
+    },
+    { Setting: 'task_count', Value: tasks.length, Detail: 'Matching tasks exported into the workbook' },
+    { Setting: 'project_count', Value: projects.filter((project) => !project.parentId).length, Detail: 'Top-level projects inside the selected scope' },
+    { Setting: 'sub_project_count', Value: projects.filter((project) => project.parentId).length, Detail: 'Sub-projects inside the selected scope' },
+    { Setting: 'program_count', Value: programs.length, Detail: 'Programs inside the selected scope' },
+    { Setting: 'include_subtasks', Value: String(Boolean(include.subtasks)), Detail: 'Whether subtasks were requested in export options' },
+    { Setting: 'include_milestones', Value: String(Boolean(include.milestones)), Detail: 'Whether milestones sheet is included' },
+    { Setting: 'include_summary', Value: String(Boolean(include.summaries)), Detail: 'Whether summary sheet is included' },
+    { Setting: 'include_gantt_config', Value: String(Boolean(include.ganttConfig)), Detail: 'Whether gantt config sheet is included' },
+  ]
 
   const taskRows = tasks.map((task) => {
     const project = getProject(task.projectId)
@@ -448,11 +502,15 @@ function buildExcelWorkbookXml({
 
   const workItemsRows = [...hierarchyRows, ...taskRows]
   const sheets = [
-    {
+    { name: 'Export_Selection', rows: selectionRows },
+  ]
+
+  if (include.tasks) {
+    sheets.push({
       name: 'Work_Items',
       rows: workItemsRows.length ? workItemsRows : [{ 'Row Type': 'Info', 'Item Name': 'No matching work items' }],
-    },
-  ]
+    })
+  }
 
   if (include.milestones) {
     const milestoneRows = milestones.map((milestone) => {
@@ -603,7 +661,7 @@ const ExportModal = memo(function ExportModal({ onClose }) {
         a.click(); URL.revokeObjectURL(url)
       } else if (format === 'xlsx') {
         const workbookXml = buildExcelWorkbookXml({
-          tasks: include.tasks ? scopedData.tasks : [],
+          tasks: scopedData.tasks,
           projects: scopedData.projects,
           programs: scopedPrograms,
           milestones: scopedData.milestones,
@@ -611,6 +669,8 @@ const ExportModal = memo(function ExportModal({ onClose }) {
           include,
           ganttConfig,
           scope,
+          selectedProgramIds: [...selProgramIds],
+          selectedProjectIds: [...selProjectIds],
         })
         const blob = new Blob([workbookXml], { type: 'application/vnd.ms-excel;charset=utf-8;' })
         const url = URL.createObjectURL(blob)
@@ -740,6 +800,14 @@ const ExportModal = memo(function ExportModal({ onClose }) {
                     <FileText size={14} /> PDF Report
                   </button>
                 </div>
+                {format === 'xlsx' && (
+                  <div
+                    className="mt-2 rounded-xl px-3 py-2 text-[11px]"
+                    style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.16)', color: '#a7f3d0' }}
+                  >
+                    Excel workbook includes an <span className="font-semibold">Export_Selection</span> sheet with scope, selected programs/projects, included sections, and chosen columns.
+                  </div>
+                )}
               </div>
             </div>
           ) : (

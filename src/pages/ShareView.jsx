@@ -153,6 +153,44 @@ const Section = ({ title, description, icon: Icon, action = null, children }) =>
   </GlassCard>
 )
 
+const ManagerNavButton = ({ active, icon: Icon, label, meta, onClick }) => (
+  <button
+    onClick={onClick}
+    className="w-full rounded-2xl px-3 py-3 text-left transition-colors"
+    style={active
+      ? {
+          background: 'rgba(var(--accent-rgb),0.14)',
+          color: 'var(--text-primary)',
+          border: '1px solid rgba(var(--accent-rgb),0.34)',
+          boxShadow: '0 12px 28px rgba(var(--accent-rgb),0.14)',
+        }
+      : {
+          background: 'rgba(255,255,255,0.03)',
+          color: 'var(--text-secondary)',
+          border: '1px solid rgba(255,255,255,0.08)',
+        }}
+  >
+    <div className="flex items-start gap-3">
+      <div
+        className="mt-0.5 w-8 h-8 rounded-2xl flex items-center justify-center flex-shrink-0"
+        style={active
+          ? { background: 'rgba(var(--accent-rgb),0.16)', color: 'var(--accent)' }
+          : { background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)' }}
+      >
+        <Icon size={14} />
+      </div>
+      <div className="min-w-0">
+        <div className="text-sm font-semibold" style={{ color: active ? 'var(--text-primary)' : 'inherit' }}>
+          {label}
+        </div>
+        <div className="text-[11px] mt-1 line-clamp-2" style={{ color: 'var(--text-secondary)' }}>
+          {meta}
+        </div>
+      </div>
+    </div>
+  </button>
+)
+
 const ManagerGantt = ({ programs, projects, tasks, milestones }) => {
   const [filteredProgramIds, setFilteredProgramIds] = useState(() => new Set())
   const [filteredProjectIds, setFilteredProjectIds] = useState(() => new Set())
@@ -808,6 +846,66 @@ export default function ShareView({ token }) {
     return 'Shared view'
   }, [link?.resource_type])
 
+  const availableSections = useMemo(() => {
+    const sections = []
+    if (shareConfig.modules.overview) {
+      sections.push({
+        id: 'overview',
+        label: 'Overview',
+        icon: ShieldCheck,
+        meta: 'Executive summary, delivery health, and immediate attention items.',
+      })
+    }
+    if (shareConfig.modules.analytics) {
+      sections.push({
+        id: 'analytics',
+        label: 'Analytics',
+        icon: BarChart3,
+        meta: 'Program roll-ups, completion signals, and portfolio load.',
+      })
+    }
+    if (shareConfig.modules.projects) {
+      sections.push({
+        id: 'delivery',
+        label: 'Delivery',
+        icon: FolderKanban,
+        meta: 'Project-level execution cards with progress, blocked work, and dates.',
+      })
+    }
+    if (shareConfig.modules.tasks) {
+      sections.push({
+        id: 'tasks',
+        label: 'Tasks',
+        icon: Lock,
+        meta: 'Detailed read-only task register with scope, dates, and priorities.',
+      })
+    }
+    if (shareConfig.modules.milestones) {
+      sections.push({
+        id: 'milestones',
+        label: 'Milestones',
+        icon: CalendarClock,
+        meta: 'Upcoming and completed checkpoints in the selected manager scope.',
+      })
+    }
+    if (shareConfig.modules.gantt) {
+      sections.push({
+        id: 'gantt',
+        label: 'Gantt',
+        icon: Target,
+        meta: 'Interactive read-only timeline with scope filters and time controls.',
+      })
+    }
+    return sections
+  }, [shareConfig.modules])
+
+  const [activeSection, setActiveSection] = useState('overview')
+
+  useEffect(() => {
+    if (availableSections.some((section) => section.id === activeSection)) return
+    setActiveSection(availableSections[0]?.id || '')
+  }, [activeSection, availableSections])
+
   const attentionItems = useMemo(() => {
     const overdueTasks = filteredTasks
       .filter((task) => task.dueDate && startOfDayTs(task.dueDate) < startOfDayTs(new Date()) && task.status !== 'done')
@@ -844,9 +942,20 @@ export default function ShareView({ token }) {
     return [...overdueTasks, ...blockedTasks, ...upcomingMilestones].slice(0, 5)
   }, [filteredMilestones, filteredTasks])
 
+  const activeSectionMeta = useMemo(
+    () => availableSections.find((section) => section.id === activeSection) ?? availableSections[0] ?? null,
+    [activeSection, availableSections]
+  )
+
+  const clearScopeFilters = () => {
+    setSelectedProgramId('')
+    setSelectedProjectId('')
+    setSelectedSubProjectId('')
+  }
+
   return (
     <div className="min-h-dvh px-4 py-6 md:py-8" style={{ background: 'var(--bg-gradient)' }}>
-      <div className="max-w-6xl mx-auto space-y-4">
+      <div className="max-w-7xl mx-auto space-y-4">
         {(loading || error) && (
           <GlassCard padding="p-5">
             {loading ? (
@@ -862,427 +971,502 @@ export default function ShareView({ token }) {
 
         {!loading && !error && (
           <>
-            <div className="grid grid-cols-1 xl:grid-cols-[1.25fr_0.75fr] gap-4">
-              <GlassCard padding="p-6">
-                <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                  <div className="min-w-0">
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.24em]" style={{ color: 'var(--text-secondary)' }}>
-                      Shared TaskFlow View
-                    </div>
-                    <div className="mt-2 flex items-center gap-2 flex-wrap">
-                      <h2 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>
-                        {link?.name || 'Manager View'}
-                      </h2>
-                      <InfoTooltip
-                        text="Live read-only snapshot of progress, analytics, and delivery timeline. The same share link always shows the latest data while it remains active."
-                        widthClassName="w-72"
-                      />
-                    </div>
-                    <div className="mt-3 flex items-center gap-2 flex-wrap text-xs">
-                      <span className="px-2.5 py-1 rounded-full" style={{ background: 'rgba(var(--accent-rgb),0.12)', color: 'var(--accent)' }}>
-                        {shareScopeLabel}
-                      </span>
-                      <span className="px-2.5 py-1 rounded-full" style={{ background: 'rgba(16,185,129,0.12)', color: '#10b981' }}>
-                        Live data
-                      </span>
-                      <span className="px-2.5 py-1 rounded-full" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)' }}>
-                        Read-only
-                      </span>
-                    </div>
+            <GlassCard padding="p-6">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div className="min-w-0">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.24em]" style={{ color: 'var(--text-secondary)' }}>
+                    Shared TaskFlow View
                   </div>
-
-                  <div className="grid grid-cols-3 gap-2 min-w-[280px]">
-                    <StatCard label="Programs" value={filteredPrograms.length} />
-                    <StatCard label="Projects" value={filteredProjects.filter((project) => !project.parentId).length} />
-                    <StatCard label="Tasks" value={stats.total} />
-                  </div>
-                </div>
-
-                {shareConfig.modules.overview && (
-                  <div className="mt-4 grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
-                    <StatCard label="Done %" value={`${stats.completion}%`} color="#10b981" />
-                    <StatCard label="In Progress" value={stats.inProgress} color="#22d3ee" />
-                    <StatCard label="Blocked" value={stats.blocked} color="#ef4444" />
-                    <StatCard label="Overdue" value={stats.overdue} color="#f97316" />
-                    <StatCard label="Milestones" value={filteredMilestones.length} color="#a78bfa" />
-                    <StatCard label="Active Scope" value={selectedSubProjectId ? 'Sub-project' : selectedProjectId ? 'Project' : selectedProgramId ? 'Program' : 'Portfolio'} />
-                  </div>
-                )}
-              </GlassCard>
-
-              <GlassCard padding="p-5">
-                <div className="flex items-center gap-2">
-                  <div
-                    className="w-8 h-8 rounded-2xl flex items-center justify-center"
-                    style={{ background: 'rgba(249,115,22,0.12)', border: '1px solid rgba(249,115,22,0.2)' }}
-                  >
-                    <Target size={14} style={{ color: '#f97316' }} />
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-                      Attention Now
-                    </h3>
+                  <div className="mt-2 flex items-center gap-2 flex-wrap">
+                    <h2 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>
+                      {link?.name || 'Manager View'}
+                    </h2>
                     <InfoTooltip
-                      text="Top signals from the current shared scope: overdue tasks, blocked work, and upcoming milestones."
-                      widthClassName="w-64"
+                      text="Live read-only snapshot of progress, analytics, and delivery timeline. The same share link always shows the latest data while it remains active."
+                      widthClassName="w-72"
                     />
                   </div>
+                  <p className="mt-3 text-sm max-w-2xl" style={{ color: 'var(--text-secondary)' }}>
+                    Structured for leadership review: one clean navigation rail, live scope filters, and focused sections instead of one long report.
+                  </p>
+                  <div className="mt-3 flex items-center gap-2 flex-wrap text-xs">
+                    <span className="px-2.5 py-1 rounded-full" style={{ background: 'rgba(var(--accent-rgb),0.12)', color: 'var(--accent)' }}>
+                      {shareScopeLabel}
+                    </span>
+                    <span className="px-2.5 py-1 rounded-full" style={{ background: 'rgba(16,185,129,0.12)', color: '#10b981' }}>
+                      Live data
+                    </span>
+                    <span className="px-2.5 py-1 rounded-full" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)' }}>
+                      Read-only
+                    </span>
+                    <span className="px-2.5 py-1 rounded-full" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)' }}>
+                      {activeSectionMeta?.label || 'Overview'}
+                    </span>
+                  </div>
                 </div>
 
-                <div className="mt-4 space-y-3">
-                  {attentionItems.length === 0 ? (
-                    <div
-                      className="rounded-2xl px-4 py-5 text-sm"
-                      style={{ background: 'rgba(255,255,255,0.04)', border: '1px dashed rgba(255,255,255,0.1)', color: 'var(--text-secondary)' }}
-                    >
-                      No urgent delivery signals in the current scope.
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-2 min-w-[280px]">
+                  <StatCard label="Programs" value={filteredPrograms.length} />
+                  <StatCard label="Projects" value={filteredProjects.filter((project) => !project.parentId).length} />
+                  <StatCard label="Tasks" value={stats.total} />
+                  <StatCard label="Done %" value={`${stats.completion}%`} color="#10b981" />
+                  <StatCard label="Blocked" value={stats.blocked} color="#ef4444" />
+                  <StatCard label="Overdue" value={stats.overdue} color="#f97316" />
+                </div>
+              </div>
+            </GlassCard>
+
+            <div className="grid grid-cols-1 xl:grid-cols-[250px_minmax(0,1fr)] gap-4 items-start">
+              <div className="space-y-4 xl:sticky xl:top-6 self-start">
+                <GlassCard padding="p-4">
+                  <div className="flex items-center justify-between gap-2 mb-3">
+                    <div>
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>
+                        Manager Sections
+                      </p>
+                      <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
+                        Switch between summary, delivery, detail, and timeline views.
+                      </p>
                     </div>
-                  ) : attentionItems.map((item) => (
-                    <div
-                      key={item.id}
-                      className="rounded-2xl px-4 py-3"
-                      style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${item.color}30` }}
+                  </div>
+                  <div className="space-y-2">
+                    {availableSections.map((section) => (
+                      <ManagerNavButton
+                        key={section.id}
+                        active={activeSection === section.id}
+                        icon={section.icon}
+                        label={section.label}
+                        meta={section.meta}
+                        onClick={() => setActiveSection(section.id)}
+                      />
+                    ))}
+                  </div>
+                </GlassCard>
+
+                <GlassCard padding="p-4">
+                  <div className="flex items-center justify-between gap-2 mb-3">
+                    <div className="flex items-center gap-2">
+                      <div
+                        className="w-8 h-8 rounded-2xl flex items-center justify-center"
+                        style={{ background: 'rgba(var(--accent-rgb),0.1)', border: '1px solid rgba(var(--accent-rgb),0.18)' }}
+                      >
+                        <Filter size={14} style={{ color: 'var(--accent)' }} />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Scope Filters</p>
+                        <p className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>Narrow the manager view without changing the share link.</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={clearScopeFilters}
+                      className="px-2.5 py-1.5 rounded-xl text-[11px]"
+                      style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)', border: '1px solid rgba(255,255,255,0.1)' }}
                     >
-                      <div className="flex items-start gap-3">
-                        <span className="w-2.5 h-2.5 rounded-full mt-1.5" style={{ background: item.color }} />
-                        <div className="min-w-0">
-                          <div className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>
-                            {item.label}
+                      Clear
+                    </button>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div>
+                      <p className="text-[10px] mb-1 uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>Program</p>
+                      <select
+                        value={selectedProgramId}
+                        onChange={(event) => {
+                          setSelectedProgramId(event.target.value)
+                          setSelectedProjectId('')
+                          setSelectedSubProjectId('')
+                        }}
+                        className="w-full px-3 py-2.5 rounded-xl text-xs"
+                        style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-primary)' }}
+                      >
+                        <option value="">All programs</option>
+                        {programs.map((program) => (
+                          <option key={program.id} value={program.id}>{program.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <p className="text-[10px] mb-1 uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>Project</p>
+                      <select
+                        value={selectedProjectId}
+                        onChange={(event) => {
+                          setSelectedProjectId(event.target.value)
+                          setSelectedSubProjectId('')
+                        }}
+                        className="w-full px-3 py-2.5 rounded-xl text-xs"
+                        style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-primary)' }}
+                      >
+                        <option value="">All projects</option>
+                        {visibleTopProjects.map((project) => (
+                          <option key={project.id} value={project.id}>{project.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <p className="text-[10px] mb-1 uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>Sub-project</p>
+                      <select
+                        value={selectedSubProjectId}
+                        onChange={(event) => setSelectedSubProjectId(event.target.value)}
+                        className="w-full px-3 py-2.5 rounded-xl text-xs"
+                        style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-primary)' }}
+                      >
+                        <option value="">All sub-projects</option>
+                        {visibleSubProjects.map((project) => (
+                          <option key={project.id} value={project.id}>{project.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </GlassCard>
+              </div>
+
+              <div className="space-y-4 min-w-0">
+                <GlassCard padding="p-5">
+                  <div className="flex items-start justify-between gap-4 flex-wrap">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {activeSectionMeta && (
+                          <div
+                            className="w-8 h-8 rounded-2xl flex items-center justify-center"
+                            style={{ background: 'rgba(var(--accent-rgb),0.1)', border: '1px solid rgba(var(--accent-rgb),0.18)' }}
+                          >
+                            <activeSectionMeta.icon size={14} style={{ color: 'var(--accent)' }} />
                           </div>
-                          <div className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
-                            {item.meta}
-                          </div>
+                        )}
+                        <div>
+                          <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                            {activeSectionMeta?.label || 'Overview'}
+                          </p>
+                          <p className="text-xs mt-1 max-w-2xl" style={{ color: 'var(--text-secondary)' }}>
+                            {activeSectionMeta?.meta}
+                          </p>
                         </div>
                       </div>
                     </div>
-                  ))}
-                </div>
-              </GlassCard>
-            </div>
-
-            <Section
-              title="Scope Filters"
-              description="Narrow the manager dashboard to a program, project, or sub-project without changing the original share link."
-              icon={Filter}
-              action={(
-                <button
-                  onClick={() => {
-                    setSelectedProgramId('')
-                    setSelectedProjectId('')
-                    setSelectedSubProjectId('')
-                  }}
-                  className="px-2.5 py-1.5 rounded-xl text-[11px]"
-                  style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)', border: '1px solid rgba(255,255,255,0.1)' }}
-                >
-                  Clear filters
-                </button>
-              )}
-            >
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <div>
-                  <p className="text-[10px] mb-1 uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>Program</p>
-                  <select
-                    value={selectedProgramId}
-                    onChange={(event) => {
-                      setSelectedProgramId(event.target.value)
-                      setSelectedProjectId('')
-                      setSelectedSubProjectId('')
-                    }}
-                    className="w-full px-3 py-2.5 rounded-xl text-xs"
-                    style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-primary)' }}
-                  >
-                    <option value="">All programs</option>
-                    {programs.map((program) => (
-                      <option key={program.id} value={program.id}>{program.name}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <p className="text-[10px] mb-1 uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>Project</p>
-                  <select
-                    value={selectedProjectId}
-                    onChange={(event) => {
-                      setSelectedProjectId(event.target.value)
-                      setSelectedSubProjectId('')
-                    }}
-                    className="w-full px-3 py-2.5 rounded-xl text-xs"
-                    style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-primary)' }}
-                  >
-                    <option value="">All projects</option>
-                    {visibleTopProjects.map((project) => (
-                      <option key={project.id} value={project.id}>{project.name}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <p className="text-[10px] mb-1 uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>Sub-project</p>
-                  <select
-                    value={selectedSubProjectId}
-                    onChange={(event) => setSelectedSubProjectId(event.target.value)}
-                    className="w-full px-3 py-2.5 rounded-xl text-xs"
-                    style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-primary)' }}
-                  >
-                    <option value="">All sub-projects</option>
-                    {visibleSubProjects.map((project) => (
-                      <option key={project.id} value={project.id}>{project.name}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            </Section>
-
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-              {shareConfig.modules.analytics && (
-                <Section
-                  title="Program Analytics"
-                  description="Portfolio roll-up by program so a manager can see scope, delivery load, blocked work, and completion quickly."
-                  icon={BarChart3}
-                >
-                  {programStats.length === 0 ? (
-                    <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>No program analytics available.</p>
-                  ) : (
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-xs min-w-[560px]">
-                        <thead>
-                          <tr style={{ color: 'var(--text-secondary)' }}>
-                            <th className="text-left py-2">Program</th>
-                            <th className="text-left py-2">Projects</th>
-                            <th className="text-left py-2">Tasks</th>
-                            <th className="text-left py-2">Done</th>
-                            <th className="text-left py-2">Blocked</th>
-                            <th className="text-left py-2">Completion</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {programStats.map((stat) => (
-                            <tr key={stat.id} style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-                              <td className="py-3">
-                                <span className="inline-flex items-center gap-2">
-                                  <span className="w-2 h-2 rounded-full" style={{ background: stat.color }} />
-                                  <span style={{ color: 'var(--text-primary)' }}>{stat.name}</span>
-                                </span>
-                              </td>
-                              <td className="py-3" style={{ color: 'var(--text-secondary)' }}>{stat.projects}</td>
-                              <td className="py-3" style={{ color: 'var(--text-secondary)' }}>{stat.tasks}</td>
-                              <td className="py-3" style={{ color: '#10b981' }}>{stat.done}</td>
-                              <td className="py-3" style={{ color: '#ef4444' }}>{stat.blocked}</td>
-                              <td className="py-3" style={{ color: 'var(--text-primary)' }}>{stat.completion}%</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                    <div className="flex gap-2 flex-wrap">
+                      {selectedProgramId && (
+                        <span className="px-2.5 py-1 rounded-full text-[11px]" style={{ background: 'rgba(var(--accent-rgb),0.12)', color: 'var(--accent)' }}>
+                          {programById.get(selectedProgramId)?.name || 'Program'}
+                        </span>
+                      )}
+                      {selectedProjectId && (
+                        <span className="px-2.5 py-1 rounded-full text-[11px]" style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--text-secondary)' }}>
+                          {projectById.get(selectedProjectId)?.name || 'Project'}
+                        </span>
+                      )}
+                      {selectedSubProjectId && (
+                        <span className="px-2.5 py-1 rounded-full text-[11px]" style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--text-secondary)' }}>
+                          {projectById.get(selectedSubProjectId)?.name || 'Sub-project'}
+                        </span>
+                      )}
                     </div>
-                  )}
-                </Section>
-              )}
+                  </div>
+                </GlassCard>
 
-              {shareConfig.modules.projects && (
-                <Section
-                  title="Project Delivery Board"
-                  description="Top-level projects with delivery status, completion, and timing so the manager can scan active execution without editing anything."
-                  icon={FolderKanban}
-                >
-                  {filteredProjects.length === 0 ? (
-                    <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>No projects available.</p>
-                  ) : (
-                    <div className="grid grid-cols-1 gap-3">
-                      {filteredProjects.filter((project) => !project.parentId).map((project) => {
-                        const scopedIds = new Set([
-                          project.id,
-                          ...filteredProjects.filter((candidate) => candidate.parentId === project.id).map((candidate) => candidate.id),
-                        ])
-                        const projectTasks = filteredTasks.filter((task) => task.projectId && scopedIds.has(task.projectId))
-                        const done = projectTasks.filter((task) => task.status === 'done').length
-                        const blocked = projectTasks.filter((task) => task.status === 'blocked').length
-                        const overdue = projectTasks.filter((task) => task.dueDate && startOfDayTs(task.dueDate) < startOfDayTs(new Date()) && task.status !== 'done').length
-                        const completion = projectTasks.length ? Math.round((done / projectTasks.length) * 100) : 0
-                        const programName = project.programId ? programById.get(project.programId)?.name : 'Unassigned'
-                        return (
+                {activeSection === 'overview' && (
+                  <>
+                    <Section
+                      title="Overview KPIs"
+                      description="Executive summary of completion, blocked work, overdue load, and active scope size."
+                      icon={ShieldCheck}
+                    >
+                      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+                        <StatCard label="Done %" value={`${stats.completion}%`} color="#10b981" />
+                        <StatCard label="In Progress" value={stats.inProgress} color="#22d3ee" />
+                        <StatCard label="Blocked" value={stats.blocked} color="#ef4444" />
+                        <StatCard label="Overdue" value={stats.overdue} color="#f97316" />
+                        <StatCard label="Milestones" value={filteredMilestones.length} color="#a78bfa" />
+                        <StatCard label="Active Scope" value={selectedSubProjectId ? 'Sub-project' : selectedProjectId ? 'Project' : selectedProgramId ? 'Program' : 'Portfolio'} />
+                      </div>
+                    </Section>
+
+                    <Section
+                      title="Attention Now"
+                      description="Top signals from the current shared scope: overdue tasks, blocked work, and upcoming milestones."
+                      icon={Target}
+                    >
+                      <div className="space-y-3">
+                        {attentionItems.length === 0 ? (
                           <div
-                            key={project.id}
-                            className="rounded-2xl p-4"
-                            style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${project.color}33` }}
+                            className="rounded-2xl px-4 py-5 text-sm"
+                            style={{ background: 'rgba(255,255,255,0.04)', border: '1px dashed rgba(255,255,255,0.1)', color: 'var(--text-secondary)' }}
                           >
-                            <div className="flex items-start justify-between gap-3">
+                            No urgent delivery signals in the current scope.
+                          </div>
+                        ) : attentionItems.map((item) => (
+                          <div
+                            key={item.id}
+                            className="rounded-2xl px-4 py-3"
+                            style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${item.color}30` }}
+                          >
+                            <div className="flex items-start gap-3">
+                              <span className="w-2.5 h-2.5 rounded-full mt-1.5" style={{ background: item.color }} />
                               <div className="min-w-0">
-                                <div className="flex items-center gap-2">
-                                  <span className="w-2.5 h-2.5 rounded-full" style={{ background: project.color }} />
-                                  <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
-                                    {project.name}
-                                  </p>
+                                <div className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>
+                                  {item.label}
                                 </div>
-                                <p className="text-[11px] mt-1 truncate" style={{ color: 'var(--text-secondary)' }}>
-                                  {programName}
-                                </p>
+                                <div className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
+                                  {item.meta}
+                                </div>
                               </div>
-                              <span className="text-[10px] px-2 py-1 rounded-full" style={{ background: `${project.color}22`, color: project.color }}>
-                                {completion}%
-                              </span>
-                            </div>
-
-                            <div className="mt-3 grid grid-cols-4 gap-3 text-[11px]">
-                              <div>
-                                <div style={{ color: 'var(--text-secondary)' }}>Tasks</div>
-                                <div className="mt-1 text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{projectTasks.length}</div>
-                              </div>
-                              <div>
-                                <div style={{ color: 'var(--text-secondary)' }}>Done</div>
-                                <div className="mt-1 text-sm font-semibold" style={{ color: '#10b981' }}>{done}</div>
-                              </div>
-                              <div>
-                                <div style={{ color: 'var(--text-secondary)' }}>Blocked</div>
-                                <div className="mt-1 text-sm font-semibold" style={{ color: blocked > 0 ? '#ef4444' : 'var(--text-primary)' }}>{blocked}</div>
-                              </div>
-                              <div>
-                                <div style={{ color: 'var(--text-secondary)' }}>Overdue</div>
-                                <div className="mt-1 text-sm font-semibold" style={{ color: overdue > 0 ? '#f97316' : 'var(--text-primary)' }}>{overdue}</div>
-                              </div>
-                            </div>
-
-                            <div className="flex items-center justify-between mt-3 text-[10px]" style={{ color: 'var(--text-secondary)' }}>
-                              <span>Start: {fmtDate(project.startDate)}</span>
-                              <span>Due: {fmtDate(project.dueDate)}</span>
                             </div>
                           </div>
-                        )
-                      })}
-                    </div>
-                  )}
-                </Section>
-              )}
-            </div>
-
-            {shareConfig.modules.tasks && (
-              <Section
-                title="Task Register"
-                description="Read-only task detail with project context, delivery status, priority, and schedule dates."
-                icon={Lock}
-              >
-                {filteredTasks.length === 0 ? (
-                  <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>No tasks in this shared scope.</p>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-xs min-w-[920px]">
-                      <thead>
-                        <tr style={{ color: 'var(--text-secondary)' }}>
-                          <th className="text-left py-2">Task</th>
-                          <th className="text-left py-2">Project</th>
-                          <th className="text-left py-2">Status</th>
-                          <th className="text-left py-2">Priority</th>
-                          <th className="text-left py-2">Start</th>
-                          <th className="text-left py-2">Due</th>
-                          {shareConfig.modules.dependencies && <th className="text-left py-2">Dependencies</th>}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {filteredTasks
-                          .slice()
-                          .sort((a, b) => {
-                            if (!a.dueDate && !b.dueDate) return 0
-                            if (!a.dueDate) return 1
-                            if (!b.dueDate) return -1
-                            return startOfDayTs(a.dueDate) - startOfDayTs(b.dueDate)
-                          })
-                          .map((task) => {
-                            const project = task.projectId ? projectById.get(task.projectId) : null
-                            const program = getTaskProgramId(task, projects)
-                              ? programById.get(getTaskProgramId(task, projects))
-                              : null
-                            return (
-                              <tr key={task.id} style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-                                <td className="py-3">
-                                  <p className="text-[12px] font-medium" style={{ color: 'var(--text-primary)' }}>{task.title}</p>
-                                  {shareConfig.modules.details && task.description && (
-                                    <p className="text-[10px] line-clamp-2 mt-1" style={{ color: 'var(--text-secondary)' }}>
-                                      {task.description}
-                                    </p>
-                                  )}
-                                </td>
-                                <td className="py-3" style={{ color: 'var(--text-secondary)' }}>
-                                  {project?.name || (program ? `${program.name} · Program` : '—')}
-                                </td>
-                                <td className="py-3">
-                                  <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: `${STATUS_COLOR[task.status] || '#94a3b8'}22`, color: STATUS_COLOR[task.status] || '#94a3b8' }}>
-                                    {TASK_STATUS_OPTIONS.find((item) => item.key === task.status)?.label || task.status}
-                                  </span>
-                                </td>
-                                <td className="py-3">
-                                  <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: `${PRIORITY_COLOR[task.priority] || '#94a3b8'}22`, color: PRIORITY_COLOR[task.priority] || '#94a3b8' }}>
-                                    {TASK_PRIORITY_OPTIONS.find((item) => item.key === task.priority)?.label || task.priority}
-                                  </span>
-                                </td>
-                                <td className="py-3" style={{ color: 'var(--text-secondary)' }}>{fmtDate(task.startDate)}</td>
-                                <td className="py-3" style={{ color: 'var(--text-secondary)' }}>{fmtDate(task.dueDate)}</td>
-                                {shareConfig.modules.dependencies && (
-                                  <td className="py-3" style={{ color: 'var(--text-secondary)' }}>
-                                    {task.dependsOn?.length ? task.dependsOn.join(', ') : '—'}
-                                  </td>
-                                )}
-                              </tr>
-                            )
-                          })}
-                      </tbody>
-                    </table>
-                  </div>
+                        ))}
+                      </div>
+                    </Section>
+                  </>
                 )}
-              </Section>
-            )}
 
-            <div className="grid grid-cols-1 xl:grid-cols-[0.9fr_1.1fr] gap-4">
-              {shareConfig.modules.milestones && (
-                <Section
-                  title="Milestones"
-                  description="Upcoming and completed delivery checkpoints inside the shared scope."
-                  icon={CalendarClock}
-                >
-                  {filteredMilestones.length === 0 ? (
-                    <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>No milestones available in this scope.</p>
-                  ) : (
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-xs min-w-[520px]">
-                        <thead>
-                          <tr style={{ color: 'var(--text-secondary)' }}>
-                            <th className="text-left py-2">Milestone</th>
-                            <th className="text-left py-2">Project</th>
-                            <th className="text-left py-2">Due Date</th>
-                            <th className="text-left py-2">Status</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {filteredMilestones.map((milestone) => {
-                            const project = milestone.projectId ? projectById.get(milestone.projectId) : null
-                            return (
-                              <tr key={milestone.id} style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-                                <td className="py-2.5" style={{ color: 'var(--text-primary)' }}>{milestone.name}</td>
-                                <td className="py-2.5" style={{ color: 'var(--text-secondary)' }}>{project?.name || '—'}</td>
-                                <td className="py-2.5" style={{ color: 'var(--text-secondary)' }}>{fmtDate(milestone.dueDate)}</td>
-                                <td className="py-2.5" style={{ color: milestone.completed ? '#10b981' : '#f59e0b' }}>
-                                  {milestone.completed ? 'Completed' : milestone.status}
+                {activeSection === 'analytics' && shareConfig.modules.analytics && (
+                  <Section
+                    title="Program Analytics"
+                    description="Portfolio roll-up by program so a manager can see scope, delivery load, blocked work, and completion quickly."
+                    icon={BarChart3}
+                  >
+                    {programStats.length === 0 ? (
+                      <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>No program analytics available.</p>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-xs min-w-[560px]">
+                          <thead>
+                            <tr style={{ color: 'var(--text-secondary)' }}>
+                              <th className="text-left py-2">Program</th>
+                              <th className="text-left py-2">Projects</th>
+                              <th className="text-left py-2">Tasks</th>
+                              <th className="text-left py-2">Done</th>
+                              <th className="text-left py-2">Blocked</th>
+                              <th className="text-left py-2">Completion</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {programStats.map((stat) => (
+                              <tr key={stat.id} style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                                <td className="py-3">
+                                  <span className="inline-flex items-center gap-2">
+                                    <span className="w-2 h-2 rounded-full" style={{ background: stat.color }} />
+                                    <span style={{ color: 'var(--text-primary)' }}>{stat.name}</span>
+                                  </span>
                                 </td>
+                                <td className="py-3" style={{ color: 'var(--text-secondary)' }}>{stat.projects}</td>
+                                <td className="py-3" style={{ color: 'var(--text-secondary)' }}>{stat.tasks}</td>
+                                <td className="py-3" style={{ color: '#10b981' }}>{stat.done}</td>
+                                <td className="py-3" style={{ color: '#ef4444' }}>{stat.blocked}</td>
+                                <td className="py-3" style={{ color: 'var(--text-primary)' }}>{stat.completion}%</td>
                               </tr>
-                            )
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </Section>
-              )}
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </Section>
+                )}
 
-              {shareConfig.modules.gantt && (
-                <Section
-                  title="Read-only Gantt"
-                  description="Timeline view of programs, projects, tasks, and milestones with the same filters available in the manager link."
-                  icon={ShieldCheck}
-                >
-                  <ManagerGantt
-                    programs={filteredPrograms}
-                    projects={filteredProjects}
-                    tasks={filteredTasks}
-                    milestones={filteredMilestones}
-                  />
-                </Section>
-              )}
+                {activeSection === 'delivery' && shareConfig.modules.projects && (
+                  <Section
+                    title="Project Delivery Board"
+                    description="Top-level projects with delivery status, completion, and timing so the manager can scan active execution without editing anything."
+                    icon={FolderKanban}
+                  >
+                    {filteredProjects.length === 0 ? (
+                      <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>No projects available.</p>
+                    ) : (
+                      <div className="grid grid-cols-1 gap-3">
+                        {filteredProjects.filter((project) => !project.parentId).map((project) => {
+                          const scopedIds = new Set([
+                            project.id,
+                            ...filteredProjects.filter((candidate) => candidate.parentId === project.id).map((candidate) => candidate.id),
+                          ])
+                          const projectTasks = filteredTasks.filter((task) => task.projectId && scopedIds.has(task.projectId))
+                          const done = projectTasks.filter((task) => task.status === 'done').length
+                          const blocked = projectTasks.filter((task) => task.status === 'blocked').length
+                          const overdue = projectTasks.filter((task) => task.dueDate && startOfDayTs(task.dueDate) < startOfDayTs(new Date()) && task.status !== 'done').length
+                          const completion = projectTasks.length ? Math.round((done / projectTasks.length) * 100) : 0
+                          const programName = project.programId ? programById.get(project.programId)?.name : 'Unassigned'
+                          return (
+                            <div
+                              key={project.id}
+                              className="rounded-2xl p-4"
+                              style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${project.color}33` }}
+                            >
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                  <div className="flex items-center gap-2">
+                                    <span className="w-2.5 h-2.5 rounded-full" style={{ background: project.color }} />
+                                    <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
+                                      {project.name}
+                                    </p>
+                                  </div>
+                                  <p className="text-[11px] mt-1 truncate" style={{ color: 'var(--text-secondary)' }}>
+                                    {programName}
+                                  </p>
+                                </div>
+                                <span className="text-[10px] px-2 py-1 rounded-full" style={{ background: `${project.color}22`, color: project.color }}>
+                                  {completion}%
+                                </span>
+                              </div>
+
+                              <div className="mt-3 grid grid-cols-4 gap-3 text-[11px]">
+                                <div>
+                                  <div style={{ color: 'var(--text-secondary)' }}>Tasks</div>
+                                  <div className="mt-1 text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{projectTasks.length}</div>
+                                </div>
+                                <div>
+                                  <div style={{ color: 'var(--text-secondary)' }}>Done</div>
+                                  <div className="mt-1 text-sm font-semibold" style={{ color: '#10b981' }}>{done}</div>
+                                </div>
+                                <div>
+                                  <div style={{ color: 'var(--text-secondary)' }}>Blocked</div>
+                                  <div className="mt-1 text-sm font-semibold" style={{ color: blocked > 0 ? '#ef4444' : 'var(--text-primary)' }}>{blocked}</div>
+                                </div>
+                                <div>
+                                  <div style={{ color: 'var(--text-secondary)' }}>Overdue</div>
+                                  <div className="mt-1 text-sm font-semibold" style={{ color: overdue > 0 ? '#f97316' : 'var(--text-primary)' }}>{overdue}</div>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center justify-between mt-3 text-[10px]" style={{ color: 'var(--text-secondary)' }}>
+                                <span>Start: {fmtDate(project.startDate)}</span>
+                                <span>Due: {fmtDate(project.dueDate)}</span>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </Section>
+                )}
+
+                {activeSection === 'tasks' && shareConfig.modules.tasks && (
+                  <Section
+                    title="Task Register"
+                    description="Read-only task detail with project context, delivery status, priority, and schedule dates."
+                    icon={Lock}
+                  >
+                    {filteredTasks.length === 0 ? (
+                      <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>No tasks in this shared scope.</p>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-xs min-w-[920px]">
+                          <thead>
+                            <tr style={{ color: 'var(--text-secondary)' }}>
+                              <th className="text-left py-2">Task</th>
+                              <th className="text-left py-2">Project</th>
+                              <th className="text-left py-2">Status</th>
+                              <th className="text-left py-2">Priority</th>
+                              <th className="text-left py-2">Start</th>
+                              <th className="text-left py-2">Due</th>
+                              {shareConfig.modules.dependencies && <th className="text-left py-2">Dependencies</th>}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {filteredTasks
+                              .slice()
+                              .sort((a, b) => {
+                                if (!a.dueDate && !b.dueDate) return 0
+                                if (!a.dueDate) return 1
+                                if (!b.dueDate) return -1
+                                return startOfDayTs(a.dueDate) - startOfDayTs(b.dueDate)
+                              })
+                              .map((task) => {
+                                const project = task.projectId ? projectById.get(task.projectId) : null
+                                const program = getTaskProgramId(task, projects)
+                                  ? programById.get(getTaskProgramId(task, projects))
+                                  : null
+                                return (
+                                  <tr key={task.id} style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                                    <td className="py-3">
+                                      <p className="text-[12px] font-medium" style={{ color: 'var(--text-primary)' }}>{task.title}</p>
+                                      {shareConfig.modules.details && task.description && (
+                                        <p className="text-[10px] line-clamp-2 mt-1" style={{ color: 'var(--text-secondary)' }}>
+                                          {task.description}
+                                        </p>
+                                      )}
+                                    </td>
+                                    <td className="py-3" style={{ color: 'var(--text-secondary)' }}>
+                                      {project?.name || (program ? `${program.name} · Program` : '—')}
+                                    </td>
+                                    <td className="py-3">
+                                      <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: `${STATUS_COLOR[task.status] || '#94a3b8'}22`, color: STATUS_COLOR[task.status] || '#94a3b8' }}>
+                                        {TASK_STATUS_OPTIONS.find((item) => item.key === task.status)?.label || task.status}
+                                      </span>
+                                    </td>
+                                    <td className="py-3">
+                                      <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: `${PRIORITY_COLOR[task.priority] || '#94a3b8'}22`, color: PRIORITY_COLOR[task.priority] || '#94a3b8' }}>
+                                        {TASK_PRIORITY_OPTIONS.find((item) => item.key === task.priority)?.label || task.priority}
+                                      </span>
+                                    </td>
+                                    <td className="py-3" style={{ color: 'var(--text-secondary)' }}>{fmtDate(task.startDate)}</td>
+                                    <td className="py-3" style={{ color: 'var(--text-secondary)' }}>{fmtDate(task.dueDate)}</td>
+                                    {shareConfig.modules.dependencies && (
+                                      <td className="py-3" style={{ color: 'var(--text-secondary)' }}>
+                                        {task.dependsOn?.length ? task.dependsOn.join(', ') : '—'}
+                                      </td>
+                                    )}
+                                  </tr>
+                                )
+                              })}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </Section>
+                )}
+
+                {activeSection === 'milestones' && shareConfig.modules.milestones && (
+                  <Section
+                    title="Milestones"
+                    description="Upcoming and completed delivery checkpoints inside the shared scope."
+                    icon={CalendarClock}
+                  >
+                    {filteredMilestones.length === 0 ? (
+                      <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>No milestones available in this scope.</p>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-xs min-w-[520px]">
+                          <thead>
+                            <tr style={{ color: 'var(--text-secondary)' }}>
+                              <th className="text-left py-2">Milestone</th>
+                              <th className="text-left py-2">Project</th>
+                              <th className="text-left py-2">Due Date</th>
+                              <th className="text-left py-2">Status</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {filteredMilestones.map((milestone) => {
+                              const project = milestone.projectId ? projectById.get(milestone.projectId) : null
+                              return (
+                                <tr key={milestone.id} style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                                  <td className="py-2.5" style={{ color: 'var(--text-primary)' }}>{milestone.name}</td>
+                                  <td className="py-2.5" style={{ color: 'var(--text-secondary)' }}>{project?.name || '—'}</td>
+                                  <td className="py-2.5" style={{ color: 'var(--text-secondary)' }}>{fmtDate(milestone.dueDate)}</td>
+                                  <td className="py-2.5" style={{ color: milestone.completed ? '#10b981' : '#f59e0b' }}>
+                                    {milestone.completed ? 'Completed' : milestone.status}
+                                  </td>
+                                </tr>
+                              )
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </Section>
+                )}
+
+                {activeSection === 'gantt' && shareConfig.modules.gantt && (
+                  <Section
+                    title="Read-only Gantt"
+                    description="Timeline view of programs, projects, tasks, and milestones with the same filters available in the manager link."
+                    icon={ShieldCheck}
+                  >
+                    <ManagerGantt
+                      programs={filteredPrograms}
+                      projects={filteredProjects}
+                      tasks={filteredTasks}
+                      milestones={filteredMilestones}
+                    />
+                  </Section>
+                )}
+              </div>
             </div>
           </>
         )}
