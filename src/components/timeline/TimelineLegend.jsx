@@ -5,25 +5,27 @@ const TimelineLegend = memo(function TimelineLegend({ readOnly = false }) {
   const entries = [
     ['todo', 'To Do'],
     ['in-progress', 'In Progress'],
-    ['review', 'Review'],
     ['done', 'Done'],
     ['blocked', 'Blocked'],
   ]
 
   return (
     <div className="px-4 md:px-6 pb-2">
-      <div className="flex items-center gap-2 flex-wrap">
+      <div
+        className="flex items-center gap-2 flex-wrap rounded-2xl px-3 py-2"
+        style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)' }}
+      >
         <span className="text-[10px] uppercase tracking-wider font-semibold" style={{ color: 'var(--text-secondary)' }}>
-          Legend
+          Chart Key
         </span>
         <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: 'rgba(255,255,255,0.08)', color: 'var(--text-secondary)' }}>
-          Thick bar: program
+          Program
         </span>
         <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--text-secondary)' }}>
-          Medium bar: project
+          Project
         </span>
         <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)' }}>
-          Slim bar: task
+          Task
         </span>
         {entries.map(([id, label]) => (
           <span
@@ -44,15 +46,15 @@ const TimelineLegend = memo(function TimelineLegend({ readOnly = false }) {
           Dependency risk
         </span>
         <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: 'rgba(249,115,22,0.15)', color: '#fb923c' }}>
-          Red edge/glow = late
+          Late
         </span>
         <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: 'rgba(239,68,68,0.14)', color: '#f87171' }}>
-          Stripes = blocked
+          Blocked stripes
         </span>
         <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--text-secondary)' }}>
           {readOnly
-            ? 'Read-only timeline view'
-            : 'Drag bars to move. Drag edges to resize. Use Advanced for risk filters.'}
+            ? 'Read-only timeline'
+            : 'Drag bars or edges to reschedule'}
         </span>
       </div>
     </div>

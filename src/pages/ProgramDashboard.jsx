@@ -221,6 +221,16 @@ const ProgramDashboard = memo(function ProgramDashboard() {
           <>
             <OverallSummary allStats={allStats} programs={programs} />
 
+            <div className="grid gap-4 md:grid-cols-2">
+              {programs.map((program) => (
+                <ProgramCard
+                  key={program.id}
+                  program={program}
+                  stats={allStats[program.id] || { total: 0, done: 0, inProgress: 0, blocked: 0, overdue: 0, critical: 0, completion: 0, projectCount: 0, health: 'on-track', upcomingMilestones: [] }}
+                />
+              ))}
+            </div>
+
             <TimelinePlanningPanel
               showSavedViews={false}
               insights={insights}
@@ -243,16 +253,6 @@ const ProgramDashboard = memo(function ProgramDashboard() {
                 setPage('timeline')
               }}
             />
-
-            <div className="grid gap-4 md:grid-cols-2">
-              {programs.map((program) => (
-                <ProgramCard
-                  key={program.id}
-                  program={program}
-                  stats={allStats[program.id] || { total: 0, done: 0, inProgress: 0, blocked: 0, overdue: 0, critical: 0, completion: 0, projectCount: 0, health: 'on-track', upcomingMilestones: [] }}
-                />
-              ))}
-            </div>
           </>
         )}
       </div>

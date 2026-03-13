@@ -21,6 +21,7 @@ const Settings         = lazy(() => import('./pages/Settings'))
 const Projects         = lazy(() => import('./pages/Projects'))
 const ProgramDashboard = lazy(() => import('./pages/ProgramDashboard'))
 const Timeline         = lazy(() => import('./pages/Timeline'))
+const Trash            = lazy(() => import('./pages/Trash'))
 const ShareView        = lazy(() => import('./pages/ShareView'))
 
 const PageFallback = () => (
@@ -72,6 +73,7 @@ function PageRouter({ page }) {
         {page === 'projects'           && <Projects />}
         {page === 'program-dashboard'  && <ProgramDashboard />}
         {page === 'timeline'           && <Timeline />}
+        {page === 'trash'              && <Trash />}
       </Suspense>
     </ErrorBoundary>
   )
@@ -332,7 +334,7 @@ export default function App() {
         },
         onSubtask: (payload) => {
           const row = payload.eventType === 'DELETE' ? payload.old : payload.new
-          const hasTask = useTaskStore.getState().tasks.some((t) => t.id === row.task_id)
+          const hasTask = Boolean(useTaskStore.getState().getTaskById(row.task_id))
           if (!hasTask) {
             scheduleTaskReload(workspaceId)
             return
@@ -344,7 +346,7 @@ export default function App() {
         },
         onNote: (payload) => {
           const row = payload.eventType === 'DELETE' ? payload.old : payload.new
-          const hasTask = useTaskStore.getState().tasks.some((t) => t.id === row.task_id)
+          const hasTask = Boolean(useTaskStore.getState().getTaskById(row.task_id))
           if (!hasTask) {
             scheduleTaskReload(workspaceId)
             return
@@ -411,7 +413,7 @@ export default function App() {
       {selectedTaskId && <TaskDetail />}
 
       {/* Floating action button */}
-      <QuickAdd />
+      {activePage !== 'trash' && <QuickAdd />}
 
       <SyncIssueBanner
         message={workspaceError}

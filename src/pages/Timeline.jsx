@@ -559,24 +559,35 @@ const Timeline = memo(function Timeline() {
 
       <TimelineLegend />
 
-      {rows.length === 0 ? (
-        <TimelineEmptyState filtered={filtered} />
-      ) : (
-        <TimelineGrid
-          rows={rows}
-          startDate={startDate}
-          days={config.days}
-          cellWidth={config.cellWidth}
-          zoom={zoom}
-          onToggleProject={toggleExpandedProject}
-          onSelectTask={selectTask}
-          onUpdateTaskSchedule={handleTaskScheduleUpdate}
-          onUpdateProjectSchedule={handleProjectScheduleUpdate}
-          onCreateTaskInRange={createTaskInRange}
-          showDependencies={showDependencies}
-          onlyDependencyRisk={onlyDependencyRisk}
-        />
-      )}
+      <div className="px-4 md:px-6 pb-6">
+        <div
+          className="rounded-[24px] overflow-hidden"
+          style={{
+            background: 'linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0.018))',
+            border: '1px solid rgba(255,255,255,0.08)',
+            boxShadow: '0 22px 48px rgba(0,0,0,0.18)',
+          }}
+        >
+          {rows.length === 0 ? (
+            <TimelineEmptyState filtered={filtered} />
+          ) : (
+            <TimelineGrid
+              rows={rows}
+              startDate={startDate}
+              days={config.days}
+              cellWidth={config.cellWidth}
+              zoom={zoom}
+              onToggleProject={toggleExpandedProject}
+              onSelectTask={selectTask}
+              onUpdateTaskSchedule={handleTaskScheduleUpdate}
+              onUpdateProjectSchedule={handleProjectScheduleUpdate}
+              onCreateTaskInRange={createTaskInRange}
+              showDependencies={showDependencies}
+              onlyDependencyRisk={onlyDependencyRisk}
+            />
+          )}
+        </div>
+      </div>
 
       <TimelineActionToast
         itemLabel={scheduleNotice?.itemLabel}

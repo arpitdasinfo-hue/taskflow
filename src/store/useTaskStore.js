@@ -52,21 +52,22 @@ const normalizeTaskScope = (task = null, updates = {}) => {
 const toTaskRow = (task, workspaceId, userId) => {
   const scope = normalizeTaskScope(task)
   return {
-  id: task.id,
-  workspace_id: workspaceId,
-  project_id: scope.projectId,
-  program_id: scope.programId,
-  title: task.title ?? 'Untitled task',
-  description: task.description ?? '',
-  status: task.status ?? 'todo',
-  priority: task.priority ?? 'medium',
-  start_date: task.startDate ?? null,
-  due_date: task.dueDate ?? null,
-  tags: task.tags ?? [],
-  depends_on: task.dependsOn ?? [],
-  created_by: userId,
-  created_at: task.createdAt ?? now(),
-  updated_at: task.updatedAt ?? now(),
+    id: task.id,
+    workspace_id: workspaceId,
+    project_id: scope.projectId,
+    program_id: scope.programId,
+    title: task.title ?? 'Untitled task',
+    description: task.description ?? '',
+    status: task.status ?? 'todo',
+    priority: task.priority ?? 'medium',
+    start_date: task.startDate ?? null,
+    due_date: task.dueDate ?? null,
+    tags: task.tags ?? [],
+    depends_on: task.dependsOn ?? [],
+    created_by: userId,
+    created_at: task.createdAt ?? now(),
+    updated_at: task.updatedAt ?? now(),
+    deleted_at: task.deletedAt ?? null,
   }
 }
 
@@ -84,9 +85,34 @@ const fromTaskRow = (row) => ({
   dependsOn: Array.isArray(row.depends_on) ? row.depends_on : [],
   createdAt: row.created_at ?? now(),
   updatedAt: row.updated_at ?? row.created_at ?? now(),
+  deletedAt: row.deleted_at ?? null,
   subtasks: [],
   notes: [],
 })
+
+const sortTasksByCreatedAt = (tasks = []) =>
+  [...tasks].sort((left, right) => new Date(right.createdAt ?? 0) - new Date(left.createdAt ?? 0))
+
+const sortTasksByDeletedAt = (tasks = []) =>
+  [...tasks].sort((left, right) => new Date(right.deletedAt ?? right.updatedAt ?? 0) - new Date(left.deletedAt ?? left.updatedAt ?? 0))
+
+const detachTaskDependencies = (tasks = [], removedIds = []) => {
+  if (!removedIds.length) return
+  const removedSet = new Set(removedIds)
+  tasks.forEach((task) => {
+    task.dependsOn = (task.dependsOn ?? []).filter((depId) => !removedSet.has(depId))
+  })
+}
+
+const findTaskCollection = (state, taskId) => {
+  const activeIndex = state.tasks.findIndex((task) => task.id === taskId)
+  if (activeIndex !== -1) return { key: 'tasks', index: activeIndex, task: state.tasks[activeIndex] }
+
+  const trashIndex = state.trashTasks.findIndex((task) => task.id === taskId)
+  if (trashIndex !== -1) return { key: 'trashTasks', index: trashIndex, task: state.trashTasks[trashIndex] }
+
+  return null
+}
 
 const toSubtaskRow = (taskId, subtask) => ({
   id: subtask.id,
@@ -161,6 +187,7 @@ const useTaskStore = create(
   persist(
     immer((set, get) => ({
       tasks: [],
+      trashTasks: [],
       syncing: false,
 
       addTask: (data) => {
@@ -183,6 +210,7 @@ const useTaskStore = create(
             dependsOn: data.dependsOn ?? [],
             createdAt: ts,
             updatedAt: ts,
+            deletedAt: null,
             subtasks: [],
             notes: [],
           }
@@ -256,16 +284,23 @@ const useTaskStore = create(
       },
 
       deleteTask: (id) => {
+        let deletedTask = null
         set((state) => {
-          state.tasks = state.tasks.filter((t) => t.id !== id)
-          state.tasks.forEach((t) => {
-            t.dependsOn = (t.dependsOn ?? []).filter((depId) => depId !== id)
-          })
+          const index = state.tasks.findIndex((task) => task.id === id)
+          if (index === -1) return
+
+          const [task] = state.tasks.splice(index, 1)
+          const ts = now()
+          task.deletedAt = ts
+          task.updatedAt = ts
+          state.trashTasks.unshift(task)
+          detachTaskDependencies(state.tasks, [id])
+          deletedTask = { ...task }
         })
 
-        const { workspaceId } = getSyncContext()
-        if (workspaceId) {
-          void supabase.from('tasks').delete().eq('id', id)
+        const { workspaceId, userId } = getSyncContext()
+        if (workspaceId && deletedTask) {
+          void supabase.from('tasks').upsert(toTaskRow(deletedTask, workspaceId, userId))
         }
       },
 
@@ -324,15 +359,75 @@ const useTaskStore = create(
       },
 
       bulkDeleteTasks: (ids) => {
+        let deletedRows = []
         set((state) => {
-          state.tasks = state.tasks.filter((t) => !ids.includes(t.id))
-          state.tasks.forEach((t) => {
-            t.dependsOn = (t.dependsOn ?? []).filter((depId) => !ids.includes(depId))
+          const removedSet = new Set(ids)
+          const ts = now()
+          const nextActive = []
+
+          state.tasks.forEach((task) => {
+            if (removedSet.has(task.id)) {
+              task.deletedAt = ts
+              task.updatedAt = ts
+              state.trashTasks.unshift(task)
+              deletedRows.push({ ...task })
+            } else {
+              nextActive.push(task)
+            }
           })
+
+          state.tasks = nextActive
+          detachTaskDependencies(state.tasks, ids)
+        })
+
+        const { workspaceId, userId } = getSyncContext()
+        if (workspaceId && deletedRows.length > 0) {
+          void supabase.from('tasks').upsert(
+            deletedRows.map((task) => toTaskRow(task, workspaceId, userId))
+          )
+        }
+      },
+
+      restoreTask: (id) => {
+        let restoredTask = null
+        set((state) => {
+          const index = state.trashTasks.findIndex((task) => task.id === id)
+          if (index === -1) return
+
+          const [task] = state.trashTasks.splice(index, 1)
+          task.deletedAt = null
+          task.updatedAt = now()
+          state.tasks.unshift(task)
+          restoredTask = { ...task }
+        })
+
+        const { workspaceId, userId } = getSyncContext()
+        if (workspaceId && restoredTask) {
+          void supabase.from('tasks').upsert(toTaskRow(restoredTask, workspaceId, userId))
+        }
+      },
+
+      purgeTask: (id) => {
+        set((state) => {
+          state.trashTasks = state.trashTasks.filter((task) => task.id !== id)
         })
 
         const { workspaceId } = getSyncContext()
-        if (workspaceId && ids.length > 0) {
+        if (workspaceId) {
+          void supabase.from('tasks').delete().eq('id', id)
+        }
+      },
+
+      emptyTrash: () => {
+        const ids = get().trashTasks.map((task) => task.id)
+        if (ids.length === 0) return
+
+        set((state) => {
+          state.trashTasks = []
+        })
+
+        const { workspaceId } = getSyncContext()
+        if (workspaceId) {
           void supabase.from('tasks').delete().in('id', ids)
         }
       },
@@ -453,11 +548,12 @@ const useTaskStore = create(
         const { userId } = getSyncContext()
         const state = get()
 
-        const taskRows = (state.tasks ?? []).map((task) => toTaskRow(task, workspaceId, userId))
-        const subtaskRows = (state.tasks ?? []).flatMap((task) =>
+        const allTasks = [...(state.tasks ?? []), ...(state.trashTasks ?? [])]
+        const taskRows = allTasks.map((task) => toTaskRow(task, workspaceId, userId))
+        const subtaskRows = allTasks.flatMap((task) =>
           (task.subtasks ?? []).map((subtask) => toSubtaskRow(task.id, subtask))
         )
-        const noteRows = (state.tasks ?? []).flatMap((task) =>
+        const noteRows = allTasks.flatMap((task) =>
           (task.notes ?? []).map((note) => toNoteRow(task.id, note, userId))
         )
 
@@ -476,7 +572,7 @@ const useTaskStore = create(
 
           if (!hasRemoteData) {
             const localState = get()
-            if ((localState.tasks?.length ?? 0) > 0) {
+            if ((localState.tasks?.length ?? 0) > 0 || (localState.trashTasks?.length ?? 0) > 0) {
               await get().migrateLocalToSupabase(workspaceId)
               const refreshed = await fetchWorkspaceTaskData(workspaceId)
               taskRows = refreshed.taskRows
@@ -504,7 +600,8 @@ const useTaskStore = create(
           })
 
           set((state) => {
-            state.tasks = assembled
+            state.tasks = sortTasksByCreatedAt(assembled.filter((task) => !task.deletedAt))
+            state.trashTasks = sortTasksByDeletedAt(assembled.filter((task) => task.deletedAt))
           })
         } finally {
           set((s) => { s.syncing = false })
@@ -515,30 +612,46 @@ const useTaskStore = create(
       upsertTaskFromRealtime: (row) =>
         set((state) => {
           const incoming = fromTaskRow(row)
-          const idx = state.tasks.findIndex((t) => t.id === incoming.id)
-          if (idx === -1) state.tasks.unshift(incoming)
-          else {
-            state.tasks[idx] = {
-              ...state.tasks[idx],
+          const targetKey = incoming.deletedAt ? 'trashTasks' : 'tasks'
+          const otherKey = incoming.deletedAt ? 'tasks' : 'trashTasks'
+          const existing = findTaskCollection(state, incoming.id)
+
+          state[otherKey] = state[otherKey].filter((task) => task.id !== incoming.id)
+
+          if (!existing || existing.key !== targetKey) {
+            const previousTask = existing?.task ?? null
+            state[targetKey].unshift({
+              ...(previousTask ?? {}),
               ...incoming,
-              subtasks: state.tasks[idx].subtasks ?? [],
-              notes: state.tasks[idx].notes ?? [],
+              subtasks: previousTask?.subtasks ?? [],
+              notes: previousTask?.notes ?? [],
+            })
+          } else {
+            state[targetKey][existing.index] = {
+              ...state[targetKey][existing.index],
+              ...incoming,
+              subtasks: state[targetKey][existing.index].subtasks ?? [],
+              notes: state[targetKey][existing.index].notes ?? [],
             }
           }
+
+          if (incoming.deletedAt) detachTaskDependencies(state.tasks, [incoming.id])
+          state.tasks = sortTasksByCreatedAt(state.tasks)
+          state.trashTasks = sortTasksByDeletedAt(state.trashTasks)
         }),
 
       removeTaskFromRealtime: (id) =>
         set((state) => {
           state.tasks = state.tasks.filter((t) => t.id !== id)
-          state.tasks.forEach((task) => {
-            task.dependsOn = (task.dependsOn ?? []).filter((depId) => depId !== id)
-          })
+          state.trashTasks = state.trashTasks.filter((t) => t.id !== id)
+          detachTaskDependencies(state.tasks, [id])
         }),
 
       upsertSubtaskFromRealtime: (row) =>
         set((state) => {
-          const task = state.tasks.find((t) => t.id === row.task_id)
-          if (!task) return
+          const match = findTaskCollection(state, row.task_id)
+          if (!match) return
+          const task = match.task
           const subtask = fromSubtaskRow(row)
           const idx = task.subtasks.findIndex((s) => s.id === subtask.id)
           if (idx === -1) task.subtasks.push(subtask)
@@ -548,16 +661,18 @@ const useTaskStore = create(
 
       removeSubtaskFromRealtime: (id, taskId) =>
         set((state) => {
-          const task = state.tasks.find((t) => t.id === taskId)
-          if (!task) return
+          const match = findTaskCollection(state, taskId)
+          if (!match) return
+          const task = match.task
           task.subtasks = task.subtasks.filter((s) => s.id !== id)
           task.updatedAt = now()
         }),
 
       upsertNoteFromRealtime: (row) =>
         set((state) => {
-          const task = state.tasks.find((t) => t.id === row.task_id)
-          if (!task) return
+          const match = findTaskCollection(state, row.task_id)
+          if (!match) return
+          const task = match.task
           const note = fromNoteRow(row)
           const idx = task.notes.findIndex((n) => n.id === note.id)
           if (idx === -1) task.notes.unshift(note)
@@ -568,18 +683,22 @@ const useTaskStore = create(
 
       removeNoteFromRealtime: (id, taskId) =>
         set((state) => {
-          const task = state.tasks.find((t) => t.id === taskId)
-          if (!task) return
+          const match = findTaskCollection(state, taskId)
+          if (!match) return
+          const task = match.task
           task.notes = task.notes.filter((n) => n.id !== id)
           task.updatedAt = now()
         }),
 
-      getTaskById: (id) => get().tasks.find((t) => t.id === id),
+      getTaskById: (id) => {
+        const state = get()
+        return state.tasks.find((task) => task.id === id) ?? state.trashTasks.find((task) => task.id === id)
+      },
     })),
     {
       name: 'taskflow-tasks',
       storage: createJSONStorage(() => localStorage),
-      version: 6,
+      version: 7,
       migrate: (state, version) => {
         let s = state
         if (version < 2) {
@@ -593,6 +712,13 @@ const useTaskStore = create(
         }
         if (version < 6) {
           s = { ...s, tasks: (s.tasks ?? []).map((t) => ({ ...t, programId: t.programId ?? null })) }
+        }
+        if (version < 7) {
+          s = {
+            ...s,
+            tasks: (s.tasks ?? []).map((task) => ({ ...task, deletedAt: task.deletedAt ?? null })),
+            trashTasks: [],
+          }
         }
         return s
       },

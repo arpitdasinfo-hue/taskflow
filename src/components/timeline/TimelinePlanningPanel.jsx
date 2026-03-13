@@ -53,6 +53,125 @@ const TimelinePlanningPanel = memo(function TimelinePlanningPanel({
 
   if (!showSavedViews && !showInsights) return null
 
+  if (showSavedViews && !showInsights) {
+    return (
+      <div className="px-4 md:px-6 pb-3">
+        <section
+          className="rounded-[20px] p-4"
+          style={{
+            background: 'linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02))',
+            border: '1px solid rgba(255,255,255,0.08)',
+          }}
+        >
+          <div className="flex items-start justify-between gap-3 flex-wrap mb-3">
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.2em]" style={{ color: 'var(--accent)' }}>
+                Saved Views
+              </p>
+              <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
+                Reuse your roadmap, delivery, or risk setups without adding another heavy panel above the chart.
+              </p>
+            </div>
+
+            <button
+              onClick={() => setComposerOpen((value) => !value)}
+              className="inline-flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-medium"
+              style={{ background: 'rgba(var(--accent-rgb),0.12)', color: 'var(--accent)', border: '1px solid rgba(var(--accent-rgb),0.24)' }}
+            >
+              <Plus size={13} />
+              Save current
+            </button>
+          </div>
+
+          {composerOpen && (
+            <div
+              className="flex flex-col md:flex-row gap-2 p-3 rounded-2xl mb-3"
+              style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}
+            >
+              <input
+                value={draftName}
+                onChange={(event) => setDraftName(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') commitView()
+                  if (event.key === 'Escape') {
+                    setComposerOpen(false)
+                    setDraftName('')
+                  }
+                }}
+                placeholder="Quarterly delivery review"
+                className="flex-1 rounded-xl px-3 py-2 text-sm outline-none"
+                style={{
+                  background: 'rgba(255,255,255,0.04)',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  color: 'var(--text-primary)',
+                }}
+              />
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={commitView}
+                  className="px-3 py-2 rounded-xl text-xs font-medium"
+                  style={{ background: 'var(--accent)', color: '#fff' }}
+                >
+                  Save
+                </button>
+                <button
+                  onClick={() => {
+                    setComposerOpen(false)
+                    setDraftName('')
+                  }}
+                  className="px-3 py-2 rounded-xl text-xs font-medium"
+                  style={{ background: 'rgba(255,255,255,0.04)', color: 'var(--text-secondary)' }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
+          {savedViews.length === 0 ? (
+            <div
+              className="rounded-2xl px-3 py-3 text-xs"
+              style={{ background: 'rgba(255,255,255,0.03)', color: 'var(--text-secondary)' }}
+            >
+              No saved views yet. Save a clean review setup once and reuse it here.
+            </div>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {savedViews.map((view) => {
+                const active = view.id === activeSavedViewId
+                return (
+                  <div
+                    key={view.id}
+                    className="inline-flex items-center gap-1.5 rounded-2xl pl-3 pr-2 py-2"
+                    style={{
+                      background: active ? 'rgba(var(--accent-rgb),0.12)' : 'rgba(255,255,255,0.03)',
+                      border: active ? '1px solid rgba(var(--accent-rgb),0.24)' : '1px solid rgba(255,255,255,0.08)',
+                    }}
+                  >
+                    <button onClick={() => onApplySavedView?.(view.id)} className="flex items-center gap-2 min-w-0">
+                      <LayoutTemplate size={13} style={{ color: active ? 'var(--accent)' : 'var(--text-secondary)' }} />
+                      <span className="text-xs font-medium truncate" style={{ color: 'var(--text-primary)' }}>
+                        {view.name}
+                      </span>
+                    </button>
+                    <button
+                      onClick={() => onDeleteSavedView?.(view.id)}
+                      className="p-1 rounded-lg"
+                      style={{ color: '#f87171' }}
+                      title="Delete saved view"
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </section>
+      </div>
+    )
+  }
+
   return (
     <div className="px-4 md:px-6 pb-3">
       <div className={gridClass}>

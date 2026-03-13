@@ -131,7 +131,7 @@ const BulkActionBar = memo(function BulkActionBar() {
       {/* Delete */}
       {confirmDelete ? (
         <div className="flex items-center gap-1.5">
-          <span className="text-xs" style={{ color: '#ef4444' }}>Delete {selectedTaskIds.length}?</span>
+          <span className="text-xs" style={{ color: '#ef4444' }}>Move {selectedTaskIds.length} to trash?</span>
           <button
             onClick={handleDelete}
             className="p-1.5 rounded-lg"
@@ -152,7 +152,7 @@ const BulkActionBar = memo(function BulkActionBar() {
           onClick={handleDelete}
           className="p-1.5 rounded-lg hover:bg-red-500/10 transition-colors"
           style={{ color: '#ef4444' }}
-          title="Delete selected"
+          title="Move selected tasks to trash"
         >
           <Trash2 size={14} />
         </button>

@@ -71,10 +71,12 @@ create table if not exists tasks (
   depends_on text[] default '{}',
   created_by uuid references auth.users(id),
   created_at text,
-  updated_at timestamptz default now()
+  updated_at timestamptz default now(),
+  deleted_at timestamptz
 );
 
 alter table tasks add column if not exists program_id text references programs(id) on delete set null;
+alter table tasks add column if not exists deleted_at timestamptz;
 
 create table if not exists subtasks (
   id text primary key,
@@ -130,3 +132,4 @@ create index if not exists idx_share_links_workspace_id on share_links(workspace
 create index if not exists idx_share_links_created_by on share_links(created_by);
 create index if not exists idx_share_links_resource on share_links(resource_type, resource_id);
 create index if not exists idx_share_view_events_link on share_view_events(share_link_id);
+create index if not exists idx_tasks_workspace_deleted_at on tasks(workspace_id, deleted_at);

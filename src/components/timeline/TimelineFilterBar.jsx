@@ -26,20 +26,20 @@ const TimelineFilterBar = memo(function TimelineFilterBar({
   return (
     <div className="px-4 md:px-6 pb-2.5">
       <div
-        className="rounded-2xl p-4"
+        className="rounded-2xl p-3.5"
         style={{
-          background: 'linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02))',
+          background: 'linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0.02))',
           border: '1px solid rgba(255,255,255,0.1)',
-          boxShadow: '0 18px 40px rgba(0,0,0,0.18)',
+          boxShadow: '0 12px 28px rgba(0,0,0,0.16)',
         }}
       >
-        <div className="flex items-start justify-between gap-4 flex-wrap mb-3">
+        <div className="flex items-start justify-between gap-4 flex-wrap mb-2.5">
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-[0.2em]" style={{ color: 'var(--accent)' }}>
               Advanced Filters
             </p>
-            <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
-              Narrow the chart to delivery risks and dependency relationships without changing the main scope.
+            <p className="text-[11px] mt-1" style={{ color: 'var(--text-secondary)' }}>
+              Keep these for risk review only. The main scope selectors stay above.
             </p>
           </div>
           <div className="flex items-center gap-1.5">
@@ -73,7 +73,7 @@ const TimelineFilterBar = memo(function TimelineFilterBar({
             <CalendarClock size={12} />
             <span>
               <span className="block font-semibold">Delayed items</span>
-              <span className="block text-[10px] opacity-80">Show work already slipping past the current plan.</span>
+              <span className="block text-[10px] opacity-80">Only show work already slipping.</span>
             </span>
           </button>
 
@@ -85,7 +85,7 @@ const TimelineFilterBar = memo(function TimelineFilterBar({
             <AlertTriangle size={12} />
             <span>
               <span className="block font-semibold">Critical or blocked</span>
-              <span className="block text-[10px] opacity-80">Surface the most urgent items first.</span>
+              <span className="block text-[10px] opacity-80">Bring the urgent items forward.</span>
             </span>
           </button>
 
@@ -97,7 +97,7 @@ const TimelineFilterBar = memo(function TimelineFilterBar({
             <Link2 size={12} />
             <span>
               <span className="block font-semibold">Dependency risk</span>
-              <span className="block text-[10px] opacity-80">Highlight tasks that rely on incomplete upstream work.</span>
+              <span className="block text-[10px] opacity-80">Highlight blocked upstream relationships.</span>
             </span>
           </button>
 
@@ -109,7 +109,7 @@ const TimelineFilterBar = memo(function TimelineFilterBar({
             <GitBranch size={12} />
             <span>
               <span className="block font-semibold">Dependency lines</span>
-              <span className="block text-[10px] opacity-80">Turn relationship arrows on or off for cleaner scanning.</span>
+              <span className="block text-[10px] opacity-80">Turn arrows off for a cleaner chart.</span>
             </span>
           </button>
         </div>

@@ -1,5 +1,5 @@
 import { memo } from 'react'
-import { LayoutDashboard, ListTodo, CalendarClock, Settings2, FolderKanban, BarChart3 } from 'lucide-react'
+import { LayoutDashboard, ListTodo, CalendarClock, Settings2, FolderKanban, BarChart3, GanttChart, Trash2 } from 'lucide-react'
 import useSettingsStore from '../../store/useSettingsStore'
 import { useTaskStats } from '../../hooks/useFilteredTasks'
 
@@ -9,6 +9,8 @@ const NAV_ITEMS = [
   { id: 'today',             label: 'Today',     icon: CalendarClock   },
   { id: 'projects',          label: 'Programs',  icon: FolderKanban    },
   { id: 'program-dashboard', label: 'Analytics', icon: BarChart3       },
+  { id: 'timeline',          label: 'Gantt',     icon: GanttChart      },
+  { id: 'trash',             label: 'Trash',     icon: Trash2          },
   { id: 'settings',          label: 'Settings',  icon: Settings2       },
 ]
 
@@ -29,7 +31,7 @@ const BottomNav = memo(function BottomNav() {
         borderTop: '1px solid var(--glass-border)',
       }}
     >
-      <div className="flex items-stretch h-[60px]">
+      <div className="flex items-stretch h-[60px] overflow-x-auto no-scrollbar px-1">
         {NAV_ITEMS.map(({ id, label, icon: Icon }) => {
           const isActive = id === 'projects'
             ? activePage === 'projects'
@@ -45,7 +47,7 @@ const BottomNav = memo(function BottomNav() {
                   setActiveProgram(null)
                 }
               }}
-              className="flex-1 flex flex-col items-center justify-center gap-0.5 relative no-select"
+              className="min-w-[76px] flex-1 shrink-0 flex flex-col items-center justify-center gap-0.5 relative no-select"
               style={{ color: isActive ? 'var(--accent)' : 'var(--text-secondary)' }}
             >
               {isActive && (

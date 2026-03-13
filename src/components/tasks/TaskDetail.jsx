@@ -146,7 +146,8 @@ const TaskDetail = memo(function TaskDetail() {
             onClick={handleDelete}
             className="p-2 rounded-xl hover:bg-red-500/10 transition-colors"
             style={{ color: '#ef4444' }}
-            aria-label="Delete task"
+            aria-label="Move task to trash"
+            title="Move task to trash"
           >
             <Trash2 size={15} />
           </button>

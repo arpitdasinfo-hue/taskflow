@@ -497,7 +497,7 @@ export default function ShareView({ token }) {
         const [programRes, projectRes, taskRes] = await Promise.all([
           supabase.from('programs').select('*').eq('workspace_id', workspaceId),
           supabase.from('projects').select('*').eq('workspace_id', workspaceId),
-          supabase.from('tasks').select('*').eq('workspace_id', workspaceId),
+          supabase.from('tasks').select('*').eq('workspace_id', workspaceId).is('deleted_at', null),
         ])
         if (programRes.error || projectRes.error || taskRes.error) {
           if (!cancelled) {
@@ -534,9 +534,9 @@ export default function ShareView({ token }) {
         projectRows = projectRes.data ?? []
         const projectIds = projectRows.map((row) => row.id)
         const [directTaskRes, projectTaskRes] = await Promise.all([
-          supabase.from('tasks').select('*').eq('program_id', program.id).is('project_id', null),
+          supabase.from('tasks').select('*').eq('program_id', program.id).is('project_id', null).is('deleted_at', null),
           projectIds.length > 0
-            ? supabase.from('tasks').select('*').in('project_id', projectIds)
+            ? supabase.from('tasks').select('*').in('project_id', projectIds).is('deleted_at', null)
             : Promise.resolve({ data: [], error: null }),
         ])
         if (directTaskRes.error || projectTaskRes.error) {
@@ -594,7 +594,7 @@ export default function ShareView({ token }) {
           })
         }
         projectRows = [...descendantIds].map((id) => projectById.get(id)).filter(Boolean)
-        const taskRes = await supabase.from('tasks').select('*').in('project_id', [...descendantIds])
+        const taskRes = await supabase.from('tasks').select('*').in('project_id', [...descendantIds]).is('deleted_at', null)
         if (taskRes.error) {
           if (!cancelled) {
             setError(taskRes.error.message)

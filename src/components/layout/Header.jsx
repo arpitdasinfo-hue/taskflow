@@ -5,6 +5,7 @@ import useSettingsStore from '../../store/useSettingsStore'
 const PAGE_TITLES = {
   dashboard:           'Dashboard',
   tasks:               'All Tasks',
+  trash:               'Trash',
   today:               'Today',
   projects:            'Projects',
   settings:            'Settings',

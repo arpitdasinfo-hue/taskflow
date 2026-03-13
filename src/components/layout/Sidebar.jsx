@@ -1,7 +1,7 @@
 import { memo, useState } from 'react'
 import {
   LayoutDashboard, ListTodo, CalendarClock, Settings2, FolderKanban,
-  Zap, ChevronLeft, ChevronRight, Folder, ChevronDown, BarChart3, GanttChart, LogOut,
+  Zap, ChevronLeft, ChevronRight, Folder, ChevronDown, BarChart3, GanttChart, LogOut, Trash2,
 } from 'lucide-react'
 import useSettingsStore from '../../store/useSettingsStore'
 import useProjectStore from '../../store/useProjectStore'
@@ -17,6 +17,7 @@ const NAV_ITEMS = [
   { id: 'projects',          label: 'Programs',   icon: FolderKanban    },
   { id: 'program-dashboard', label: 'Analytics',  icon: BarChart3       },
   { id: 'timeline',          label: 'Gantt Chart', icon: GanttChart     },
+  { id: 'trash',             label: 'Trash',      icon: Trash2          },
   { id: 'settings',          label: 'Settings',   icon: Settings2       },
 ]
 
@@ -178,6 +179,7 @@ const Sidebar = memo(function Sidebar() {
   const programs          = useProjectStore((s) => s.programs)
   const projects          = useProjectStore((s) => s.projects)
   const tasks             = useTaskStore((s) => s.tasks)
+  const trashTasks        = useTaskStore((s) => s.trashTasks)
   const { overdue, inProgress } = useTaskStats()
   const user              = useAuthStore((s) => s.user)
   const signOut           = useAuthStore((s) => s.signOut)
@@ -216,6 +218,7 @@ const Sidebar = memo(function Sidebar() {
             : activePage === id && !activeProjectId && !activeProgramId
           const badge = id === 'today' && overdue > 0 ? overdue
             : id === 'tasks' && inProgress > 0 ? inProgress
+            : id === 'trash' && trashTasks.length > 0 ? trashTasks.length
             : null
           return (
             <button key={id}
