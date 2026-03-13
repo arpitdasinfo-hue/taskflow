@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import useTaskStore from '../store/useTaskStore'
 import useProjectStore from '../store/useProjectStore'
+import { taskMatchesProgram } from '../lib/taskScope'
 
 /** Stats for a single program */
 export function useProgramStats(programId) {
@@ -11,7 +12,10 @@ export function useProgramStats(programId) {
   return useMemo(() => {
     const programProjects = projects.filter((p) => p.programId === programId)
     const projectIds = new Set(programProjects.map((p) => p.id))
-    const programTasks = tasks.filter((t) => t.projectId && projectIds.has(t.projectId))
+    const programTasks = tasks.filter((task) =>
+      taskMatchesProgram(task, programId, projects) &&
+      (!task.projectId || projectIds.has(task.projectId))
+    )
 
     const total      = programTasks.length
     const done       = programTasks.filter((t) => t.status === 'done').length
@@ -57,7 +61,10 @@ export function useAllProgramStats() {
     for (const program of programs) {
       const programProjects = projects.filter((p) => p.programId === program.id)
       const projectIds = new Set(programProjects.map((p) => p.id))
-      const programTasks = tasks.filter((t) => t.projectId && projectIds.has(t.projectId))
+      const programTasks = tasks.filter((task) =>
+        taskMatchesProgram(task, program.id, projects) &&
+        (!task.projectId || projectIds.has(task.projectId))
+      )
 
       const total      = programTasks.length
       const done       = programTasks.filter((t) => t.status === 'done').length

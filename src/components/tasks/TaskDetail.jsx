@@ -57,6 +57,7 @@ const TaskDetail = memo(function TaskDetail() {
   const updateTask     = useTaskStore((s) => s.updateTask)
   const deleteTask     = useTaskStore((s) => s.deleteTask)
   const projects       = useProjectStore((s) => s.projects)
+  const programs       = useProjectStore((s) => s.programs)
 
   const task = tasks.find((t) => t.id === selectedTaskId)
   const isBlockedByDep = useIsBlockedByDependency(selectedTaskId)
@@ -108,6 +109,12 @@ const TaskDetail = memo(function TaskDetail() {
     if (task?.id) deleteTask(task.id)
     closeTask()
   }, [task, deleteTask, closeTask])
+
+  const projectById = new Map(projects.map((project) => [project.id, project]))
+  const selectedProgramId = task?.projectId
+    ? (projectById.get(task.projectId)?.programId ?? task.programId ?? null)
+    : task?.programId ?? null
+  const visibleProjects = projects.filter((project) => !selectedProgramId || project.programId === selectedProgramId)
 
   if (!task) return null
 
@@ -209,6 +216,31 @@ const TaskDetail = memo(function TaskDetail() {
           </div>
         </div>
 
+        {/* Program */}
+        <div>
+          <label className="text-[10px] font-semibold uppercase tracking-wide mb-1.5 flex items-center gap-1.5" style={{ color: 'var(--text-secondary)' }}>
+            <Folder size={10} />
+            Program
+          </label>
+          <SelectField
+            value={selectedProgramId}
+            options={[null, ...programs.map((program) => program.id)]}
+            onChange={(value) => {
+              const currentProject = task.projectId ? projectById.get(task.projectId) : null
+              updateTask(task.id, {
+                programId: value ?? null,
+                projectId: currentProject?.programId === (value ?? null) ? task.projectId ?? null : null,
+              })
+            }}
+            renderOption={(value) => {
+              const program = programs.find((entry) => entry.id === value)
+              return program
+                ? <span className="flex items-center gap-1.5 text-xs"><span className="w-2 h-2 rounded-full" style={{ background: program.color }} />{program.name}</span>
+                : <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>No program</span>
+            }}
+          />
+        </div>
+
         {/* Project */}
         <div>
           <label className="text-[10px] font-semibold uppercase tracking-wide mb-1.5 flex items-center gap-1.5" style={{ color: 'var(--text-secondary)' }}>
@@ -217,12 +249,13 @@ const TaskDetail = memo(function TaskDetail() {
           </label>
           <SelectField
             value={task.projectId}
-            options={[null, ...projects.map((p) => p.id)]}
-            onChange={(v) => updateTask(task.id, { projectId: v })}
-            renderOption={(v) => {
-              const proj = projects.find((p) => p.id === v)
+            options={[null, ...visibleProjects.map((project) => project.id)]}
+            onChange={(value) => updateTask(task.id, { projectId: value ?? null, programId: selectedProgramId ?? null })}
+            renderOption={(value) => {
+              const proj = value ? projectById.get(value) : null
+              const parent = proj?.parentId ? projectById.get(proj.parentId) : null
               return proj
-                ? <span className="flex items-center gap-1.5 text-xs"><span className="w-2 h-2 rounded-full" style={{ background: proj.color }} />{proj.name}</span>
+                ? <span className="flex items-center gap-1.5 text-xs"><span className="w-2 h-2 rounded-full" style={{ background: proj.color }} />{parent ? `${parent.name} / ${proj.name}` : proj.name}</span>
                 : <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>No project</span>
             }}
           />

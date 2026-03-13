@@ -198,6 +198,7 @@ create policy "tasks shared read" on tasks for select
         and (
           (sl.resource_type = 'workspace' and sl.workspace_id = tasks.workspace_id)
           or (sl.resource_type = 'project' and sl.resource_id = tasks.project_id)
+          or (sl.resource_type = 'program' and sl.resource_id = tasks.program_id)
           or (
             sl.resource_type = 'program'
             and exists (

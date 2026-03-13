@@ -192,6 +192,7 @@ const QuickAdd = memo(function QuickAdd() {
     addTask({
       title: name.trim(),
       priority,
+      programId: filterProgramId || null,
       projectId: selectedSubProjectId || selectedProjectId || null,
       dueDate: dueDate ? new Date(dueDate).toISOString() : null,
     })
@@ -336,10 +337,10 @@ const QuickAdd = memo(function QuickAdd() {
                         setSelectedProjectId('')
                         setSelectedSubProjectId('')
                       }}
-                      className="w-full text-sm px-3 py-2 rounded-xl"
-                      style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-primary)' }}
-                    >
-                      <option value="">All programs</option>
+                    className="w-full text-sm px-3 py-2 rounded-xl"
+                    style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-primary)' }}
+                  >
+                      <option value="">No program</option>
                       {programs.map((program) => (
                         <option key={program.id} value={program.id}>{program.name}</option>
                       ))}
@@ -393,7 +394,7 @@ const QuickAdd = memo(function QuickAdd() {
                     style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: 'var(--text-secondary)' }}>
                     Program: <span style={{ color: 'var(--text-primary)' }}>{selectedProgram?.name ?? 'Unassigned'}</span>
                     {' · '}
-                    Project: <span style={{ color: 'var(--text-primary)' }}>{selectedProject?.name ?? 'None'}</span>
+                    Project: <span style={{ color: 'var(--text-primary)' }}>{selectedProject?.name ?? (selectedProgram ? 'Direct program task' : 'None') }</span>
                     {' · '}
                     Sub-project: <span style={{ color: 'var(--text-primary)' }}>{selectedSubProject?.name ?? 'None'}</span>
                   </div>

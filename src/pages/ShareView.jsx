@@ -22,6 +22,7 @@ import TimelineGrid from '../components/timeline/TimelineGrid'
 import TimelineLegend from '../components/timeline/TimelineLegend'
 import useTimelineScale from '../hooks/useTimelineScale'
 import useTimelineRows from '../hooks/useTimelineRows'
+import { getTaskProgramId } from '../lib/taskScope'
 
 const PRIORITY_COLOR = {
   critical: '#ef4444',
@@ -92,6 +93,7 @@ const mapProject = (row) => ({
 const mapTask = (row) => ({
   id: row.id,
   workspaceId: row.workspace_id,
+  programId: row.program_id || null,
   projectId: row.project_id || null,
   title: row.title,
   description: row.description || '',
@@ -442,17 +444,23 @@ export default function ShareView({ token }) {
         }
         projectRows = projectRes.data ?? []
         const projectIds = projectRows.map((row) => row.id)
-        if (projectIds.length > 0) {
-          const taskRes = await supabase.from('tasks').select('*').in('project_id', projectIds)
-          if (taskRes.error) {
-            if (!cancelled) {
-              setError(taskRes.error.message)
-              setLoading(false)
-            }
-            return
+        const [directTaskRes, projectTaskRes] = await Promise.all([
+          supabase.from('tasks').select('*').eq('program_id', program.id).is('project_id', null),
+          projectIds.length > 0
+            ? supabase.from('tasks').select('*').in('project_id', projectIds)
+            : Promise.resolve({ data: [], error: null }),
+        ])
+        if (directTaskRes.error || projectTaskRes.error) {
+          if (!cancelled) {
+            setError(directTaskRes.error?.message || projectTaskRes.error?.message || 'Unable to load program tasks.')
+            setLoading(false)
           }
-          taskRows = taskRes.data ?? []
+          return
         }
+        const mergedTasks = [...(directTaskRes.data ?? []), ...(projectTaskRes.data ?? [])]
+        taskRows = mergedTasks.filter((row, index, list) =>
+          list.findIndex((candidate) => candidate.id === row.id) === index
+        )
       } else if (scopeType === 'project') {
         const { data: project, error: projectError } = await supabase
           .from('projects')
@@ -627,8 +635,14 @@ export default function ShareView({ token }) {
   }, [filteredProjects, selectedSubProjectId])
 
   const filteredTasks = useMemo(
-    () => tasks.filter((task) => task.projectId && taskProjectIds.has(task.projectId)),
-    [tasks, taskProjectIds]
+    () => {
+      if (!selectedProgramId && !selectedProjectId && !selectedSubProjectId) return tasks
+      if (selectedSubProjectId) return tasks.filter((task) => task.projectId === selectedSubProjectId)
+      if (selectedProjectId) return tasks.filter((task) => task.projectId && taskProjectIds.has(task.projectId))
+      if (selectedProgramId) return tasks.filter((task) => getTaskProgramId(task, projects) === selectedProgramId)
+      return tasks
+    },
+    [tasks, taskProjectIds, selectedProgramId, selectedProjectId, selectedSubProjectId, projects]
   )
 
   const filteredMilestones = useMemo(
@@ -664,7 +678,10 @@ export default function ShareView({ token }) {
     return filteredPrograms.map((program) => {
       const programProjects = filteredProjects.filter((project) => project.programId === program.id)
       const projectIds = new Set(programProjects.map((project) => project.id))
-      const programTasks = filteredTasks.filter((task) => task.projectId && projectIds.has(task.projectId))
+      const programTasks = filteredTasks.filter((task) =>
+        getTaskProgramId(task, projects) === program.id &&
+        (!task.projectId || projectIds.has(task.projectId))
+      )
       const done = programTasks.filter((task) => task.status === 'done').length
       return {
         id: program.id,
@@ -901,6 +918,9 @@ export default function ShareView({ token }) {
                           })
                           .map((task) => {
                             const project = task.projectId ? projectById.get(task.projectId) : null
+                            const program = getTaskProgramId(task, projects)
+                              ? programById.get(getTaskProgramId(task, projects))
+                              : null
                             return (
                               <tr key={task.id} style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
                                 <td className="py-2">
@@ -911,7 +931,9 @@ export default function ShareView({ token }) {
                                     </p>
                                   )}
                                 </td>
-                                <td className="py-2" style={{ color: 'var(--text-secondary)' }}>{project?.name || '—'}</td>
+                                <td className="py-2" style={{ color: 'var(--text-secondary)' }}>
+                                  {project?.name || (program ? `${program.name} · Program` : '—')}
+                                </td>
                                 <td className="py-2">
                                   <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: `${STATUS_COLOR[task.status] || '#94a3b8'}22`, color: STATUS_COLOR[task.status] || '#94a3b8' }}>
                                     {TASK_STATUS_OPTIONS.find((item) => item.key === task.status)?.label || task.status}

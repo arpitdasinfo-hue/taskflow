@@ -5,6 +5,7 @@ import { nanoid } from 'nanoid'
 import { supabase } from '../lib/supabase'
 import useWorkspaceStore from './useWorkspaceStore'
 import useAuthStore from './useAuthStore'
+import useProjectStore from './useProjectStore'
 
 const now = () => new Date().toISOString()
 
@@ -28,10 +29,33 @@ const getSyncContext = () => {
   return { workspaceId, userId }
 }
 
-const toTaskRow = (task, workspaceId, userId) => ({
+const hasOwn = (value, key) => Object.prototype.hasOwnProperty.call(value, key)
+
+const getProgramIdForProject = (projectId) => {
+  if (!projectId) return null
+  const project = useProjectStore.getState().projects.find((entry) => entry.id === projectId)
+  return project?.programId ?? null
+}
+
+const normalizeTaskScope = (task = null, updates = {}) => {
+  const nextProjectId = hasOwn(updates, 'projectId') ? updates.projectId ?? null : task?.projectId ?? null
+  let nextProgramId = hasOwn(updates, 'programId') ? updates.programId ?? null : task?.programId ?? null
+
+  if (nextProjectId) nextProgramId = getProgramIdForProject(nextProjectId)
+
+  return {
+    projectId: nextProjectId,
+    programId: nextProgramId,
+  }
+}
+
+const toTaskRow = (task, workspaceId, userId) => {
+  const scope = normalizeTaskScope(task)
+  return {
   id: task.id,
   workspace_id: workspaceId,
-  project_id: task.projectId ?? null,
+  project_id: scope.projectId,
+  program_id: scope.programId,
   title: task.title ?? 'Untitled task',
   description: task.description ?? '',
   status: task.status ?? 'todo',
@@ -43,11 +67,13 @@ const toTaskRow = (task, workspaceId, userId) => ({
   created_by: userId,
   created_at: task.createdAt ?? now(),
   updated_at: task.updatedAt ?? now(),
-})
+  }
+}
 
 const fromTaskRow = (row) => ({
   id: row.id,
   projectId: row.project_id ?? null,
+  programId: row.program_id ?? null,
   title: row.title ?? 'Untitled task',
   description: row.description ?? '',
   status: row.status ?? 'todo',
@@ -143,7 +169,10 @@ const useTaskStore = create(
           const ts = now()
           created = {
             id: nanoid(),
-            projectId: data.projectId ?? null,
+            ...normalizeTaskScope(null, {
+              projectId: data.projectId ?? null,
+              programId: data.programId ?? null,
+            }),
             title: data.title ?? 'Untitled task',
             description: data.description ?? '',
             status: data.status ?? 'todo',
@@ -177,7 +206,7 @@ const useTaskStore = create(
         set((state) => {
           const task = state.tasks.find((t) => t.id === id)
           if (!task) return
-          Object.assign(task, updates, { updatedAt: now() })
+          Object.assign(task, updates, normalizeTaskScope(task, updates), { updatedAt: now() })
         })
 
         const updated = get().tasks.find((t) => t.id === id)
@@ -188,7 +217,6 @@ const useTaskStore = create(
       },
 
       moveTask: (id, options = {}) => {
-        const nextProjectId = options.projectId ?? null
         const beforeTaskId = options.beforeTaskId ?? null
 
         set((state) => {
@@ -196,7 +224,9 @@ const useTaskStore = create(
           if (fromIndex === -1) return
 
           const [task] = state.tasks.splice(fromIndex, 1)
-          task.projectId = nextProjectId
+          const scope = normalizeTaskScope(task, options)
+          task.projectId = scope.projectId
+          task.programId = scope.programId
           task.updatedAt = now()
 
           let insertIndex = state.tasks.length
@@ -205,7 +235,10 @@ const useTaskStore = create(
             if (targetIndex !== -1) insertIndex = targetIndex
           } else {
             for (let i = state.tasks.length - 1; i >= 0; i -= 1) {
-              if ((state.tasks[i].projectId ?? null) === nextProjectId) {
+              if (
+                (state.tasks[i].projectId ?? null) === (task.projectId ?? null) &&
+                (state.tasks[i].programId ?? null) === (task.programId ?? null)
+              ) {
                 insertIndex = i + 1
                 break
               }
@@ -276,7 +309,7 @@ const useTaskStore = create(
           const ts = now()
           state.tasks.forEach((task) => {
             if (ids.includes(task.id)) {
-              Object.assign(task, updates, { updatedAt: ts })
+              Object.assign(task, updates, normalizeTaskScope(task, updates), { updatedAt: ts })
             }
           })
         })
@@ -546,7 +579,7 @@ const useTaskStore = create(
     {
       name: 'taskflow-tasks',
       storage: createJSONStorage(() => localStorage),
-      version: 5,
+      version: 6,
       migrate: (state, version) => {
         let s = state
         if (version < 2) {
@@ -557,6 +590,9 @@ const useTaskStore = create(
         }
         if (version < 4) {
           s = { ...s, tasks: [] }
+        }
+        if (version < 6) {
+          s = { ...s, tasks: (s.tasks ?? []).map((t) => ({ ...t, programId: t.programId ?? null })) }
         }
         return s
       },

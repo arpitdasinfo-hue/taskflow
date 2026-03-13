@@ -10,6 +10,7 @@ import useSettingsStore from '../store/useSettingsStore'
 import useTaskStore from '../store/useTaskStore'
 import useProjectStore from '../store/useProjectStore'
 import { useFilteredTasks } from '../hooks/useFilteredTasks'
+import { getTaskProgram, getTaskProgramId } from '../lib/taskScope'
 
 const PRIORITY_COLOR = { critical: '#ef4444', high: '#f97316', medium: '#f59e0b', low: '#64748b' }
 const STATUS_COLOR   = { todo: '#94a3b8', 'in-progress': '#22d3ee', review: '#f59e0b', done: '#10b981', blocked: '#ef4444' }
@@ -88,7 +89,9 @@ const TaskRow = memo(function TaskRow({ task, selectMode }) {
   const selectedTaskIds     = useSettingsStore((s) => s.selectedTaskIds)
   const toggleTaskSelection = useSettingsStore((s) => s.toggleTaskSelection)
   const projects            = useProjectStore((s) => s.projects)
+  const programs            = useProjectStore((s) => s.programs)
   const project    = projects.find((p) => p.id === task.projectId)
+  const program    = getTaskProgram(task, programs, projects)
   const now        = new Date()
   const isOverdue  = task.dueDate && new Date(task.dueDate) < now && task.status !== 'done'
   const isDone     = task.status === 'done'
@@ -132,10 +135,13 @@ const TaskRow = memo(function TaskRow({ task, selectMode }) {
         )}
       </div>
 
-      {project && (
+      {(project || program) && (
         <span className="hidden sm:inline text-[10px] px-1.5 py-0.5 rounded-full flex-shrink-0"
-          style={{ background: `${project.color}18`, color: project.color }}>
-          {project.name}
+          style={{
+            background: `${(project?.color ?? program?.color) || '#94a3b8'}18`,
+            color: (project?.color ?? program?.color) || '#94a3b8',
+          }}>
+          {project?.name ?? `${program?.name} · Program`}
         </span>
       )}
 
@@ -235,6 +241,7 @@ const Tasks = memo(function Tasks() {
   const programs           = useProjectStore((s) => s.programs)
   const projects           = useProjectStore((s) => s.projects)
   const projectById        = useMemo(() => new Map(projects.map((project) => [project.id, project])), [projects])
+  const programById        = useMemo(() => new Map(programs.map((program) => [program.id, program])), [programs])
 
   const visibleProjects = useMemo(() => {
     if (!filterProgramId) return projects
@@ -253,8 +260,8 @@ const Tasks = memo(function Tasks() {
     if (!filterProgramId && !filterProjectId) return tasks
 
     return tasks.filter((task) => {
-      const project = projectById.get(task.projectId)
-      if (filterProgramId && project?.programId !== filterProgramId) return false
+      const taskProgramId = getTaskProgramId(task, projectById)
+      if (filterProgramId && taskProgramId !== filterProgramId) return false
       if (filterProjectId && task.projectId !== filterProjectId) return false
       return true
     })
@@ -336,7 +343,8 @@ const Tasks = memo(function Tasks() {
             <option value="">All projects</option>
             {visibleProjects.map((project) => {
               const parent = project.parentId ? projectById.get(project.parentId) : null
-              const label = parent ? `${parent.name} / ${project.name}` : project.name
+              const program = project.programId ? programById.get(project.programId) : null
+              const label = parent ? `${parent.name} / ${project.name}` : (program ? `${program.name} / ${project.name}` : project.name)
               return (
                 <option key={project.id} value={project.id}>{label}</option>
               )

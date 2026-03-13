@@ -113,8 +113,23 @@ const useTimelineRows = ({
 
   const allTasksByProject = new Map()
   const scheduledTasksByProject = new Map()
+  const directTasksByProgram = new Map()
+  const scheduledDirectTasksByProgram = new Map()
   tasks.forEach((task) => {
-    if (!task.projectId) return
+    if (!task.projectId) {
+      if (!task.programId) return
+
+      const direct = directTasksByProgram.get(task.programId) ?? []
+      direct.push(task)
+      directTasksByProgram.set(task.programId, direct)
+
+      if (hasSchedule(task)) {
+        const scheduled = scheduledDirectTasksByProgram.get(task.programId) ?? []
+        scheduled.push(task)
+        scheduledDirectTasksByProgram.set(task.programId, scheduled)
+      }
+      return
+    }
 
     const all = allTasksByProject.get(task.projectId) ?? []
     all.push(task)
@@ -329,17 +344,70 @@ const useTimelineRows = ({
       )
       const programRows = programResults.flatMap((result) => result.rows)
       const sectionStats = programResults.reduce((acc, result) => mergeStats(acc, result.stats), ZERO_STATS)
+      const directProgramTasks = (directTasksByProgram.get(program.id) ?? [])
+        .filter(taskMatchesQuickFilters)
+      const directScheduledTasks = (scheduledDirectTasksByProgram.get(program.id) ?? [])
+        .filter(taskMatchesQuickFilters)
+        .sort((a, b) => getTaskSortValue(a) - getTaskSortValue(b))
+      const directUnscheduledTasks = directProgramTasks
+        .filter((task) => !hasSchedule(task))
+        .sort((a, b) => getTaskSortValue(a) - getTaskSortValue(b))
 
       const projectRows = programRows.filter((row) => row.type === 'project')
-      if (projectRows.length === 0) return { rows: [], stats: sectionStats }
+      if (projectRows.length === 0 && directProgramTasks.length === 0) return { rows: [], stats: sectionStats }
 
       const projectIds = new Set(projectRows.map((row) => row.projectId))
-      const programTasks = tasks.filter((task) =>
-        projectIds.has(task.projectId) && taskMatchesQuickFilters(task)
+      const projectTasks = tasks.filter((task) =>
+        task.projectId && projectIds.has(task.projectId) && taskMatchesQuickFilters(task)
       )
-      const programScheduledTasks = programTasks.filter(hasSchedule)
+      const programTasks = [...projectTasks, ...directProgramTasks]
+      const programScheduledTasks = [...projectTasks.filter(hasSchedule), ...directScheduledTasks]
       const programUnscheduledCount = programTasks.length - programScheduledTasks.length
       const programRange = getRangeFromTasks(programScheduledTasks)
+      const directStats = {
+        scheduledCount: directScheduledTasks.length,
+        unscheduledCount: directUnscheduledTasks.length,
+        delayedCount: directProgramTasks.filter(isTaskDelayed).length,
+        criticalCount: directProgramTasks.filter(isTaskCritical).length,
+        dependencyRiskCount: directProgramTasks.filter(isTaskDependencyRisk).length,
+      }
+
+      const directTaskRows = [
+        ...directScheduledTasks.map((task) => ({
+          id: `task-${task.id}`,
+          type: 'task',
+          taskId: task.id,
+          projectId: null,
+          programId: program.id,
+          depth: 1,
+          label: task.title,
+          subtitle: getTaskSubtitle(task, false, isTaskDependencyRisk(task)),
+          color: STATUS_COLOR[task.status] ?? program.color,
+          bars: [task],
+          milestones: [],
+          delayedCount: isTaskDelayed(task) ? 1 : 0,
+          criticalCount: isTaskCritical(task) ? 1 : 0,
+          dependencyRiskCount: isTaskDependencyRisk(task) ? 1 : 0,
+          unscheduled: false,
+        })),
+        ...directUnscheduledTasks.map((task) => ({
+          id: `task-${task.id}`,
+          type: 'task',
+          taskId: task.id,
+          projectId: null,
+          programId: program.id,
+          depth: 1,
+          label: task.title,
+          subtitle: getTaskSubtitle(task, true, isTaskDependencyRisk(task)),
+          color: STATUS_COLOR[task.status] ?? program.color,
+          bars: [],
+          milestones: [],
+          delayedCount: 0,
+          criticalCount: isTaskCritical(task) ? 1 : 0,
+          dependencyRiskCount: isTaskDependencyRisk(task) ? 1 : 0,
+          unscheduled: true,
+        })),
+      ]
 
       const headerRow = {
         id: `program-${program.id}`,
@@ -366,8 +434,8 @@ const useTimelineRows = ({
       }
 
       return {
-        rows: [headerRow, ...programRows],
-        stats: sectionStats,
+        rows: [headerRow, ...directTaskRows, ...programRows],
+        stats: mergeStats(sectionStats, directStats),
       }
     })
 

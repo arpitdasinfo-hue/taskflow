@@ -59,6 +59,7 @@ create table if not exists milestones (
 create table if not exists tasks (
   id text primary key,
   workspace_id uuid references workspaces(id) on delete cascade,
+  program_id text references programs(id) on delete set null,
   project_id text references projects(id) on delete set null,
   title text not null,
   description text,
@@ -72,6 +73,8 @@ create table if not exists tasks (
   created_at text,
   updated_at timestamptz default now()
 );
+
+alter table tasks add column if not exists program_id text references programs(id) on delete set null;
 
 create table if not exists subtasks (
   id text primary key,

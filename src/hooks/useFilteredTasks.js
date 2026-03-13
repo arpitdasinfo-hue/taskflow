@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import useTaskStore from '../store/useTaskStore'
 import useSettingsStore from '../store/useSettingsStore'
 import useProjectStore from '../store/useProjectStore'
+import { taskMatchesProgram } from '../lib/taskScope'
 
 const PRIORITY_ORDER = { critical: 0, high: 1, medium: 2, low: 3 }
 
@@ -22,10 +23,7 @@ export function useFilteredTasks() {
 
     // Program filter (takes all projects in that program)
     if (activeProgramId) {
-      const programProjectIds = new Set(
-        projects.filter((p) => p.programId === activeProgramId).map((p) => p.id)
-      )
-      result = result.filter((t) => t.projectId && programProjectIds.has(t.projectId))
+      result = result.filter((task) => taskMatchesProgram(task, activeProgramId, projects))
     } else if (activeProjectId) {
       result = result.filter((t) => t.projectId === activeProjectId)
     }

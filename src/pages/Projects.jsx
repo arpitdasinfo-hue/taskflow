@@ -14,6 +14,7 @@ import MilestonePanel from '../components/projects/MilestonePanel'
 import useProjectStore, { PROJECT_COLORS } from '../store/useProjectStore'
 import useTaskStore from '../store/useTaskStore'
 import useSettingsStore from '../store/useSettingsStore'
+import { taskMatchesProgram } from '../lib/taskScope'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const PRIORITY_COLOR = { critical: '#ef4444', high: '#f97316', medium: '#f59e0b', low: '#94a3b8' }
@@ -674,6 +675,7 @@ const ProgramSection = memo(function ProgramSection({ program, projects }) {
   const addProject    = useProjectStore((s) => s.addProject)
   const moveProject   = useProjectStore((s) => s.moveProject)
   const tasks         = useTaskStore((s) => s.tasks)
+  const moveTask      = useTaskStore((s) => s.moveTask)
   const activeProgramId = useSettingsStore((s) => s.activeProgramId)
   const activeProjectId = useSettingsStore((s) => s.activeProjectId)
 
@@ -689,7 +691,12 @@ const ProgramSection = memo(function ProgramSection({ program, projects }) {
   const topLevelProjects = projects.filter((p) => !p.parentId)
   const containsActiveProject = !!activeProjectId && projects.some((p) => p.id === activeProjectId)
 
-  const allTasks   = tasks.filter((t) => projects.some((p) => p.id === t.projectId))
+  const programDirectTasks = sortTasksByDueDate(
+    tasks.filter((task) => !task.projectId && taskMatchesProgram(task, program.id, projects))
+  )
+  const allTasks = tasks.filter((task) =>
+    taskMatchesProgram(task, program.id, projects)
+  )
   const totalTasks = allTasks.length
   const doneTasks  = allTasks.filter((t) => t.status === 'done').length
 
@@ -697,6 +704,16 @@ const ProgramSection = memo(function ProgramSection({ program, projects }) {
     if (!newProjName.trim()) return
     addProject({ name: newProjName.trim(), color: newProjColor, programId: program.id })
     setNewProjName(''); setAddingProject(false)
+  }
+
+  const openProgramTaskComposer = () => {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('taskflow:quick-add', {
+          detail: { type: 'task', programId: program.id },
+        })
+      )
+    }
   }
 
   useEffect(() => {
@@ -727,6 +744,10 @@ const ProgramSection = memo(function ProgramSection({ program, projects }) {
       event.preventDefault()
       event.dataTransfer.dropEffect = 'move'
     }
+    if (payload.type === 'task') {
+      event.preventDefault()
+      event.dataTransfer.dropEffect = 'move'
+    }
   }
 
   const handleProgramDrop = (event) => {
@@ -744,6 +765,13 @@ const ProgramSection = memo(function ProgramSection({ program, projects }) {
       event.preventDefault()
       event.stopPropagation()
       moveProject(payload.id, { programId: program.id, parentId: null })
+      return
+    }
+
+    if (payload.type === 'task') {
+      event.preventDefault()
+      event.stopPropagation()
+      moveTask(payload.id, { projectId: null, programId: program.id })
     }
   }
 
@@ -815,6 +843,11 @@ const ProgramSection = memo(function ProgramSection({ program, projects }) {
             style={{ color: 'var(--accent)' }}>
             <Plus size={11} /> Project
           </button>
+          <button onClick={openProgramTaskComposer}
+            className="flex items-center gap-1 text-[11px] px-2 py-1 rounded-lg transition-colors hover:bg-white/5"
+            style={{ color: 'var(--accent)' }}>
+            <Plus size={11} /> Task
+          </button>
           {deleteArmed ? (
             <>
               <button
@@ -883,7 +916,54 @@ const ProgramSection = memo(function ProgramSection({ program, projects }) {
       {/* Projects */}
       {!collapsed && (
         <div className="space-y-2 pl-6">
-          {topLevelProjects.length === 0 && !addingProject ? (
+          {programDirectTasks.length > 0 && (
+            <div
+              className="mb-3 rounded-2xl p-2.5"
+              style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}
+            >
+              <div className="flex items-center justify-between px-1 pb-2">
+                <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
+                  Program Tasks
+                </p>
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full"
+                  style={{ background: `${program.color}16`, color: program.color }}>
+                  {programDirectTasks.length}
+                </span>
+              </div>
+              <div className="space-y-2">
+                {programDirectTasks.map((task) => (
+                  <TaskRow
+                    key={task.id}
+                    task={task}
+                    onDragStart={(event, item) => {
+                      event.stopPropagation()
+                      writeDragPayload(event, {
+                        type: 'task',
+                        id: item.id,
+                        projectId: item.projectId ?? null,
+                        programId: item.programId ?? null,
+                      })
+                    }}
+                    onDragOver={(event, item) => {
+                      const payload = readDragPayload(event)
+                      if (!payload || payload.type !== 'task' || payload.id === item.id) return
+                      event.preventDefault()
+                      event.dataTransfer.dropEffect = 'move'
+                    }}
+                    onDrop={(event, item) => {
+                      const payload = readDragPayload(event)
+                      if (!payload || payload.type !== 'task' || payload.id === item.id) return
+                      event.preventDefault()
+                      event.stopPropagation()
+                      moveTask(payload.id, { projectId: null, programId: program.id, beforeTaskId: item.id })
+                    }}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {topLevelProjects.length === 0 && programDirectTasks.length === 0 && !addingProject ? (
             <p className="text-xs py-2" style={{ color: 'var(--text-secondary)' }}>
               No projects yet.{' '}
               <button onClick={() => setAddingProject(true)} className="underline" style={{ color: 'var(--accent)' }}>Add one</button>
@@ -1015,7 +1095,7 @@ const Projects = memo(function Projects() {
     : projects.filter((p) => !p.programId || !programs.find((prog) => prog.id === p.programId))
 
   const visibleTasks = focusedProgram
-    ? tasks.filter((t) => visibleProjects.some((p) => p.id === t.projectId))
+    ? tasks.filter((task) => taskMatchesProgram(task, focusedProgram.id, projects))
     : tasks
   const totalTasks = visibleTasks.length
   const doneTasks  = visibleTasks.filter((t) => t.status === 'done').length

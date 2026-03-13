@@ -5,12 +5,15 @@ import { PriorityBadge, StatusBadge, TagBadge } from '../common/Badge'
 import useSettingsStore from '../../store/useSettingsStore'
 import useTaskStore from '../../store/useTaskStore'
 import useProjectStore from '../../store/useProjectStore'
+import { getTaskProgram } from '../../lib/taskScope'
 
 const TaskCard = memo(function TaskCard({ task, draggable = false }) {
   const selectTask    = useSettingsStore((s) => s.selectTask)
   const toggleSubtask = useTaskStore((s) => s.toggleSubtask)
   const projects      = useProjectStore((s) => s.projects)
+  const programs      = useProjectStore((s) => s.programs)
   const project       = projects.find((p) => p.id === task.projectId)
+  const program       = getTaskProgram(task, programs, projects)
 
   const completedSubs = task.subtasks.filter((s) => s.completed).length
   const totalSubs     = task.subtasks.length
@@ -42,13 +45,16 @@ const TaskCard = memo(function TaskCard({ task, draggable = false }) {
       <div className="flex items-center justify-between gap-2 mb-2.5">
         <div className="flex items-center gap-1.5">
           <PriorityBadge priority={task.priority} size="xs" />
-          {project && (
+          {(project || program) && (
             <span
               className="flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full"
-              style={{ background: `${project.color}18`, color: project.color }}
+              style={{
+                background: `${(project?.color ?? program?.color) || '#94a3b8'}18`,
+                color: (project?.color ?? program?.color) || '#94a3b8',
+              }}
             >
-              <span className="w-1.5 h-1.5 rounded-full" style={{ background: project.color }} />
-              {project.name}
+              <span className="w-1.5 h-1.5 rounded-full" style={{ background: (project?.color ?? program?.color) || '#94a3b8' }} />
+              {project?.name ?? `${program?.name} · Program`}
             </span>
           )}
         </div>
