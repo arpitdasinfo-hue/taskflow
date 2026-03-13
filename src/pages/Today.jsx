@@ -664,7 +664,7 @@ const Today = memo(function Today() {
           <div className="flex flex-col gap-5 lg:flex-row lg:items-end">
             <div className="flex-1 min-w-0">
               <div className="text-[11px] font-semibold uppercase tracking-[0.24em]" style={{ color: 'var(--text-secondary)' }}>
-                Today Workspace
+                Planning Workspace
               </div>
               <div className="mt-2 flex items-center gap-2 flex-wrap">
                 <h1 className="text-2xl md:text-3xl font-bold" style={{ color: 'var(--text-primary)' }}>

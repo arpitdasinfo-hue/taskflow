@@ -153,39 +153,34 @@ const Section = ({ title, description, icon: Icon, action = null, children }) =>
   </GlassCard>
 )
 
-const ManagerNavButton = ({ active, icon: Icon, label, meta, onClick }) => (
+const SectionTab = ({ active, icon: Icon, label, onClick }) => (
   <button
     onClick={onClick}
-    className="w-full rounded-2xl px-3 py-3 text-left transition-colors"
+    className="rounded-2xl px-3 py-2.5 text-left transition-colors min-w-[144px]"
     style={active
       ? {
           background: 'rgba(var(--accent-rgb),0.14)',
           color: 'var(--text-primary)',
           border: '1px solid rgba(var(--accent-rgb),0.34)',
-          boxShadow: '0 12px 28px rgba(var(--accent-rgb),0.14)',
+          boxShadow: '0 10px 24px rgba(var(--accent-rgb),0.14)',
         }
       : {
-          background: 'rgba(255,255,255,0.03)',
-          color: 'var(--text-secondary)',
-          border: '1px solid rgba(255,255,255,0.08)',
-        }}
+        background: 'rgba(255,255,255,0.03)',
+        color: 'var(--text-secondary)',
+        border: '1px solid rgba(255,255,255,0.08)',
+      }}
   >
-    <div className="flex items-start gap-3">
+    <div className="flex items-center gap-2.5">
       <div
-        className="mt-0.5 w-8 h-8 rounded-2xl flex items-center justify-center flex-shrink-0"
+        className="w-8 h-8 rounded-2xl flex items-center justify-center flex-shrink-0"
         style={active
           ? { background: 'rgba(var(--accent-rgb),0.16)', color: 'var(--accent)' }
           : { background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)' }}
       >
         <Icon size={14} />
       </div>
-      <div className="min-w-0">
-        <div className="text-sm font-semibold" style={{ color: active ? 'var(--text-primary)' : 'inherit' }}>
-          {label}
-        </div>
-        <div className="text-[11px] mt-1 line-clamp-2" style={{ color: 'var(--text-secondary)' }}>
-          {meta}
-        </div>
+      <div className="min-w-0 text-sm font-semibold truncate" style={{ color: active ? 'var(--text-primary)' : 'inherit' }}>
+        {label}
       </div>
     </div>
   </button>
@@ -840,9 +835,9 @@ export default function ShareView({ token }) {
 
   const shareScopeLabel = useMemo(() => {
     if (!link?.resource_type) return 'Shared view'
-    if (link.resource_type === 'workspace') return 'Workspace view'
-    if (link.resource_type === 'program') return 'Program view'
-    if (link.resource_type === 'project') return 'Project view'
+    if (link.resource_type === 'workspace') return 'Workspace'
+    if (link.resource_type === 'program') return 'Program'
+    if (link.resource_type === 'project') return 'Project'
     return 'Shared view'
   }, [link?.resource_type])
 
@@ -877,7 +872,7 @@ export default function ShareView({ token }) {
         id: 'tasks',
         label: 'Tasks',
         icon: Lock,
-        meta: 'Detailed read-only task register with scope, dates, and priorities.',
+        meta: 'Detailed task register with scope, dates, and priorities.',
       })
     }
     if (shareConfig.modules.milestones) {
@@ -885,7 +880,7 @@ export default function ShareView({ token }) {
         id: 'milestones',
         label: 'Milestones',
         icon: CalendarClock,
-        meta: 'Upcoming and completed checkpoints in the selected manager scope.',
+        meta: 'Upcoming and completed checkpoints in the selected scope.',
       })
     }
     if (shareConfig.modules.gantt) {
@@ -893,7 +888,7 @@ export default function ShareView({ token }) {
         id: 'gantt',
         label: 'Gantt',
         icon: Target,
-        meta: 'Interactive read-only timeline with scope filters and time controls.',
+        meta: 'Interactive timeline with scope filters and time controls.',
       })
     }
     return sections
@@ -975,19 +970,19 @@ export default function ShareView({ token }) {
               <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div className="min-w-0">
                   <div className="text-[11px] font-semibold uppercase tracking-[0.24em]" style={{ color: 'var(--text-secondary)' }}>
-                    Shared TaskFlow View
+                    TaskFlow Dashboard
                   </div>
                   <div className="mt-2 flex items-center gap-2 flex-wrap">
                     <h2 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>
-                      {link?.name || 'Manager View'}
+                      {link?.name || 'Shared Dashboard'}
                     </h2>
                     <InfoTooltip
-                      text="Live read-only snapshot of progress, analytics, and delivery timeline. The same share link always shows the latest data while it remains active."
+                      text="Live snapshot of progress, analytics, milestones, and timeline. The same link keeps reflecting the latest data while it stays active."
                       widthClassName="w-72"
                     />
                   </div>
                   <p className="mt-3 text-sm max-w-2xl" style={{ color: 'var(--text-secondary)' }}>
-                    Structured for leadership review: one clean navigation rail, live scope filters, and focused sections instead of one long report.
+                    Programs, delivery health, milestones, tasks, and timeline in one place.
                   </p>
                   <div className="mt-3 flex items-center gap-2 flex-wrap text-xs">
                     <span className="px-2.5 py-1 rounded-full" style={{ background: 'rgba(var(--accent-rgb),0.12)', color: 'var(--accent)' }}>
@@ -995,12 +990,6 @@ export default function ShareView({ token }) {
                     </span>
                     <span className="px-2.5 py-1 rounded-full" style={{ background: 'rgba(16,185,129,0.12)', color: '#10b981' }}>
                       Live data
-                    </span>
-                    <span className="px-2.5 py-1 rounded-full" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)' }}>
-                      Read-only
-                    </span>
-                    <span className="px-2.5 py-1 rounded-full" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)' }}>
-                      {activeSectionMeta?.label || 'Overview'}
                     </span>
                   </div>
                 </div>
@@ -1016,33 +1005,22 @@ export default function ShareView({ token }) {
               </div>
             </GlassCard>
 
-            <div className="grid grid-cols-1 xl:grid-cols-[250px_minmax(0,1fr)] gap-4 items-start">
-              <div className="space-y-4 xl:sticky xl:top-6 self-start">
-                <GlassCard padding="p-4">
-                  <div className="flex items-center justify-between gap-2 mb-3">
-                    <div>
-                      <p className="text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>
-                        Manager Sections
-                      </p>
-                      <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
-                        Switch between summary, delivery, detail, and timeline views.
-                      </p>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    {availableSections.map((section) => (
-                      <ManagerNavButton
-                        key={section.id}
-                        active={activeSection === section.id}
-                        icon={section.icon}
-                        label={section.label}
-                        meta={section.meta}
-                        onClick={() => setActiveSection(section.id)}
-                      />
-                    ))}
-                  </div>
-                </GlassCard>
+            <GlassCard padding="p-3">
+              <div className="flex gap-2 overflow-x-auto no-select">
+                {availableSections.map((section) => (
+                  <SectionTab
+                    key={section.id}
+                    active={activeSection === section.id}
+                    icon={section.icon}
+                    label={section.label}
+                    onClick={() => setActiveSection(section.id)}
+                  />
+                ))}
+              </div>
+            </GlassCard>
 
+            <div className="grid grid-cols-1 xl:grid-cols-[280px_minmax(0,1fr)] gap-4 items-start">
+              <div className="space-y-4 xl:sticky xl:top-6 self-start">
                 <GlassCard padding="p-4">
                   <div className="flex items-center justify-between gap-2 mb-3">
                     <div className="flex items-center gap-2">
@@ -1054,7 +1032,7 @@ export default function ShareView({ token }) {
                       </div>
                       <div>
                         <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Scope Filters</p>
-                        <p className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>Narrow the manager view without changing the share link.</p>
+                        <p className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>Narrow the dashboard to a program, project, or sub-project.</p>
                       </div>
                     </div>
                     <button
@@ -1118,51 +1096,43 @@ export default function ShareView({ token }) {
                     </div>
                   </div>
                 </GlassCard>
+
+                <GlassCard padding="p-4">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>
+                    Active View
+                  </p>
+                  <p className="mt-2 text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                    {activeSectionMeta?.label || 'Overview'}
+                  </p>
+                  <p className="mt-1 text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                    {activeSectionMeta?.meta}
+                  </p>
+                  <div className="mt-3 flex gap-2 flex-wrap">
+                    {selectedProgramId && (
+                      <span className="px-2.5 py-1 rounded-full text-[11px]" style={{ background: 'rgba(var(--accent-rgb),0.12)', color: 'var(--accent)' }}>
+                        {programById.get(selectedProgramId)?.name || 'Program'}
+                      </span>
+                    )}
+                    {selectedProjectId && (
+                      <span className="px-2.5 py-1 rounded-full text-[11px]" style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--text-secondary)' }}>
+                        {projectById.get(selectedProjectId)?.name || 'Project'}
+                      </span>
+                    )}
+                    {selectedSubProjectId && (
+                      <span className="px-2.5 py-1 rounded-full text-[11px]" style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--text-secondary)' }}>
+                        {projectById.get(selectedSubProjectId)?.name || 'Sub-project'}
+                      </span>
+                    )}
+                    {!selectedProgramId && !selectedProjectId && !selectedSubProjectId && (
+                      <span className="px-2.5 py-1 rounded-full text-[11px]" style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--text-secondary)' }}>
+                        Entire scope
+                      </span>
+                    )}
+                  </div>
+                </GlassCard>
               </div>
 
               <div className="space-y-4 min-w-0">
-                <GlassCard padding="p-5">
-                  <div className="flex items-start justify-between gap-4 flex-wrap">
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        {activeSectionMeta && (
-                          <div
-                            className="w-8 h-8 rounded-2xl flex items-center justify-center"
-                            style={{ background: 'rgba(var(--accent-rgb),0.1)', border: '1px solid rgba(var(--accent-rgb),0.18)' }}
-                          >
-                            <activeSectionMeta.icon size={14} style={{ color: 'var(--accent)' }} />
-                          </div>
-                        )}
-                        <div>
-                          <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-                            {activeSectionMeta?.label || 'Overview'}
-                          </p>
-                          <p className="text-xs mt-1 max-w-2xl" style={{ color: 'var(--text-secondary)' }}>
-                            {activeSectionMeta?.meta}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex gap-2 flex-wrap">
-                      {selectedProgramId && (
-                        <span className="px-2.5 py-1 rounded-full text-[11px]" style={{ background: 'rgba(var(--accent-rgb),0.12)', color: 'var(--accent)' }}>
-                          {programById.get(selectedProgramId)?.name || 'Program'}
-                        </span>
-                      )}
-                      {selectedProjectId && (
-                        <span className="px-2.5 py-1 rounded-full text-[11px]" style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--text-secondary)' }}>
-                          {projectById.get(selectedProjectId)?.name || 'Project'}
-                        </span>
-                      )}
-                      {selectedSubProjectId && (
-                        <span className="px-2.5 py-1 rounded-full text-[11px]" style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--text-secondary)' }}>
-                          {projectById.get(selectedSubProjectId)?.name || 'Sub-project'}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </GlassCard>
-
                 {activeSection === 'overview' && (
                   <>
                     <Section
@@ -1220,7 +1190,7 @@ export default function ShareView({ token }) {
                 {activeSection === 'analytics' && shareConfig.modules.analytics && (
                   <Section
                     title="Program Analytics"
-                    description="Portfolio roll-up by program so a manager can see scope, delivery load, blocked work, and completion quickly."
+                    description="Portfolio roll-up by program for quick scanning of scope, delivery load, blocked work, and completion."
                     icon={BarChart3}
                   >
                     {programStats.length === 0 ? (
@@ -1264,7 +1234,7 @@ export default function ShareView({ token }) {
                 {activeSection === 'delivery' && shareConfig.modules.projects && (
                   <Section
                     title="Project Delivery Board"
-                    description="Top-level projects with delivery status, completion, and timing so the manager can scan active execution without editing anything."
+                    description="Top-level projects with delivery status, completion, and timing for scanning active execution."
                     icon={FolderKanban}
                   >
                     {filteredProjects.length === 0 ? (
@@ -1339,7 +1309,7 @@ export default function ShareView({ token }) {
                 {activeSection === 'tasks' && shareConfig.modules.tasks && (
                   <Section
                     title="Task Register"
-                    description="Read-only task detail with project context, delivery status, priority, and schedule dates."
+                    description="Task detail with project context, delivery status, priority, and schedule dates."
                     icon={Lock}
                   >
                     {filteredTasks.length === 0 ? (
@@ -1454,8 +1424,8 @@ export default function ShareView({ token }) {
 
                 {activeSection === 'gantt' && shareConfig.modules.gantt && (
                   <Section
-                    title="Read-only Gantt"
-                    description="Timeline view of programs, projects, tasks, and milestones with the same filters available in the manager link."
+                    title="Gantt"
+                    description="Timeline view of programs, projects, tasks, and milestones with the same filters available in this dashboard."
                     icon={ShieldCheck}
                   >
                     <ManagerGantt
@@ -1472,9 +1442,6 @@ export default function ShareView({ token }) {
         )}
 
         <div className="flex items-center justify-center gap-2 text-[11px]" style={{ color: 'var(--text-secondary)' }}>
-          <Lock size={12} />
-          Read-only view
-          <span>•</span>
           <a href={window.location.origin} className="inline-flex items-center gap-1 hover:opacity-80" style={{ color: 'var(--accent)' }}>
             Powered by TaskFlow <ExternalLink size={11} />
           </a>

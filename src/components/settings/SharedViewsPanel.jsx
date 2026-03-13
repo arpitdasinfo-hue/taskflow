@@ -98,7 +98,7 @@ const SharedViewsPanel = memo(function SharedViewsPanel() {
       >
         <div>
           <p className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>
-            Permanent manager links
+            Shared dashboard links
           </p>
           <p className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>
             {activeCount} active view links. Links stay valid until you disable or revoke them.
@@ -126,7 +126,7 @@ const SharedViewsPanel = memo(function SharedViewsPanel() {
           className="rounded-xl p-4 text-xs"
           style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', color: 'var(--text-secondary)' }}
         >
-          No shared links yet. Create your first manager link from a program/project share button or using "Workspace Link".
+          No shared links yet. Create your first dashboard link from a program/project share button or by using "Workspace Link".
         </div>
       ) : (
         <div className="space-y-2">

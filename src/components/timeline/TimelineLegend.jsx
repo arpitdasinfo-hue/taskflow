@@ -53,7 +53,7 @@ const TimelineLegend = memo(function TimelineLegend({ readOnly = false }) {
         </span>
         <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--text-secondary)' }}>
           {readOnly
-            ? 'Read-only timeline'
+            ? 'Timeline view'
             : 'Drag bars or edges to reschedule'}
         </span>
       </div>

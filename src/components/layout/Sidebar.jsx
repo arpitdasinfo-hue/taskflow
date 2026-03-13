@@ -13,7 +13,7 @@ import InfoTooltip from '../common/InfoTooltip'
 const NAV_ITEMS = [
   { id: 'dashboard',         label: 'Dashboard',  icon: LayoutDashboard },
   { id: 'tasks',             label: 'All Tasks',  icon: ListTodo        },
-  { id: 'today',             label: 'Today',      icon: CalendarClock   },
+  { id: 'today',             label: 'Planner',    icon: CalendarClock   },
   { id: 'projects',          label: 'Programs',   icon: FolderKanban    },
   { id: 'program-dashboard', label: 'Analytics',  icon: BarChart3       },
   { id: 'timeline',          label: 'Gantt Chart', icon: GanttChart     },

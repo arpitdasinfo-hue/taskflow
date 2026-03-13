@@ -6,7 +6,7 @@ import { useTaskStats } from '../../hooks/useFilteredTasks'
 const NAV_ITEMS = [
   { id: 'dashboard',         label: 'Home',      icon: LayoutDashboard },
   { id: 'tasks',             label: 'Tasks',     icon: ListTodo        },
-  { id: 'today',             label: 'Today',     icon: CalendarClock   },
+  { id: 'today',             label: 'Planner',   icon: CalendarClock   },
   { id: 'projects',          label: 'Programs',  icon: FolderKanban    },
   { id: 'program-dashboard', label: 'Analytics', icon: BarChart3       },
   { id: 'timeline',          label: 'Gantt',     icon: GanttChart      },

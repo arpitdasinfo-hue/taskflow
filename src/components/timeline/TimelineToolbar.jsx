@@ -114,7 +114,7 @@ const TimelineToolbar = memo(function TimelineToolbar({
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--accent)' }}>
-                {readOnly ? 'Read-only Gantt' : `${currentView.label} view`}
+                {readOnly ? 'Gantt' : `${currentView.label} view`}
               </span>
               <span
                 className="text-[10px] px-2 py-0.5 rounded-full"

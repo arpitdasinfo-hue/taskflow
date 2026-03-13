@@ -93,7 +93,7 @@ const Settings = memo(function Settings() {
               id="sharing"
               icon={Link2}
               title="Shared Views"
-              description="Create permanent read-only manager dashboards."
+              description="Create permanent shared dashboards with configurable sections and filters."
               open={openSections.sharing}
               onToggle={toggleSection}
             >

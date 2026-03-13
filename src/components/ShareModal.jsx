@@ -36,7 +36,7 @@ const ShareModal = memo(function ShareModal({ resourceType, resourceId, resource
   const [link, setLink] = useState(null)
   const [error, setError] = useState('')
   const [copied, setCopied] = useState(false)
-  const [linkName, setLinkName] = useState(resourceName ? `${resourceName} • Manager View` : 'Manager View')
+  const [linkName, setLinkName] = useState(resourceName ? `${resourceName} • Dashboard` : 'Shared Dashboard')
   const [config, setConfig] = useState(() => normalizeShareConfig(DEFAULT_SHARE_CONFIG))
   const [neverExpires, setNeverExpires] = useState(true)
   const [expiresAt, setExpiresAt] = useState('')
@@ -69,7 +69,7 @@ const ShareModal = memo(function ShareModal({ resourceType, resourceId, resource
       setNeverExpires(!normalized.expires_at)
       setExpiresAt(normalized.expires_at ? new Date(normalized.expires_at).toISOString().slice(0, 16) : '')
     } else {
-      setLinkName(resourceName ? `${resourceName} • Manager View` : `${resourceLabel} • Manager View`)
+      setLinkName(resourceName ? `${resourceName} • Dashboard` : `${resourceLabel} • Dashboard`)
       setConfig(normalizeShareConfig(DEFAULT_SHARE_CONFIG))
       setNeverExpires(true)
       setExpiresAt('')
@@ -115,7 +115,7 @@ const ShareModal = memo(function ShareModal({ resourceType, resourceId, resource
       resource_id: resourceId,
       workspace_id: workspaceId,
       access_mode: 'view',
-      name: linkName.trim() || (resourceName ? `${resourceName} • Manager View` : 'Manager View'),
+      name: linkName.trim() || (resourceName ? `${resourceName} • Dashboard` : 'Shared Dashboard'),
       config: normalizeShareConfig(config),
       expires_at: neverExpires ? null : (expiresAt ? new Date(expiresAt).toISOString() : null),
       created_by: user.id,
@@ -247,10 +247,10 @@ const ShareModal = memo(function ShareModal({ resourceType, resourceId, resource
           <div className="flex items-center justify-between mb-3">
             <div>
               <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-                Share {resourceLabel} View
+                Share {resourceLabel} Dashboard
               </p>
               <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>
-                Manager-style read-only dashboard link. No write or comment access.
+                Dashboard link with configurable sections, filters, and timeline views.
               </p>
             </div>
             <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/10" style={{ color: 'var(--text-secondary)' }}>
@@ -274,7 +274,7 @@ const ShareModal = memo(function ShareModal({ resourceType, resourceId, resource
                 <input
                   value={linkName}
                   onChange={(e) => setLinkName(e.target.value)}
-                  placeholder={`${resourceLabel} manager view`}
+                  placeholder={`${resourceLabel} dashboard`}
                   className="w-full px-3 py-2 rounded-xl text-xs"
                   style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-primary)' }}
                 />
@@ -415,7 +415,7 @@ const ShareModal = memo(function ShareModal({ resourceType, resourceId, resource
                       {status}
                     </span>
                     <span className="text-[10px]" style={{ color: 'var(--text-secondary)' }}>
-                      View-only access
+                      Dashboard link
                     </span>
                   </div>
                   <div className="flex gap-2">
@@ -457,7 +457,7 @@ const ShareModal = memo(function ShareModal({ resourceType, resourceId, resource
                     No link created yet.
                   </p>
                   <p className="text-[10px]" style={{ color: 'var(--text-secondary)' }}>
-                    Create one to share a read-only manager dashboard.
+                    Create one to share this dashboard.
                   </p>
                 </div>
               )}
@@ -470,7 +470,7 @@ const ShareModal = memo(function ShareModal({ resourceType, resourceId, resource
                   style={{ background: 'var(--accent)', color: '#fff' }}
                 >
                   {link ? <Check size={13} /> : <Link2 size={13} />}
-                  {link ? 'Save configuration' : 'Create permanent link'}
+                  {link ? 'Save configuration' : 'Create dashboard link'}
                 </button>
               </div>
 
