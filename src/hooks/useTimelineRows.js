@@ -194,10 +194,12 @@ const useTimelineRows = ({
   }
 
   const taskMatchesQuickFilters = (task) => {
-    if (onlyDelayed && !isTaskDelayed(task)) return false
-    if (onlyCritical && !isTaskCritical(task)) return false
-    if (onlyDependencyRisk && !isTaskDependencyRisk(task)) return false
-    return true
+    const enabledChecks = []
+    if (onlyDelayed) enabledChecks.push(isTaskDelayed(task))
+    if (onlyCritical) enabledChecks.push(isTaskCritical(task))
+    if (onlyDependencyRisk) enabledChecks.push(isTaskDependencyRisk(task))
+    if (enabledChecks.length === 0) return true
+    return enabledChecks.some(Boolean)
   }
 
   const buildProjectRows = (project, depth, options = {}) => {

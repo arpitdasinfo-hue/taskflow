@@ -1,4 +1,4 @@
-import { memo, useEffect, useRef, useState } from 'react'
+import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import Header from '../components/layout/Header'
 import TimelineToolbar from '../components/timeline/TimelineToolbar'
 import TimelineFilterBar from '../components/timeline/TimelineFilterBar'
@@ -26,6 +26,7 @@ const Timeline = memo(function Timeline() {
   const [filteredProjectIds, setFilteredProjectIds] = useState(() => new Set(ganttConfig.filteredProjectIds ?? []))
   const [filteredSubProjectIds, setFilteredSubProjectIds] = useState(() => new Set(ganttConfig.filteredSubProjectIds ?? []))
   const [expandedProjectIds, setExpandedProjectIds] = useState(() => new Set(ganttConfig.expandedProjectIds ?? []))
+  const [viewMode, setViewMode] = useState(ganttConfig.viewMode ?? 'roadmap')
   const [onlyDelayed, setOnlyDelayed] = useState(Boolean(ganttConfig.onlyDelayed))
   const [onlyCritical, setOnlyCritical] = useState(Boolean(ganttConfig.onlyCritical))
   const [onlyDependencyRisk, setOnlyDependencyRisk] = useState(Boolean(ganttConfig.onlyDependencyRisk))
@@ -35,6 +36,10 @@ const Timeline = memo(function Timeline() {
 
   useEffect(() => {
     if (initializedExpandedRef.current || projects.length === 0 || tasks.length === 0) return
+    if ((ganttConfig.viewMode ?? 'roadmap') === 'roadmap') {
+      initializedExpandedRef.current = true
+      return
+    }
     const projectIdsWithTasks = new Set(
       tasks
         .map((task) => task.projectId)
@@ -46,7 +51,7 @@ const Timeline = memo(function Timeline() {
         .map((project) => project.id)
     ))
     initializedExpandedRef.current = true
-  }, [projects, tasks])
+  }, [projects, tasks, ganttConfig.viewMode])
 
   const {
     zoom,
@@ -62,6 +67,7 @@ const Timeline = memo(function Timeline() {
   useEffect(() => {
     setGanttConfig({
       zoom,
+      viewMode,
       showDependencies,
       onlyDelayed,
       onlyCritical,
@@ -75,6 +81,7 @@ const Timeline = memo(function Timeline() {
     })
   }, [
     zoom,
+    viewMode,
     showDependencies,
     onlyDelayed,
     onlyCritical,
@@ -87,6 +94,48 @@ const Timeline = memo(function Timeline() {
     endDate,
     setGanttConfig,
   ])
+
+  const selectedProgramId = useMemo(
+    () => [...filteredProgramIds][0] ?? '',
+    [filteredProgramIds]
+  )
+
+  const visibleProjects = useMemo(
+    () => projects.filter((project) => !project.parentId && (!selectedProgramId || project.programId === selectedProgramId)),
+    [projects, selectedProgramId]
+  )
+
+  const selectedProjectId = useMemo(
+    () => [...filteredProjectIds][0] ?? '',
+    [filteredProjectIds]
+  )
+
+  const visibleSubProjects = useMemo(() => {
+    const subProjects = projects.filter((project) => Boolean(project.parentId))
+    if (selectedProjectId) return subProjects.filter((project) => project.parentId === selectedProjectId)
+    if (selectedProgramId) return subProjects.filter((project) => project.programId === selectedProgramId)
+    return subProjects
+  }, [projects, selectedProgramId, selectedProjectId])
+
+  const selectedSubProjectId = useMemo(
+    () => [...filteredSubProjectIds][0] ?? '',
+    [filteredSubProjectIds]
+  )
+
+  useEffect(() => {
+    if (!selectedProjectId) return
+    if (!visibleProjects.some((project) => project.id === selectedProjectId)) {
+      setFilteredProjectIds(new Set())
+      setFilteredSubProjectIds(new Set())
+    }
+  }, [selectedProjectId, visibleProjects])
+
+  useEffect(() => {
+    if (!selectedSubProjectId) return
+    if (!visibleSubProjects.some((project) => project.id === selectedSubProjectId)) {
+      setFilteredSubProjectIds(new Set())
+    }
+  }, [selectedSubProjectId, visibleSubProjects])
 
   const { rows, stats } = useTimelineRows({
     programs,
@@ -102,36 +151,24 @@ const Timeline = memo(function Timeline() {
     onlyDependencyRisk,
   })
 
-  const toggleProgram = (id) => {
-    setFilteredProgramIds((previous) => {
-      const next = new Set(previous)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
-
-    // Keep project filters scoped to latest program choices.
+  const setProgramScope = (id) => {
+    setFilteredProgramIds(id ? new Set([id]) : new Set())
     setFilteredProjectIds(new Set())
     setFilteredSubProjectIds(new Set())
   }
 
-  const toggleProject = (id) => {
-    setFilteredProjectIds((previous) => {
-      const next = new Set(previous)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
+  const setProjectScope = (id) => {
+    if (!id) {
+      setFilteredProjectIds(new Set())
+      setFilteredSubProjectIds(new Set())
+      return
+    }
+    setFilteredProjectIds(new Set([id]))
     setFilteredSubProjectIds(new Set())
   }
 
-  const toggleSubProject = (id) => {
-    setFilteredSubProjectIds((previous) => {
-      const next = new Set(previous)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
+  const setSubProjectScope = (id) => {
+    setFilteredSubProjectIds(id ? new Set([id]) : new Set())
   }
 
   const toggleExpandedProject = (projectId) => {
@@ -144,13 +181,47 @@ const Timeline = memo(function Timeline() {
   }
 
   const clearFilters = () => {
-    setFilteredProgramIds(new Set())
-    setFilteredProjectIds(new Set())
-    setFilteredSubProjectIds(new Set())
     setOnlyDelayed(false)
     setOnlyCritical(false)
     setOnlyDependencyRisk(false)
     setShowDependencies(true)
+  }
+
+  const applyViewMode = (nextViewMode) => {
+    if (!nextViewMode || nextViewMode === viewMode) return
+    setViewMode(nextViewMode)
+
+    const projectIdsWithTasks = new Set(
+      tasks
+        .map((task) => task.projectId)
+        .filter(Boolean)
+    )
+
+    if (nextViewMode === 'roadmap') {
+      setOnlyDelayed(false)
+      setOnlyCritical(false)
+      setOnlyDependencyRisk(false)
+      setShowDependencies(false)
+      setExpandedProjectIds(new Set())
+      return
+    }
+
+    if (nextViewMode === 'delivery') {
+      setOnlyDelayed(false)
+      setOnlyCritical(false)
+      setOnlyDependencyRisk(false)
+      setShowDependencies(true)
+      setExpandedProjectIds(projectIdsWithTasks)
+      return
+    }
+
+    if (nextViewMode === 'risk') {
+      setOnlyDelayed(true)
+      setOnlyCritical(true)
+      setOnlyDependencyRisk(true)
+      setShowDependencies(true)
+      setExpandedProjectIds(projectIdsWithTasks)
+    }
   }
 
   const filtered =
@@ -162,12 +233,10 @@ const Timeline = memo(function Timeline() {
     onlyDependencyRisk
 
   const activeFilterCount =
-    filteredProgramIds.size +
-    filteredProjectIds.size +
-    filteredSubProjectIds.size +
     Number(onlyDelayed) +
     Number(onlyCritical) +
-    Number(onlyDependencyRisk)
+    Number(onlyDependencyRisk) +
+    Number(!showDependencies)
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
@@ -177,8 +246,19 @@ const Timeline = memo(function Timeline() {
         zoom={zoom}
         rangeLabel={rangeLabel}
         stats={stats}
+        selectedProgramId={selectedProgramId}
+        selectedProjectId={selectedProjectId}
+        selectedSubProjectId={selectedSubProjectId}
+        visiblePrograms={programs}
+        visibleProjects={visibleProjects}
+        visibleSubProjects={visibleSubProjects}
+        viewMode={viewMode}
         activeFilterCount={activeFilterCount}
         filterPanelOpen={showFilterPanel}
+        onChangeProgram={setProgramScope}
+        onChangeProject={setProjectScope}
+        onChangeSubProject={setSubProjectScope}
+        onChangeViewMode={applyViewMode}
         onChangeZoom={changeZoom}
         onShiftRange={shiftRange}
         onResetToToday={resetToToday}
@@ -187,18 +267,10 @@ const Timeline = memo(function Timeline() {
 
       {showFilterPanel && (
         <TimelineFilterBar
-          programs={programs}
-          projects={projects}
-          filteredProgramIds={filteredProgramIds}
-          filteredProjectIds={filteredProjectIds}
-          filteredSubProjectIds={filteredSubProjectIds}
           onlyDelayed={onlyDelayed}
           onlyCritical={onlyCritical}
           onlyDependencyRisk={onlyDependencyRisk}
           showDependencies={showDependencies}
-          onToggleProgram={toggleProgram}
-          onToggleProject={toggleProject}
-          onToggleSubProject={toggleSubProject}
           onToggleOnlyDelayed={() => setOnlyDelayed((value) => !value)}
           onToggleOnlyCritical={() => setOnlyCritical((value) => !value)}
           onToggleOnlyDependencyRisk={() => setOnlyDependencyRisk((value) => !value)}

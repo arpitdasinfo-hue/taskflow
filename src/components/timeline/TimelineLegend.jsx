@@ -14,7 +14,16 @@ const TimelineLegend = memo(function TimelineLegend({ readOnly = false }) {
     <div className="px-4 md:px-6 pb-2">
       <div className="flex items-center gap-2 flex-wrap">
         <span className="text-[10px] uppercase tracking-wider font-semibold" style={{ color: 'var(--text-secondary)' }}>
-          Status
+          Legend
+        </span>
+        <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: 'rgba(255,255,255,0.08)', color: 'var(--text-secondary)' }}>
+          Thick bar: program
+        </span>
+        <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--text-secondary)' }}>
+          Medium bar: project
+        </span>
+        <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)' }}>
+          Slim bar: task
         </span>
         {entries.map(([id, label]) => (
           <span
@@ -34,10 +43,16 @@ const TimelineLegend = memo(function TimelineLegend({ readOnly = false }) {
           <span>⛓</span>
           Dependency risk
         </span>
+        <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: 'rgba(249,115,22,0.15)', color: '#fb923c' }}>
+          Red edge/glow = late
+        </span>
+        <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: 'rgba(239,68,68,0.14)', color: '#f87171' }}>
+          Stripes = blocked
+        </span>
         <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--text-secondary)' }}>
           {readOnly
             ? 'Read-only timeline view'
-            : 'Drag bars to move. Drag edges to resize. Use + to add tasks.'}
+            : 'Drag bars to move. Drag edges to resize. Use Advanced for risk filters.'}
         </span>
       </div>
     </div>

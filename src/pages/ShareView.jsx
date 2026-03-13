@@ -22,6 +22,7 @@ import TimelineGrid from '../components/timeline/TimelineGrid'
 import TimelineLegend from '../components/timeline/TimelineLegend'
 import useTimelineScale from '../hooks/useTimelineScale'
 import useTimelineRows from '../hooks/useTimelineRows'
+import { TIMELINE_VIEW_MODES } from '../components/timeline/timelineConfig'
 import { getTaskProgramId } from '../lib/taskScope'
 
 const PRIORITY_COLOR = {
@@ -141,14 +142,13 @@ const ManagerGantt = ({ programs, projects, tasks, milestones }) => {
   const [filteredProgramIds, setFilteredProgramIds] = useState(() => new Set())
   const [filteredProjectIds, setFilteredProjectIds] = useState(() => new Set())
   const [filteredSubProjectIds, setFilteredSubProjectIds] = useState(() => new Set())
-  const [expandedProjectIds, setExpandedProjectIds] = useState(
-    () => new Set(tasks.map((task) => task.projectId).filter(Boolean))
-  )
+  const [expandedProjectIds, setExpandedProjectIds] = useState(() => new Set())
+  const [viewMode, setViewMode] = useState('roadmap')
   const [onlyDelayed, setOnlyDelayed] = useState(false)
   const [onlyCritical, setOnlyCritical] = useState(false)
   const [onlyDependencyRisk, setOnlyDependencyRisk] = useState(false)
   const [showDependencies, setShowDependencies] = useState(true)
-  const [showFilterPanel, setShowFilterPanel] = useState(true)
+  const [showFilterPanel, setShowFilterPanel] = useState(false)
 
   const {
     zoom,
@@ -174,34 +174,47 @@ const ManagerGantt = ({ programs, projects, tasks, milestones }) => {
     onlyDependencyRisk,
   })
 
-  const toggleProgram = (id) => {
-    setFilteredProgramIds((previous) => {
-      const next = new Set(previous)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
+  const selectedProgramId = [...filteredProgramIds][0] ?? ''
+  const visibleProjects = projects.filter((project) => !project.parentId && (!selectedProgramId || project.programId === selectedProgramId))
+  const selectedProjectId = [...filteredProjectIds][0] ?? ''
+  const visibleSubProjects = selectedProjectId
+    ? projects.filter((project) => project.parentId === selectedProjectId)
+    : projects.filter((project) => project.parentId && (!selectedProgramId || project.programId === selectedProgramId))
+  const selectedSubProjectId = [...filteredSubProjectIds][0] ?? ''
+
+  useEffect(() => {
+    if (!selectedProjectId) return
+    if (!visibleProjects.some((project) => project.id === selectedProjectId)) {
+      setFilteredProjectIds(new Set())
+      setFilteredSubProjectIds(new Set())
+    }
+  }, [selectedProjectId, visibleProjects])
+
+  useEffect(() => {
+    if (!selectedSubProjectId) return
+    if (!visibleSubProjects.some((project) => project.id === selectedSubProjectId)) {
+      setFilteredSubProjectIds(new Set())
+    }
+  }, [selectedSubProjectId, visibleSubProjects])
+
+  const setProgramScope = (id) => {
+    setFilteredProgramIds(id ? new Set([id]) : new Set())
     setFilteredProjectIds(new Set())
     setFilteredSubProjectIds(new Set())
   }
 
-  const toggleProject = (id) => {
-    setFilteredProjectIds((previous) => {
-      const next = new Set(previous)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
+  const setProjectScope = (id) => {
+    if (!id) {
+      setFilteredProjectIds(new Set())
+      setFilteredSubProjectIds(new Set())
+      return
+    }
+    setFilteredProjectIds(new Set([id]))
     setFilteredSubProjectIds(new Set())
   }
 
-  const toggleSubProject = (id) => {
-    setFilteredSubProjectIds((previous) => {
-      const next = new Set(previous)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
+  const setSubProjectScope = (id) => {
+    setFilteredSubProjectIds(id ? new Set([id]) : new Set())
   }
 
   const toggleExpandedProject = (projectId) => {
@@ -214,13 +227,40 @@ const ManagerGantt = ({ programs, projects, tasks, milestones }) => {
   }
 
   const clearFilters = () => {
-    setFilteredProgramIds(new Set())
-    setFilteredProjectIds(new Set())
-    setFilteredSubProjectIds(new Set())
     setOnlyDelayed(false)
     setOnlyCritical(false)
     setOnlyDependencyRisk(false)
     setShowDependencies(true)
+  }
+
+  const applyViewMode = (nextViewMode) => {
+    if (!TIMELINE_VIEW_MODES[nextViewMode]) return
+    setViewMode(nextViewMode)
+    const projectIdsWithTasks = new Set(tasks.map((task) => task.projectId).filter(Boolean))
+
+    if (nextViewMode === 'roadmap') {
+      setOnlyDelayed(false)
+      setOnlyCritical(false)
+      setOnlyDependencyRisk(false)
+      setShowDependencies(false)
+      setExpandedProjectIds(new Set())
+      return
+    }
+
+    if (nextViewMode === 'delivery') {
+      setOnlyDelayed(false)
+      setOnlyCritical(false)
+      setOnlyDependencyRisk(false)
+      setShowDependencies(true)
+      setExpandedProjectIds(projectIdsWithTasks)
+      return
+    }
+
+    setOnlyDelayed(true)
+    setOnlyCritical(true)
+    setOnlyDependencyRisk(true)
+    setShowDependencies(true)
+    setExpandedProjectIds(projectIdsWithTasks)
   }
 
   const filtered =
@@ -232,12 +272,10 @@ const ManagerGantt = ({ programs, projects, tasks, milestones }) => {
     onlyDependencyRisk
 
   const activeFilterCount =
-    filteredProgramIds.size +
-    filteredProjectIds.size +
-    filteredSubProjectIds.size +
     Number(onlyDelayed) +
     Number(onlyCritical) +
-    Number(onlyDependencyRisk)
+    Number(onlyDependencyRisk) +
+    Number(!showDependencies)
 
   return (
     <div className="space-y-2.5">
@@ -245,8 +283,20 @@ const ManagerGantt = ({ programs, projects, tasks, milestones }) => {
         zoom={zoom}
         rangeLabel={rangeLabel}
         stats={stats}
+        selectedProgramId={selectedProgramId}
+        selectedProjectId={selectedProjectId}
+        selectedSubProjectId={selectedSubProjectId}
+        visiblePrograms={programs}
+        visibleProjects={visibleProjects}
+        visibleSubProjects={visibleSubProjects}
+        viewMode={viewMode}
         activeFilterCount={activeFilterCount}
         filterPanelOpen={showFilterPanel}
+        readOnly
+        onChangeProgram={setProgramScope}
+        onChangeProject={setProjectScope}
+        onChangeSubProject={setSubProjectScope}
+        onChangeViewMode={applyViewMode}
         onChangeZoom={changeZoom}
         onShiftRange={shiftRange}
         onResetToToday={resetToToday}
@@ -255,11 +305,6 @@ const ManagerGantt = ({ programs, projects, tasks, milestones }) => {
 
       {showFilterPanel && (
         <TimelineFilterBar
-          programs={programs}
-          projects={projects}
-          filteredProgramIds={filteredProgramIds}
-          filteredProjectIds={filteredProjectIds}
-          filteredSubProjectIds={filteredSubProjectIds}
           onlyDelayed={onlyDelayed}
           onlyCritical={onlyCritical}
           onlyDependencyRisk={onlyDependencyRisk}

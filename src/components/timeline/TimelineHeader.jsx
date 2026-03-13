@@ -25,8 +25,17 @@ const TimelineHeader = memo(function TimelineHeader({ startDate, days, cellWidth
 
   return (
     <div className="sticky top-0 z-20">
-      <div className="flex" style={{ background: 'rgba(8,20,35,0.96)', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-        <div className="flex-shrink-0 border-r" style={{ width: leftColumnWidth, borderColor: 'rgba(255,255,255,0.08)' }} />
+      <div className="flex" style={{ background: 'rgba(7,18,31,0.97)', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+        <div className="flex-shrink-0 border-r px-3 py-1.5" style={{ width: leftColumnWidth, borderColor: 'rgba(255,255,255,0.08)' }}>
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[10px] font-semibold uppercase tracking-[0.18em]" style={{ color: 'var(--text-secondary)' }}>
+              Workstream
+            </span>
+            <span className="text-[10px]" style={{ color: 'var(--text-secondary)' }}>
+              {zoom === 'week' ? 'Day view' : zoom === 'month' ? 'Delivery view' : 'Roadmap view'}
+            </span>
+          </div>
+        </div>
         <div className="flex">
           {monthSegments.map((segment) => (
             <div
@@ -45,10 +54,10 @@ const TimelineHeader = memo(function TimelineHeader({ startDate, days, cellWidth
         </div>
       </div>
 
-      <div className="flex" style={{ background: 'rgba(8,20,35,0.92)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+      <div className="flex" style={{ background: 'rgba(8,20,35,0.94)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
         <div className="flex-shrink-0 border-r px-3 py-1.5" style={{ width: leftColumnWidth, borderColor: 'rgba(255,255,255,0.08)' }}>
           <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
-            Gantt
+            Timeline
           </span>
         </div>
         <div className="flex">
@@ -68,8 +77,8 @@ const TimelineHeader = memo(function TimelineHeader({ startDate, days, cellWidth
                   borderColor: 'rgba(255,255,255,0.04)',
                   color: isToday ? 'var(--accent)' : 'var(--text-secondary)',
                   background: isToday
-                    ? 'rgba(var(--accent-rgb),0.12)'
-                    : isWeekend ? 'rgba(255,255,255,0.02)' : 'transparent',
+                    ? 'rgba(var(--accent-rgb),0.14)'
+                    : isWeekend ? 'rgba(255,255,255,0.03)' : 'transparent',
                 }}
               >
                 {showLabel ? date.toLocaleDateString('en-US', zoom === 'week'

@@ -5,6 +5,7 @@ import { THEMES, THEME_ROTATION_DAYS } from '../themes'
 
 const DEFAULT_GANTT_CONFIG = {
   zoom: 'month',
+  viewMode: 'roadmap',
   showDependencies: true,
   onlyDelayed: false,
   onlyCritical: false,
@@ -235,7 +236,7 @@ const useSettingsStore = create(
     {
       name: 'taskflow-settings',
       storage: createJSONStorage(() => localStorage),
-      version: 3,
+      version: 4,
       partialize: (state) => {
         const { selectedTaskId: _s1, selectedTaskIds: _s2, ...rest } = state
         return rest
@@ -253,6 +254,16 @@ const useSettingsStore = create(
             contrastMode: s?.contrastMode ?? 'standard',
             uiDensity: s?.uiDensity ?? 'comfortable',
             ganttConfig: s?.ganttConfig ?? { ...DEFAULT_GANTT_CONFIG },
+          }
+        }
+        if (version < 4) {
+          s = {
+            ...s,
+            ganttConfig: {
+              ...DEFAULT_GANTT_CONFIG,
+              ...(s?.ganttConfig ?? {}),
+              viewMode: s?.ganttConfig?.viewMode ?? 'roadmap',
+            },
           }
         }
         return s

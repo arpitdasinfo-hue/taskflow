@@ -1,7 +1,25 @@
 export const ZOOM_CONFIGS = {
-  week: { id: 'week', label: 'Week', days: 14, cellWidth: 56 },
-  month: { id: 'month', label: 'Month', days: 56, cellWidth: 24 },
+  week: { id: 'week', label: '2 Weeks', days: 14, cellWidth: 56 },
+  month: { id: 'month', label: '2 Months', days: 56, cellWidth: 24 },
   quarter: { id: 'quarter', label: 'Quarter', days: 112, cellWidth: 14 },
+}
+
+export const TIMELINE_VIEW_MODES = {
+  roadmap: {
+    id: 'roadmap',
+    label: 'Roadmap',
+    description: 'Programs and projects first. Tasks stay tucked under the hierarchy.',
+  },
+  delivery: {
+    id: 'delivery',
+    label: 'Delivery',
+    description: 'Execution view with projects, tasks, milestones, and schedule context.',
+  },
+  risk: {
+    id: 'risk',
+    label: 'Risk',
+    description: 'Pull forward delayed, blocked, and dependency-risk work.',
+  },
 }
 
 export const STATUS_COLOR = {
@@ -20,9 +38,9 @@ export const PRIORITY_COLOR = {
 }
 
 export const ROW_HEIGHT = {
-  program: 42,
-  project: 38,
-  task: 34,
+  program: 48,
+  project: 42,
+  task: 36,
 }
 
 export const DEFAULT_ZOOM = 'month'

@@ -2,7 +2,7 @@ import { memo, useMemo } from 'react'
 import TimelineHeader from './TimelineHeader'
 import TimelineRow from './TimelineRow'
 import { ROW_HEIGHT } from './timelineConfig'
-import { clamp, diffDays, toDisplayDate } from './timelineUtils'
+import { addDays, clamp, diffDays, startOfDay, toDisplayDate } from './timelineUtils'
 
 const LEFT_COLUMN_WIDTH = 300
 
@@ -87,7 +87,7 @@ const TimelineGrid = memo(function TimelineGrid({
         const controlDelta = Math.max(18, (destination.xStart - source.xEnd) / 2)
         const c1x = source.xEnd + controlDelta
         const c2x = destination.xStart - controlDelta
-        const stroke = blocked ? 'rgba(248,113,113,0.72)' : 'rgba(125,211,252,0.48)'
+        const stroke = blocked ? 'rgba(248,113,113,0.86)' : 'rgba(125,211,252,0.62)'
 
         links.push({
           id: `dep-${dependencyId}-${row.taskId}`,
@@ -103,6 +103,20 @@ const TimelineGrid = memo(function TimelineGrid({
     return { links, totalHeight }
   }, [rows, startDate, days, cellWidth, showDependencies, onlyDependencyRisk])
 
+  const calendarLayer = useMemo(() => {
+    const today = startOfDay(new Date())
+
+    return Array.from({ length: days }, (_, index) => {
+      const date = addDays(startDate, index)
+      return {
+        key: date.toISOString(),
+        left: index * cellWidth,
+        isWeekend: date.getDay() === 0 || date.getDay() === 6,
+        isToday: date.getTime() === today.getTime(),
+      }
+    })
+  }, [days, startDate, cellWidth])
+
   return (
     <div className="flex-1 overflow-auto" style={{ scrollbarWidth: 'thin' }}>
       <div style={{ minWidth: LEFT_COLUMN_WIDTH + days * cellWidth }}>
@@ -115,6 +129,39 @@ const TimelineGrid = memo(function TimelineGrid({
         />
 
         <div className="relative">
+          <div
+            className="absolute pointer-events-none z-0"
+            style={{ left: LEFT_COLUMN_WIDTH, top: 0, width: days * cellWidth, height: dependencyLayer.totalHeight }}
+          >
+            {calendarLayer.map((column) => (
+              <div
+                key={column.key}
+                className="absolute top-0 bottom-0"
+                style={{
+                  left: column.left,
+                  width: cellWidth,
+                  background: column.isToday
+                    ? 'linear-gradient(180deg, rgba(var(--accent-rgb),0.16), rgba(var(--accent-rgb),0.06))'
+                    : column.isWeekend
+                      ? 'rgba(255,255,255,0.025)'
+                      : 'transparent',
+                }}
+              />
+            ))}
+            {calendarLayer.filter((column) => column.isToday).map((column) => (
+              <div
+                key={`${column.key}-today-line`}
+                className="absolute top-0 bottom-0"
+                style={{
+                  left: column.left + cellWidth / 2 - 1,
+                  width: 2,
+                  background: 'rgba(var(--accent-rgb),0.72)',
+                  boxShadow: '0 0 18px rgba(var(--accent-rgb),0.35)',
+                }}
+              />
+            ))}
+          </div>
+
           {dependencyLayer.links.length > 0 && (
             <svg
               className="absolute pointer-events-none z-[1]"
@@ -127,14 +174,23 @@ const TimelineGrid = memo(function TimelineGrid({
               }}
               aria-hidden="true"
             >
+              <defs>
+                <marker id="timeline-arrow-risk" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto">
+                  <path d="M 0 0 L 8 4 L 0 8 z" fill="rgba(248,113,113,0.86)" />
+                </marker>
+                <marker id="timeline-arrow-normal" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto">
+                  <path d="M 0 0 L 8 4 L 0 8 z" fill="rgba(125,211,252,0.62)" />
+                </marker>
+              </defs>
               {dependencyLayer.links.map((link) => (
                 <g key={link.id}>
                   <path
                     d={link.path}
                     fill="none"
                     stroke={link.stroke}
-                    strokeWidth={link.blocked ? 1.8 : 1.4}
+                    strokeWidth={link.blocked ? 2.2 : 1.6}
                     strokeDasharray={link.blocked ? '4 4' : undefined}
+                    markerEnd={`url(#${link.blocked ? 'timeline-arrow-risk' : 'timeline-arrow-normal'})`}
                   />
                   <circle cx={link.toX} cy={link.toY} r={2} fill={link.stroke} />
                 </g>

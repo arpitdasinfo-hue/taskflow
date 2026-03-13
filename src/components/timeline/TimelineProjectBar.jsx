@@ -43,6 +43,17 @@ const TimelineProjectBar = memo(function TimelineProjectBar({
       : item.status === 'in-progress'
         ? 0.5
         : 0
+  const due = toDisplayDate(item.dueDate)
+  const isLate = !!(due && due < startOfDay(new Date()) && item.status !== 'done')
+  const isBlocked = item.status === 'blocked'
+  const background = isBlocked
+    ? `repeating-linear-gradient(135deg, ${color}26 0 8px, rgba(255,255,255,0.04) 8px 16px)`
+    : `${color}24`
+  const accentColor = isLate ? '#f87171' : color
+  const borderColor = isLate ? '#f87171' : `${color}88`
+  const boxShadow = isLate
+    ? '0 0 0 1px rgba(248,113,113,0.28), 0 0 18px rgba(248,113,113,0.18)'
+    : `0 8px 20px ${color}18`
 
   if (readOnly) {
     return (
@@ -54,20 +65,22 @@ const TimelineProjectBar = memo(function TimelineProjectBar({
           transform: 'translateY(-50%)',
           width,
           height: 16,
-          background: `${color}30`,
-          border: `1px solid ${color}66`,
+          background,
+          border: `1px solid ${borderColor}`,
+          boxShadow,
           zIndex: 4,
         }}
         title={item.title || 'Project schedule'}
       >
         <div
           className="absolute top-0 bottom-0 left-0 rounded-full"
-          style={{ width: `${progress * 100}%`, background: `${color}55` }}
+          style={{ width: `${progress * 100}%`, background: `${accentColor}68` }}
         />
+        <div className="absolute top-[2px] bottom-[2px] left-[3px] w-[2px] rounded-full" style={{ background: accentColor }} />
         {width > 56 && (
           <span
             className="relative z-[2] px-2 text-[9px] font-medium truncate block text-left"
-            style={{ color }}
+            style={{ color: '#e8edf5' }}
           >
             {item.title}
           </span>
@@ -183,16 +196,18 @@ const TimelineProjectBar = memo(function TimelineProjectBar({
           transform: 'translateY(-50%)',
           width,
           height: 16,
-          background: `${color}30`,
-          border: `1px solid ${color}66`,
+          background,
+          border: `1px solid ${borderColor}`,
+          boxShadow,
           zIndex: isInteracting ? 6 : 4,
         }}
         title={`${item.title || 'Project schedule'} (drag to adjust)`}
       >
         <div
           className="absolute top-0 bottom-0 left-0 rounded-full"
-          style={{ width: `${progress * 100}%`, background: `${color}55` }}
+          style={{ width: `${progress * 100}%`, background: `${accentColor}68` }}
         />
+        <div className="absolute top-[2px] bottom-[2px] left-[3px] w-[2px] rounded-full" style={{ background: accentColor }} />
 
         <span
           className="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-white/20"
@@ -208,7 +223,7 @@ const TimelineProjectBar = memo(function TimelineProjectBar({
         {width > 56 && (
           <span
             className="relative z-[2] px-2 text-[9px] font-medium truncate block text-left"
-            style={{ color }}
+            style={{ color: '#e8edf5' }}
           >
             {item.title}
           </span>

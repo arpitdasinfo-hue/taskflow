@@ -39,6 +39,17 @@ const TimelineTaskBar = memo(function TimelineTaskBar({
   const width = Math.max(10, (clampedEnd - clampedStart + 1) * cellWidth - 2)
   const color = STATUS_COLOR[item.status] || rowColor || 'var(--accent)'
   const progress = item.status === 'done' ? 1 : item.status === 'in-progress' ? 0.5 : 0
+  const due = toDisplayDate(item.dueDate)
+  const isLate = !!(due && due < startOfDay(new Date()) && item.status !== 'done')
+  const isBlocked = item.status === 'blocked'
+  const background = isBlocked
+    ? `repeating-linear-gradient(135deg, ${color}28 0 7px, rgba(255,255,255,0.05) 7px 14px)`
+    : `${color}24`
+  const boxShadow = isLate
+    ? '0 0 0 1px rgba(248,113,113,0.32), 0 0 18px rgba(248,113,113,0.22)'
+    : `0 8px 20px ${color}22`
+  const borderColor = isLate ? '#f87171' : `${color}88`
+  const accentColor = isLate ? '#f87171' : color
 
   if (readOnly) {
     return (
@@ -49,21 +60,24 @@ const TimelineTaskBar = memo(function TimelineTaskBar({
           top: '50%',
           transform: 'translateY(-50%)',
           width,
-          height: 18,
-          background: `${color}30`,
-          border: `1px solid ${color}66`,
+          height: 14,
+          background,
+          border: `1px solid ${borderColor}`,
+          boxShadow,
           zIndex: 4,
         }}
         title={item.title}
       >
         <div
           className="absolute top-0 bottom-0 left-0 rounded-full"
-          style={{ width: `${progress * 100}%`, background: `${color}55` }}
+          style={{ width: `${progress * 100}%`, background: `${accentColor}72` }}
         />
+        <div className="absolute top-[2px] bottom-[2px] left-[3px] w-[2px] rounded-full" style={{ background: accentColor }} />
+        {isLate && <div className="absolute top-[2px] bottom-[2px] right-[3px] w-[2px] rounded-full" style={{ background: '#f87171' }} />}
         {width > 68 && (
           <span
             className="relative z-[2] px-2 text-[9px] font-medium truncate block text-left"
-            style={{ color }}
+            style={{ color: '#e8edf5' }}
           >
             {item.title}
           </span>
@@ -190,17 +204,20 @@ const TimelineTaskBar = memo(function TimelineTaskBar({
           top: '50%',
           transform: 'translateY(-50%)',
           width,
-          height: 18,
-          background: `${color}30`,
-          border: `1px solid ${color}66`,
+          height: 14,
+          background,
+          border: `1px solid ${borderColor}`,
+          boxShadow,
           zIndex: isInteracting ? 6 : 4,
         }}
         title={item.title}
       >
         <div
           className="absolute top-0 bottom-0 left-0 rounded-full"
-          style={{ width: `${progress * 100}%`, background: `${color}55` }}
+          style={{ width: `${progress * 100}%`, background: `${accentColor}72` }}
         />
+        <div className="absolute top-[2px] bottom-[2px] left-[3px] w-[2px] rounded-full" style={{ background: accentColor }} />
+        {isLate && <div className="absolute top-[2px] bottom-[2px] right-[3px] w-[2px] rounded-full" style={{ background: '#f87171' }} />}
 
         <span
           className="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-white/20"
@@ -216,7 +233,7 @@ const TimelineTaskBar = memo(function TimelineTaskBar({
         {width > 68 && (
           <span
             className="relative z-[2] px-2 text-[9px] font-medium truncate block text-left"
-            style={{ color }}
+            style={{ color: '#e8edf5' }}
           >
             {item.title}
           </span>
