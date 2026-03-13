@@ -167,6 +167,8 @@ export default function App() {
   const workspaceError = useWorkspaceStore((s) => s.error)
   const loadProjectsFromSupabase = useProjectStore((s) => s.loadFromSupabase)
   const loadTasksFromSupabase = useTaskStore((s) => s.loadFromSupabase)
+  const taskSyncError = useTaskStore((s) => s.syncError)
+  const clearTaskSyncError = useTaskStore((s) => s.clearSyncError)
   const loadPlanningFromSupabase = usePlanningStore((s) => s.loadFromSupabase)
   const resetPlanning = usePlanningStore((s) => s.reset)
   const [syncReady, setSyncReady] = useState(false)
@@ -435,8 +437,11 @@ export default function App() {
       {activePage !== 'trash' && <QuickAdd />}
 
       <SyncIssueBanner
-        message={workspaceError}
-        onDismiss={() => useWorkspaceStore.setState({ error: '' })}
+        message={workspaceError || taskSyncError}
+        onDismiss={() => {
+          useWorkspaceStore.setState({ error: '' })
+          clearTaskSyncError()
+        }}
       />
 
       <PWAUpdateBanner

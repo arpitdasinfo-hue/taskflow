@@ -29,6 +29,39 @@ const getSyncContext = () => {
   return { workspaceId, userId }
 }
 
+const getTaskSyncErrorMessage = (error) => {
+  const rawMessage = error?.message || 'Unable to sync task changes to Supabase.'
+  const normalized = rawMessage.toLowerCase()
+
+  if (normalized.includes('deleted_at')) {
+    return 'Task trash sync is blocked. Please run the latest tasks.deleted_at migration from scripts/supabase_schema.sql in Supabase.'
+  }
+
+  if (normalized.includes('start_date')) {
+    return 'Task schedule sync is blocked. Please confirm the tasks.start_date column exists in Supabase and matches the latest schema.'
+  }
+
+  if (normalized.includes('row-level security')) {
+    return 'Task sync is blocked by Supabase RLS. Please run the latest scripts/supabase_policies.sql in Supabase SQL Editor.'
+  }
+
+  return rawMessage
+}
+
+const reportTaskSyncError = (set, error, action) => {
+  const message = getTaskSyncErrorMessage(error)
+  console.error(`[sync] Failed to ${action}:`, error)
+  set((state) => {
+    state.syncError = message
+  })
+}
+
+const clearTaskSyncError = (set) => {
+  set((state) => {
+    state.syncError = ''
+  })
+}
+
 const hasOwn = (value, key) => Object.prototype.hasOwnProperty.call(value, key)
 
 const getProgramIdForProject = (projectId) => {
@@ -205,6 +238,9 @@ const useTaskStore = create(
       tasks: [],
       trashTasks: [],
       syncing: false,
+      syncError: '',
+
+      clearSyncError: () => clearTaskSyncError(set),
 
       addTask: (data) => {
         let created
@@ -239,7 +275,8 @@ const useTaskStore = create(
             .from('tasks')
             .upsert(toTaskRow(created, workspaceId, userId))
             .then(({ error }) => {
-              if (error) console.error('[sync] Failed to persist task:', error)
+              if (error) reportTaskSyncError(set, error, 'create task')
+              else clearTaskSyncError(set)
             })
         }
 
@@ -256,7 +293,10 @@ const useTaskStore = create(
         const updated = get().tasks.find((t) => t.id === id)
         const { workspaceId, userId } = getSyncContext()
         if (workspaceId && updated) {
-          void supabase.from('tasks').upsert(toTaskRow(updated, workspaceId, userId))
+          void supabase.from('tasks').upsert(toTaskRow(updated, workspaceId, userId)).then(({ error }) => {
+            if (error) reportTaskSyncError(set, error, 'update task')
+            else clearTaskSyncError(set)
+          })
         }
       },
 
@@ -295,7 +335,10 @@ const useTaskStore = create(
         const updated = get().tasks.find((t) => t.id === id)
         const { workspaceId, userId } = getSyncContext()
         if (workspaceId && updated) {
-          void supabase.from('tasks').upsert(toTaskRow(updated, workspaceId, userId))
+          void supabase.from('tasks').upsert(toTaskRow(updated, workspaceId, userId)).then(({ error }) => {
+            if (error) reportTaskSyncError(set, error, 'move task')
+            else clearTaskSyncError(set)
+          })
         }
       },
 
@@ -316,7 +359,10 @@ const useTaskStore = create(
 
         const { workspaceId, userId } = getSyncContext()
         if (workspaceId && deletedTask) {
-          void supabase.from('tasks').upsert(toTaskRow(deletedTask, workspaceId, userId))
+          void supabase.from('tasks').upsert(toTaskRow(deletedTask, workspaceId, userId)).then(({ error }) => {
+            if (error) reportTaskSyncError(set, error, 'move task to trash')
+            else clearTaskSyncError(set)
+          })
         }
       },
 
@@ -335,7 +381,10 @@ const useTaskStore = create(
         const updated = get().tasks.find((t) => t.id === taskId)
         const { workspaceId, userId } = getSyncContext()
         if (workspaceId && updated) {
-          void supabase.from('tasks').upsert(toTaskRow(updated, workspaceId, userId))
+          void supabase.from('tasks').upsert(toTaskRow(updated, workspaceId, userId)).then(({ error }) => {
+            if (error) reportTaskSyncError(set, error, 'update task dependency')
+            else clearTaskSyncError(set)
+          })
         }
       },
 
@@ -350,7 +399,10 @@ const useTaskStore = create(
         const updated = get().tasks.find((t) => t.id === taskId)
         const { workspaceId, userId } = getSyncContext()
         if (workspaceId && updated) {
-          void supabase.from('tasks').upsert(toTaskRow(updated, workspaceId, userId))
+          void supabase.from('tasks').upsert(toTaskRow(updated, workspaceId, userId)).then(({ error }) => {
+            if (error) reportTaskSyncError(set, error, 'remove task dependency')
+            else clearTaskSyncError(set)
+          })
         }
       },
 
@@ -370,7 +422,12 @@ const useTaskStore = create(
           const rows = get().tasks
             .filter((task) => ids.includes(task.id))
             .map((task) => toTaskRow(task, workspaceId, userId))
-          if (rows.length > 0) void supabase.from('tasks').upsert(rows)
+          if (rows.length > 0) {
+            void supabase.from('tasks').upsert(rows).then(({ error }) => {
+              if (error) reportTaskSyncError(set, error, 'bulk update tasks')
+              else clearTaskSyncError(set)
+            })
+          }
         }
       },
 
@@ -400,7 +457,10 @@ const useTaskStore = create(
         if (workspaceId && deletedRows.length > 0) {
           void supabase.from('tasks').upsert(
             deletedRows.map((task) => toTaskRow(task, workspaceId, userId))
-          )
+          ).then(({ error }) => {
+            if (error) reportTaskSyncError(set, error, 'bulk move tasks to trash')
+            else clearTaskSyncError(set)
+          })
         }
       },
 
@@ -419,7 +479,10 @@ const useTaskStore = create(
 
         const { workspaceId, userId } = getSyncContext()
         if (workspaceId && restoredTask) {
-          void supabase.from('tasks').upsert(toTaskRow(restoredTask, workspaceId, userId))
+          void supabase.from('tasks').upsert(toTaskRow(restoredTask, workspaceId, userId)).then(({ error }) => {
+            if (error) reportTaskSyncError(set, error, 'restore task')
+            else clearTaskSyncError(set)
+          })
         }
       },
 
@@ -430,7 +493,10 @@ const useTaskStore = create(
 
         const { workspaceId } = getSyncContext()
         if (workspaceId) {
-          void supabase.from('tasks').delete().eq('id', id)
+          void supabase.from('tasks').delete().eq('id', id).then(({ error }) => {
+            if (error) reportTaskSyncError(set, error, 'delete task permanently')
+            else clearTaskSyncError(set)
+          })
         }
       },
 
@@ -444,7 +510,10 @@ const useTaskStore = create(
 
         const { workspaceId } = getSyncContext()
         if (workspaceId) {
-          void supabase.from('tasks').delete().in('id', ids)
+          void supabase.from('tasks').delete().in('id', ids).then(({ error }) => {
+            if (error) reportTaskSyncError(set, error, 'empty trash')
+            else clearTaskSyncError(set)
+          })
         }
       },
 
@@ -573,7 +642,10 @@ const useTaskStore = create(
           (task.notes ?? []).map((note) => toNoteRow(task.id, note, userId))
         )
 
-        if (taskRows.length > 0) await supabase.from('tasks').upsert(taskRows)
+        if (taskRows.length > 0) {
+          const { error } = await supabase.from('tasks').upsert(taskRows)
+          if (error) throw error
+        }
         if (subtaskRows.length > 0) await supabase.from('subtasks').upsert(subtaskRows)
         if (noteRows.length > 0) await supabase.from('notes').upsert(noteRows)
       },
@@ -620,6 +692,9 @@ const useTaskStore = create(
             state.tasks = sanitized.tasks
             state.trashTasks = sanitized.trashTasks
           })
+          clearTaskSyncError(set)
+        } catch (error) {
+          reportTaskSyncError(set, error, 'load tasks from Supabase')
         } finally {
           set((s) => { s.syncing = false })
         }
