@@ -15,6 +15,7 @@ import MilestonePanel from '../components/projects/MilestonePanel'
 import useProjectStore, { PROJECT_COLORS } from '../store/useProjectStore'
 import useTaskStore from '../store/useTaskStore'
 import useSettingsStore from '../store/useSettingsStore'
+import { sortTasksByStartDate } from '../lib/taskSort'
 import { taskMatchesProgram } from '../lib/taskScope'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -23,21 +24,6 @@ const STATUS_LABEL   = { todo: 'To Do', 'in-progress': 'Active', review: 'Review
 const STATUS_COLOR   = { todo: '#94a3b8', 'in-progress': '#22d3ee', review: '#f59e0b', done: '#10b981', blocked: '#ef4444' }
 const DND_MIME = 'application/x-taskflow-dnd'
 let activeDragPayload = null
-
-const toDueTimestamp = (value) => {
-  if (!value) return null
-  const ts = new Date(value).getTime()
-  return Number.isNaN(ts) ? null : ts
-}
-
-const sortTasksByDueDate = (items = []) => [...items].sort((a, b) => {
-  const dueA = toDueTimestamp(a.dueDate)
-  const dueB = toDueTimestamp(b.dueDate)
-  if (dueA === dueB) return 0
-  if (dueA === null) return 1
-  if (dueB === null) return -1
-  return dueA - dueB
-})
 
 const writeDragPayload = (event, payload) => {
   activeDragPayload = payload
@@ -297,7 +283,7 @@ const ProjectPanel = memo(function ProjectPanel({ project, depth = 0 }) {
   const [showMovePicker, setShowMovePicker] = useState(false)
   const [showShare, setShowShare]     = useState(false)
 
-  const projectTasks = sortTasksByDueDate(tasks.filter((t) => t.projectId === project.id))
+  const projectTasks = sortTasksByStartDate(tasks.filter((t) => t.projectId === project.id))
   const total      = projectTasks.length
   const done       = projectTasks.filter((t) => t.status === 'done').length
   const inProgress = projectTasks.filter((t) => t.status === 'in-progress').length
@@ -706,7 +692,7 @@ const ProgramSection = memo(function ProgramSection({ program, projects }) {
   const topLevelProjects = projects.filter((p) => !p.parentId)
   const containsActiveProject = !!activeProjectId && projects.some((p) => p.id === activeProjectId)
 
-  const programDirectTasks = sortTasksByDueDate(
+  const programDirectTasks = sortTasksByStartDate(
     tasks.filter((task) => !task.projectId && taskMatchesProgram(task, program.id, projects))
   )
   const allTasks = tasks.filter((task) =>

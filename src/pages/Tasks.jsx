@@ -12,6 +12,7 @@ import useSettingsStore from '../store/useSettingsStore'
 import useTaskStore from '../store/useTaskStore'
 import useProjectStore from '../store/useProjectStore'
 import { useFilteredTasks } from '../hooks/useFilteredTasks'
+import { sortTasksByStartDate } from '../lib/taskSort'
 import { getTaskProgram, getTaskProgramId } from '../lib/taskScope'
 
 const PRIORITY_COLOR = { critical: '#ef4444', high: '#f97316', medium: '#f59e0b', low: '#64748b' }
@@ -276,14 +277,16 @@ const Tasks = memo(function Tasks() {
   }, [projectById, filterProgramId, filterProjectId])
 
   const filteredTasks = useMemo(() => {
-    if (!filterProgramId && !filterProjectId) return tasks
+    const scopedTasks = !filterProgramId && !filterProjectId
+      ? tasks
+      : tasks.filter((task) => {
+          const taskProgramId = getTaskProgramId(task, projectById)
+          if (filterProgramId && taskProgramId !== filterProgramId) return false
+          if (filterProjectId && task.projectId !== filterProjectId) return false
+          return true
+        })
 
-    return tasks.filter((task) => {
-      const taskProgramId = getTaskProgramId(task, projectById)
-      if (filterProgramId && taskProgramId !== filterProgramId) return false
-      if (filterProjectId && task.projectId !== filterProjectId) return false
-      return true
-    })
+    return sortTasksByStartDate(scopedTasks)
   }, [tasks, projectById, filterProgramId, filterProjectId])
 
   const tasksByStatus = useMemo(() => {
