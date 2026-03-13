@@ -1,4 +1,4 @@
-import { memo } from 'react'
+import { memo, useEffect, useState } from 'react'
 import {
   CalendarRange,
   ChevronDownSquare,
@@ -18,7 +18,7 @@ const ControlLabel = ({ children }) => (
 )
 
 const selectStyle = {
-  background: 'rgba(255,255,255,0.05)',
+  background: 'rgba(255,255,255,0.07)',
   border: '1px solid rgba(255,255,255,0.1)',
   color: 'var(--text-primary)',
 }
@@ -83,6 +83,21 @@ const TimelineToolbar = memo(function TimelineToolbar({
   onToggleFilterPanel,
 }) {
   const currentView = TIMELINE_VIEW_MODES[viewMode] ?? TIMELINE_VIEW_MODES.roadmap
+  const [customPickerOpen, setCustomPickerOpen] = useState(false)
+
+  useEffect(() => {
+    if (!isCustomRange) setCustomPickerOpen(false)
+  }, [isCustomRange])
+
+  const handleZoomChange = (nextZoom) => {
+    onChangeZoom?.(nextZoom)
+    setCustomPickerOpen(nextZoom === 'custom')
+  }
+
+  const handleApplyCustomRange = () => {
+    const result = onApplyCustomRange?.()
+    if (result !== false) setCustomPickerOpen(false)
+  }
 
   return (
     <div className="px-4 md:px-6 pb-3">
@@ -116,10 +131,7 @@ const TimelineToolbar = memo(function TimelineToolbar({
               )}
             </div>
 
-            <h2 className="text-sm md:text-base font-semibold mt-2" style={{ color: 'var(--text-primary)' }}>
-              Keep the chart in focus
-            </h2>
-            <p className="text-xs mt-1 max-w-2xl" style={{ color: 'var(--text-secondary)' }}>
+            <p className="text-sm md:text-[15px] font-medium mt-2 max-w-2xl" style={{ color: 'var(--text-secondary)' }}>
               {currentView.description}
             </p>
           </div>
@@ -133,7 +145,7 @@ const TimelineToolbar = memo(function TimelineToolbar({
         </div>
 
         <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_auto] gap-3 mb-3">
-          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.2fr)_repeat(3,minmax(0,0.72fr))] gap-2">
+          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_repeat(3,minmax(0,0.72fr))] gap-2">
             <label className="relative block">
               <Search
                 size={14}
@@ -143,7 +155,7 @@ const TimelineToolbar = memo(function TimelineToolbar({
               <input
                 value={searchQuery}
                 onChange={(event) => onSearchChange?.(event.target.value)}
-                placeholder="Search programs, projects, tasks, or schedule notes"
+                placeholder="Search workstreams, projects, or tasks"
                 className="w-full rounded-2xl pl-10 pr-4 py-2.5 text-sm outline-none"
                 style={{
                   background: 'rgba(255,255,255,0.04)',
@@ -232,25 +244,27 @@ const TimelineToolbar = memo(function TimelineToolbar({
               Today
             </button>
 
-            <button
-              onClick={onExpandAll}
-              disabled={expandableProjectCount === 0}
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium disabled:opacity-40"
-              style={{ background: 'rgba(255,255,255,0.04)', color: 'var(--text-secondary)', border: '1px solid rgba(255,255,255,0.08)' }}
-            >
-              <ChevronDownSquare size={13} />
-              Expand
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={onExpandAll}
+                disabled={expandableProjectCount === 0}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium disabled:opacity-40"
+                style={{ background: 'rgba(255,255,255,0.04)', color: 'var(--text-secondary)', border: '1px solid rgba(255,255,255,0.08)' }}
+              >
+                <ChevronDownSquare size={13} />
+                Expand
+              </button>
 
-            <button
-              onClick={onCollapseAll}
-              disabled={expandableProjectCount === 0}
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium disabled:opacity-40"
-              style={{ background: 'rgba(255,255,255,0.04)', color: 'var(--text-secondary)', border: '1px solid rgba(255,255,255,0.08)' }}
-            >
-              <ChevronUpSquare size={13} />
-              Collapse
-            </button>
+              <button
+                onClick={onCollapseAll}
+                disabled={expandableProjectCount === 0}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium disabled:opacity-40"
+                style={{ background: 'rgba(255,255,255,0.04)', color: 'var(--text-secondary)', border: '1px solid rgba(255,255,255,0.08)' }}
+              >
+                <ChevronUpSquare size={13} />
+                Collapse
+              </button>
+            </div>
 
             <button
               onClick={onToggleFilterPanel}
@@ -271,7 +285,7 @@ const TimelineToolbar = memo(function TimelineToolbar({
         </div>
 
         <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_auto] gap-3 items-start">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(320px,0.95fr)] gap-3">
             <div className="flex flex-col gap-1.5">
               <ControlLabel>View</ControlLabel>
               <div className="flex items-center gap-1 p-1 rounded-xl" style={{ background: 'rgba(255,255,255,0.04)' }}>
@@ -296,7 +310,7 @@ const TimelineToolbar = memo(function TimelineToolbar({
                 {Object.values(ZOOM_CONFIGS).map((cfg) => (
                   <button
                     key={cfg.id}
-                    onClick={() => onChangeZoom(cfg.id)}
+                    onClick={() => handleZoomChange(cfg.id)}
                     className="flex-1 min-w-[78px] px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors"
                     style={zoom === cfg.id
                       ? { background: 'rgba(var(--accent-rgb),0.16)', color: 'var(--accent)', border: '1px solid rgba(var(--accent-rgb),0.34)' }
@@ -306,41 +320,59 @@ const TimelineToolbar = memo(function TimelineToolbar({
                   </button>
                 ))}
               </div>
+
+              {customPickerOpen && (
+                <div
+                  className="rounded-2xl p-3"
+                  style={{ background: 'rgba(255,255,255,0.035)', border: '1px solid rgba(255,255,255,0.08)' }}
+                >
+                  <div className="flex items-center justify-between gap-2 flex-wrap mb-2">
+                    <p className="text-[11px] font-medium" style={{ color: 'var(--text-primary)' }}>
+                      Choose your custom range
+                    </p>
+                    <button
+                      onClick={() => setCustomPickerOpen(false)}
+                      className="text-[11px] px-2 py-1 rounded-lg"
+                      style={{ color: 'var(--text-secondary)', background: 'rgba(255,255,255,0.04)' }}
+                    >
+                      Close
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] gap-2">
+                    <label className="relative">
+                      <CalendarRange
+                        size={12}
+                        className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
+                        style={{ color: 'var(--text-secondary)' }}
+                      />
+                      <input
+                        type="date"
+                        value={customRangeStart}
+                        onChange={(event) => onChangeCustomRangeStart?.(event.target.value)}
+                        className="w-full rounded-xl pl-8 pr-3 py-2 text-xs"
+                        style={{ ...selectStyle, colorScheme: 'light' }}
+                      />
+                    </label>
+                    <input
+                      type="date"
+                      value={customRangeEnd}
+                      onChange={(event) => onChangeCustomRangeEnd?.(event.target.value)}
+                      className="w-full rounded-xl px-3 py-2 text-xs"
+                      style={{ ...selectStyle, colorScheme: 'light' }}
+                    />
+                    <button
+                      onClick={handleApplyCustomRange}
+                      className="px-3 py-2 rounded-xl text-xs font-medium"
+                      style={{ background: 'rgba(var(--accent-rgb),0.16)', color: 'var(--accent)', border: '1px solid rgba(var(--accent-rgb),0.34)' }}
+                    >
+                      Apply
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
-
-          {isCustomRange && (
-            <div className="grid grid-cols-[1fr_1fr_auto] gap-2">
-              <label className="relative">
-                <CalendarRange
-                  size={12}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
-                  style={{ color: 'var(--text-secondary)' }}
-                />
-                <input
-                  type="date"
-                  value={customRangeStart}
-                  onChange={(event) => onChangeCustomRangeStart?.(event.target.value)}
-                  className="w-full rounded-xl pl-8 pr-3 py-2 text-xs"
-                  style={selectStyle}
-                />
-              </label>
-              <input
-                type="date"
-                value={customRangeEnd}
-                onChange={(event) => onChangeCustomRangeEnd?.(event.target.value)}
-                className="w-full rounded-xl px-3 py-2 text-xs"
-                style={selectStyle}
-              />
-              <button
-                onClick={onApplyCustomRange}
-                className="px-3 py-2 rounded-xl text-xs font-medium"
-                style={{ background: 'rgba(var(--accent-rgb),0.16)', color: 'var(--accent)', border: '1px solid rgba(var(--accent-rgb),0.34)' }}
-              >
-                Apply
-              </button>
-            </div>
-          )}
         </div>
       </div>
     </div>

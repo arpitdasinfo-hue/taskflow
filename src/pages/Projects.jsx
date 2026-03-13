@@ -492,12 +492,12 @@ const ProjectPanel = memo(function ProjectPanel({ project, depth = 0 }) {
               <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
               <div
                 className="absolute top-full right-0 mt-1 z-50 rounded-xl overflow-hidden"
-                style={{ background: '#1a1025', border: '1px solid rgba(255,255,255,0.12)', boxShadow: '0 16px 48px rgba(0,0,0,0.5)', minWidth: '160px' }}
+                style={{ background: '#ffffff', border: '1px solid rgba(15,23,42,0.12)', boxShadow: '0 16px 48px rgba(15,23,42,0.18)', minWidth: '160px' }}
               >
                 <button
                   onClick={(e) => { e.stopPropagation(); setShowMovePicker((v) => !v); setShowMenu(false) }}
-                  className="w-full text-left px-3 py-2 text-xs hover:bg-white/5 transition-colors"
-                  style={{ color: 'var(--text-secondary)' }}
+                  className="w-full text-left px-3 py-2 text-xs hover:bg-slate-100 transition-colors"
+                  style={{ color: '#334155' }}
                 >
                   Move to program…
                 </button>
@@ -806,14 +806,14 @@ const ProgramSection = memo(function ProgramSection({ program, projects }) {
             <>
               <div className="fixed inset-0 z-40" onClick={() => setShowStatusPicker(false)} />
               <div className="absolute top-full left-0 mt-1 z-50 rounded-xl overflow-hidden"
-                style={{ background: '#1a1025', border: '1px solid rgba(255,255,255,0.12)', boxShadow: '0 16px 48px rgba(0,0,0,0.5)', minWidth: '140px' }}>
+                style={{ background: '#ffffff', border: '1px solid rgba(15,23,42,0.12)', boxShadow: '0 16px 48px rgba(15,23,42,0.18)', minWidth: '140px' }}>
                 {STATUS_OPTIONS.map((value) => {
                   const cfg = STATUS_CONFIG[value]
                   return (
                     <button key={value}
                     onClick={() => { updateProgram(program.id, { status: value }); setShowStatusPicker(false) }}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-left hover:bg-white/5 transition-colors"
-                    style={(program.status || 'planning') === value ? { color: cfg.color, background: `${cfg.color}12` } : { color: 'var(--text-secondary)' }}>
+                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-left hover:bg-slate-100 transition-colors"
+                    style={(program.status || 'planning') === value ? { color: cfg.color, background: `${cfg.color}12` } : { color: '#334155' }}>
                     <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: cfg.color }} />
                     {cfg.label}
                   </button>

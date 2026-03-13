@@ -105,16 +105,16 @@ const DependencyList = memo(function DependencyList({ taskId }) {
           </div>
           {searchResults.length > 0 && (
             <div className="rounded-xl overflow-hidden"
-              style={{ background: '#1a1025', border: '1px solid rgba(var(--accent-rgb),0.2)' }}>
+              style={{ background: '#ffffff', border: '1px solid rgba(15,23,42,0.12)', boxShadow: '0 14px 36px rgba(15,23,42,0.14)' }}>
               {searchResults.map((t) => (
                 <button
                   key={t.id}
                   onClick={() => handleAdd(t.id)}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-white/5 transition-colors"
+                  className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-slate-100 transition-colors"
                 >
                   <span className="w-1.5 h-1.5 rounded-full flex-shrink-0"
                     style={{ background: PRIORITY_COLOR[t.priority] }} />
-                  <span className="flex-1 text-xs truncate" style={{ color: 'var(--text-primary)' }}>{t.title}</span>
+                  <span className="flex-1 text-xs truncate" style={{ color: '#0f172a' }}>{t.title}</span>
                   <StatusBadge status={t.status} size="xs" />
                 </button>
               ))}

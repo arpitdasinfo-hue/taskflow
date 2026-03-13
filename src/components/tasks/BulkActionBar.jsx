@@ -26,14 +26,14 @@ const DropdownMenu = memo(function DropdownMenu({ label, options, onSelect, rend
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
           <div
             className="absolute bottom-full mb-2 left-0 rounded-xl overflow-hidden z-50 min-w-[140px]"
-            style={{ background: '#1a1025', border: '1px solid rgba(var(--accent-rgb),0.25)', boxShadow: '0 16px 48px rgba(0,0,0,0.6)' }}
+            style={{ background: '#ffffff', border: '1px solid rgba(15,23,42,0.12)', boxShadow: '0 16px 48px rgba(15,23,42,0.18)' }}
           >
             {options.map((opt) => (
               <button
                 key={typeof opt === 'string' ? opt : opt.id}
                 onClick={() => { onSelect(typeof opt === 'string' ? opt : opt.id); setOpen(false) }}
-                className="w-full flex items-center gap-2 px-3 py-2 text-xs text-left hover:bg-white/5 transition-colors"
-                style={{ color: 'var(--text-primary)' }}
+                className="w-full flex items-center gap-2 px-3 py-2 text-xs text-left hover:bg-slate-100 transition-colors"
+                style={{ color: '#0f172a' }}
               >
                 {renderOption ? renderOption(opt) : (typeof opt === 'string' ? opt : opt.name)}
               </button>

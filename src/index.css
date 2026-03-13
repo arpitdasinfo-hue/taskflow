@@ -107,6 +107,16 @@ input, textarea, select {
 }
 input::placeholder, textarea::placeholder { color: rgba(255,255,255,0.3); }
 
+select {
+  color-scheme: light;
+}
+
+select option,
+select optgroup {
+  background: #ffffff;
+  color: #0f172a;
+}
+
 /* ── Priority ───────────────────────────────────────────────────────────── */
 .priority-dot-critical { background: #ef4444; }
 .priority-dot-high     { background: #f97316; }

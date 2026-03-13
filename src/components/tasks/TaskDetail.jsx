@@ -31,14 +31,14 @@ const SelectField = memo(function SelectField({ value, options, onChange, render
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
           <div
             className="absolute top-full left-0 right-0 mt-1 rounded-xl overflow-hidden z-50 anim-slide-down"
-            style={{ background: '#1a1025', border: '1px solid rgba(var(--accent-rgb),0.2)', boxShadow: '0 16px 48px rgba(0,0,0,0.5)' }}
+            style={{ background: '#ffffff', border: '1px solid rgba(15,23,42,0.12)', boxShadow: '0 16px 48px rgba(15,23,42,0.18)' }}
           >
             {options.map((opt) => (
               <button
                 key={opt}
                 onClick={() => { onChange(opt); setOpen(false) }}
-                className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-left hover:bg-white/5 transition-colors"
-                style={opt === value ? { background: 'rgba(var(--accent-rgb),0.1)', color: 'var(--accent)' } : { color: 'var(--text-primary)' }}
+                className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-left hover:bg-slate-100 transition-colors"
+                style={opt === value ? { background: 'rgba(var(--accent-rgb),0.1)', color: 'var(--accent)' } : { color: '#0f172a' }}
               >
                 {renderOption ? renderOption(opt, false) : opt}
               </button>
