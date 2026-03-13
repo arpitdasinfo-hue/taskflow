@@ -8,6 +8,8 @@ const DEFAULT_GANTT_CONFIG = {
   zoom: 'month',
   viewMode: 'roadmap',
   searchQuery: '',
+  customRangeStart: null,
+  customRangeEnd: null,
   showDependencies: true,
   onlyDelayed: false,
   onlyCritical: false,
@@ -265,7 +267,7 @@ const useSettingsStore = create(
     {
       name: 'taskflow-settings',
       storage: createJSONStorage(() => localStorage),
-      version: 6,
+      version: 7,
       partialize: (state) => {
         const { selectedTaskId: _s1, selectedTaskIds: _s2, ...rest } = state
         return rest
@@ -314,6 +316,18 @@ const useSettingsStore = create(
               ...DEFAULT_GANTT_CONFIG,
               ...(s?.ganttConfig ?? {}),
               searchQuery: s?.ganttConfig?.searchQuery ?? '',
+            },
+          }
+        }
+        if (version < 7) {
+          s = {
+            ...s,
+            savedGanttViews: Array.isArray(s?.savedGanttViews) ? s.savedGanttViews : [],
+            ganttConfig: {
+              ...DEFAULT_GANTT_CONFIG,
+              ...(s?.ganttConfig ?? {}),
+              customRangeStart: s?.ganttConfig?.customRangeStart ?? null,
+              customRangeEnd: s?.ganttConfig?.customRangeEnd ?? null,
             },
           }
         }

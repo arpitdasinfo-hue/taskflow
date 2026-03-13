@@ -99,18 +99,57 @@ const Timeline = memo(function Timeline() {
     startDate,
     endDate,
     rangeLabel,
+    isCustomRange,
+    customRangeStart,
+    customRangeEnd,
     changeZoom,
     shiftRange,
     resetToToday,
+    applyCustomRange,
     restoreScale,
-  } = useTimelineScale({ initialZoom: ganttConfig.zoom })
+  } = useTimelineScale({
+    initialZoom: ganttConfig.zoom,
+    initialRangeStart: ganttConfig.customRangeStart ?? ganttConfig.rangeStart,
+    initialRangeEnd: ganttConfig.customRangeEnd ?? ganttConfig.rangeEnd,
+  })
+
+  const [customStartInput, setCustomStartInput] = useState(
+    ganttConfig.customRangeStart
+      ? String(ganttConfig.customRangeStart).slice(0, 10)
+      : (ganttConfig.rangeStart ? String(ganttConfig.rangeStart).slice(0, 10) : '')
+  )
+  const [customEndInput, setCustomEndInput] = useState(
+    ganttConfig.customRangeEnd
+      ? String(ganttConfig.customRangeEnd).slice(0, 10)
+      : (ganttConfig.rangeEnd ? String(ganttConfig.rangeEnd).slice(0, 10) : '')
+  )
 
   useEffect(() => {
     if (restoredScaleRef.current) return
     if (!ganttConfig.rangeStart && !ganttConfig.zoom) return
-    restoreScale({ zoom: ganttConfig.zoom, rangeStart: ganttConfig.rangeStart })
+    restoreScale({
+      zoom: ganttConfig.zoom,
+      rangeStart: ganttConfig.rangeStart,
+      rangeEnd: ganttConfig.rangeEnd,
+      customRangeStart: ganttConfig.customRangeStart,
+      customRangeEnd: ganttConfig.customRangeEnd,
+    })
     restoredScaleRef.current = true
-  }, [ganttConfig.rangeStart, ganttConfig.zoom, restoreScale])
+  }, [
+    ganttConfig.rangeStart,
+    ganttConfig.rangeEnd,
+    ganttConfig.customRangeStart,
+    ganttConfig.customRangeEnd,
+    ganttConfig.zoom,
+    restoreScale,
+  ])
+
+  useEffect(() => {
+    if (isCustomRange) {
+      setCustomStartInput(customRangeStart)
+      setCustomEndInput(customRangeEnd)
+    }
+  }, [isCustomRange, customRangeStart, customRangeEnd])
 
   useEffect(() => () => {
     if (scheduleNoticeTimerRef.current) clearTimeout(scheduleNoticeTimerRef.current)
@@ -121,6 +160,8 @@ const Timeline = memo(function Timeline() {
       zoom,
       viewMode,
       searchQuery,
+      customRangeStart: isCustomRange ? startDate?.toISOString?.() ?? null : null,
+      customRangeEnd: isCustomRange ? endDate?.toISOString?.() ?? null : null,
       showDependencies,
       onlyDelayed,
       onlyCritical,
@@ -136,6 +177,7 @@ const Timeline = memo(function Timeline() {
     zoom,
     viewMode,
     searchQuery,
+    isCustomRange,
     showDependencies,
     onlyDelayed,
     onlyCritical,
@@ -435,6 +477,18 @@ const Timeline = memo(function Timeline() {
     selectTask(created.id)
   }
 
+  const applyCustomTimelineRange = () => {
+    const didApply = applyCustomRange(customStartInput, customEndInput)
+    if (!didApply) {
+      publishScheduleNotice({
+        kind: 'range-error',
+        itemLabel: 'Choose a valid start and end date to apply a custom timeline window.',
+        actionLabel: 'Custom timeline range not applied',
+        previous: null,
+      })
+    }
+  }
+
   const filtered =
     filteredProgramIds.size > 0 ||
     filteredProjectIds.size > 0 ||
@@ -451,7 +505,7 @@ const Timeline = memo(function Timeline() {
     Number(!showDependencies)
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden">
+    <div className="flex-1 flex flex-col min-h-0 overflow-y-auto">
       <Header />
 
       <TimelineToolbar
@@ -466,6 +520,9 @@ const Timeline = memo(function Timeline() {
         visibleSubProjects={visibleSubProjects}
         viewMode={viewMode}
         searchQuery={searchQuery}
+        isCustomRange={isCustomRange}
+        customRangeStart={customStartInput}
+        customRangeEnd={customEndInput}
         visibleCounts={visibleCounts}
         expandableProjectCount={expandableProjectIds.length}
         activeFilterCount={activeFilterCount}
@@ -476,6 +533,9 @@ const Timeline = memo(function Timeline() {
         onChangeViewMode={applyViewMode}
         onSearchChange={setSearchQuery}
         onChangeZoom={changeZoom}
+        onChangeCustomRangeStart={setCustomStartInput}
+        onChangeCustomRangeEnd={setCustomEndInput}
+        onApplyCustomRange={applyCustomTimelineRange}
         onShiftRange={shiftRange}
         onResetToToday={resetToToday}
         onExpandAll={expandAllProjects}

@@ -2,6 +2,7 @@ import { memo, useCallback, useEffect, useMemo, useState } from 'react'
 import { Check, Copy, Link2, RefreshCw, Shield, Trash2, X } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import { supabase } from '../lib/supabase'
+import { getPublicAppUrl } from '../lib/publicUrl'
 import useAuthStore from '../store/useAuthStore'
 import {
   DEFAULT_SHARE_CONFIG,
@@ -42,7 +43,7 @@ const ShareModal = memo(function ShareModal({ resourceType, resourceId, resource
 
   const shareUrl = useMemo(() => {
     if (!link?.token) return ''
-    return `${window.location.origin}/share/${link.token}`
+    return `${getPublicAppUrl()}/share/${link.token}`
   }, [link])
 
   const resourceLabel = useMemo(() => scopeLabel(resourceType), [resourceType])

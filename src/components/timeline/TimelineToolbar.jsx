@@ -1,5 +1,5 @@
 import { memo } from 'react'
-import { ChevronDownSquare, ChevronLeft, ChevronRight, ChevronUpSquare, Filter, Search, Target } from 'lucide-react'
+import { CalendarRange, ChevronDownSquare, ChevronLeft, ChevronRight, ChevronUpSquare, Filter, Search, Target } from 'lucide-react'
 import { TIMELINE_VIEW_MODES, ZOOM_CONFIGS } from './timelineConfig'
 
 const ControlLabel = ({ children }) => (
@@ -37,6 +37,12 @@ const TimelineToolbar = memo(function TimelineToolbar({
   onChangeViewMode,
   onSearchChange,
   onChangeZoom,
+  customRangeStart = '',
+  customRangeEnd = '',
+  isCustomRange = false,
+  onChangeCustomRangeStart,
+  onChangeCustomRangeEnd,
+  onApplyCustomRange,
   onShiftRange,
   onResetToToday,
   onExpandAll,
@@ -205,7 +211,7 @@ const TimelineToolbar = memo(function TimelineToolbar({
 
             <div className="flex flex-col gap-1.5">
               <ControlLabel>Time</ControlLabel>
-              <div className="flex items-center gap-1 p-1 rounded-xl" style={{ background: 'rgba(255,255,255,0.04)' }}>
+              <div className="flex items-center gap-1 p-1 rounded-xl flex-wrap" style={{ background: 'rgba(255,255,255,0.04)' }}>
                 {Object.values(ZOOM_CONFIGS).map((cfg) => (
                   <button
                     key={cfg.id}
@@ -218,6 +224,38 @@ const TimelineToolbar = memo(function TimelineToolbar({
                     {cfg.label}
                   </button>
                 ))}
+              </div>
+              <div className="grid grid-cols-[1fr_1fr_auto] gap-2">
+                <label className="relative">
+                  <CalendarRange
+                    size={12}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
+                    style={{ color: 'var(--text-secondary)' }}
+                  />
+                  <input
+                    type="date"
+                    value={customRangeStart}
+                    onChange={(event) => onChangeCustomRangeStart?.(event.target.value)}
+                    className="w-full rounded-xl pl-8 pr-3 py-2 text-xs"
+                    style={selectStyle}
+                  />
+                </label>
+                <input
+                  type="date"
+                  value={customRangeEnd}
+                  onChange={(event) => onChangeCustomRangeEnd?.(event.target.value)}
+                  className="w-full rounded-xl px-3 py-2 text-xs"
+                  style={selectStyle}
+                />
+                <button
+                  onClick={onApplyCustomRange}
+                  className="px-3 py-2 rounded-xl text-xs font-medium"
+                  style={isCustomRange
+                    ? { background: 'rgba(var(--accent-rgb),0.16)', color: 'var(--accent)', border: '1px solid rgba(var(--accent-rgb),0.34)' }
+                    : { background: 'rgba(255,255,255,0.04)', color: 'var(--text-secondary)', border: '1px solid rgba(255,255,255,0.1)' }}
+                >
+                  Apply
+                </button>
               </div>
             </div>
           </div>

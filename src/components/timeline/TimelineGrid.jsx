@@ -119,7 +119,7 @@ const TimelineGrid = memo(function TimelineGrid({
   }, [days, startDate, cellWidth])
 
   return (
-    <div className="flex-1 overflow-auto" style={{ scrollbarWidth: 'thin' }}>
+    <div className="overflow-x-auto overflow-y-visible min-h-[360px]" style={{ scrollbarWidth: 'thin' }}>
       <div style={{ minWidth: LEFT_COLUMN_WIDTH + days * cellWidth }}>
         <TimelineHeader
           startDate={startDate}

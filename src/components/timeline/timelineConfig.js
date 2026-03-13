@@ -2,6 +2,7 @@ export const ZOOM_CONFIGS = {
   week: { id: 'week', label: '2 Weeks', days: 14, cellWidth: 56 },
   month: { id: 'month', label: '2 Months', days: 56, cellWidth: 24 },
   quarter: { id: 'quarter', label: 'Quarter', days: 112, cellWidth: 14 },
+  custom: { id: 'custom', label: 'Custom', days: 30, cellWidth: 24 },
 }
 
 export const TIMELINE_VIEW_MODES = {
@@ -49,4 +50,5 @@ export const DEFAULT_OFFSET_BY_ZOOM = {
   week: -3,
   month: -14,
   quarter: -28,
+  custom: -14,
 }

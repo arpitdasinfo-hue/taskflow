@@ -155,11 +155,18 @@ const ManagerGantt = ({ programs, projects, tasks, milestones }) => {
     zoom,
     config,
     startDate,
+    endDate,
     rangeLabel,
+    isCustomRange,
+    customRangeStart,
+    customRangeEnd,
     changeZoom,
     shiftRange,
     resetToToday,
+    applyCustomRange,
   } = useTimelineScale({ initialZoom: 'month' })
+  const [customStartInput, setCustomStartInput] = useState('')
+  const [customEndInput, setCustomEndInput] = useState('')
 
   const { rows, stats } = useTimelineRows({
     programs,
@@ -183,6 +190,16 @@ const ManagerGantt = ({ programs, projects, tasks, milestones }) => {
     ? projects.filter((project) => project.parentId === selectedProjectId)
     : projects.filter((project) => project.parentId && (!selectedProgramId || project.programId === selectedProgramId))
   const selectedSubProjectId = [...filteredSubProjectIds][0] ?? ''
+
+  useEffect(() => {
+    if (isCustomRange) {
+      setCustomStartInput(customRangeStart)
+      setCustomEndInput(customRangeEnd)
+    } else if (!customStartInput && !customEndInput) {
+      setCustomStartInput(startDate.toISOString().slice(0, 10))
+      setCustomEndInput(endDate.toISOString().slice(0, 10))
+    }
+  }, [isCustomRange, customRangeStart, customRangeEnd, startDate, endDate, customStartInput, customEndInput])
 
   useEffect(() => {
     if (!selectedProjectId) return
@@ -290,6 +307,11 @@ const ManagerGantt = ({ programs, projects, tasks, milestones }) => {
     Number(onlyDependencyRisk) +
     Number(!showDependencies)
 
+  const applyCustomTimelineRange = () => {
+    const didApply = applyCustomRange(customStartInput, customEndInput)
+    if (!didApply) return
+  }
+
   return (
     <div className="space-y-2.5">
       <TimelineToolbar
@@ -304,6 +326,9 @@ const ManagerGantt = ({ programs, projects, tasks, milestones }) => {
         visibleSubProjects={visibleSubProjects}
         viewMode={viewMode}
         searchQuery={searchQuery}
+        isCustomRange={isCustomRange}
+        customRangeStart={customStartInput}
+        customRangeEnd={customEndInput}
         visibleCounts={visibleCounts}
         expandableProjectCount={expandableProjectIds.length}
         activeFilterCount={activeFilterCount}
@@ -315,6 +340,9 @@ const ManagerGantt = ({ programs, projects, tasks, milestones }) => {
         onChangeViewMode={applyViewMode}
         onSearchChange={setSearchQuery}
         onChangeZoom={changeZoom}
+        onChangeCustomRangeStart={setCustomStartInput}
+        onChangeCustomRangeEnd={setCustomEndInput}
+        onApplyCustomRange={applyCustomTimelineRange}
         onShiftRange={shiftRange}
         onResetToToday={resetToToday}
         onExpandAll={() => setExpandedProjectIds(new Set(expandableProjectIds))}
