@@ -4,7 +4,6 @@ import {
   BarChart3,
   CalendarClock,
   ExternalLink,
-  Filter,
   FolderKanban,
   Lock,
   ShieldCheck,
@@ -185,6 +184,84 @@ const SectionTab = ({ active, icon: Icon, label, onClick }) => (
       </div>
     </div>
   </button>
+)
+
+const ScopeFilterBar = ({
+  activeSectionMeta,
+  selectedProgramId,
+  selectedProjectId,
+  selectedSubProjectId,
+  programs,
+  visibleTopProjects,
+  visibleSubProjects,
+  projectById,
+  onChangeProgram,
+  onChangeProject,
+  onChangeSubProject,
+  onClear,
+}) => (
+  <GlassCard padding="p-4">
+    <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+      <div className="min-w-0">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>
+          {activeSectionMeta?.label || 'Overview'} Scope
+        </p>
+        <p className="mt-2 text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+          {activeSectionMeta?.meta || 'Scope this dashboard to the program or project you want to review.'}
+        </p>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <select
+          value={selectedProgramId}
+          onChange={(event) => onChangeProgram(event.target.value)}
+          className="text-xs px-3 py-2 rounded-xl min-w-[160px]"
+          style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-primary)' }}
+        >
+          <option value="">All programs</option>
+          {programs.map((program) => (
+            <option key={program.id} value={program.id}>{program.name}</option>
+          ))}
+        </select>
+
+        <select
+          value={selectedProjectId}
+          onChange={(event) => onChangeProject(event.target.value)}
+          className="text-xs px-3 py-2 rounded-xl min-w-[170px]"
+          style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-primary)' }}
+        >
+          <option value="">All projects</option>
+          {visibleTopProjects.map((project) => (
+            <option key={project.id} value={project.id}>{project.name}</option>
+          ))}
+        </select>
+
+        <select
+          value={selectedSubProjectId}
+          onChange={(event) => onChangeSubProject(event.target.value)}
+          className="text-xs px-3 py-2 rounded-xl min-w-[180px]"
+          style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-primary)' }}
+        >
+          <option value="">All sub-projects</option>
+          {visibleSubProjects.map((project) => {
+            const parent = project.parentId ? projectById.get(project.parentId) : null
+            const label = parent ? `${parent.name} / ${project.name}` : project.name
+            return (
+              <option key={project.id} value={project.id}>{label}</option>
+            )
+          })}
+        </select>
+
+        <button
+          onClick={onClear}
+          className="px-3 py-2 rounded-xl text-xs"
+          style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)', border: '1px solid rgba(255,255,255,0.1)' }}
+        >
+          Clear
+        </button>
+      </div>
+    </div>
+  </GlassCard>
 )
 
 const ManagerGantt = ({ programs, projects, tasks, milestones }) => {
@@ -384,6 +461,7 @@ const ManagerGantt = ({ programs, projects, tasks, milestones }) => {
         filterPanelOpen={showFilterPanel}
         readOnly
         compact
+        hideScopeControls
         onChangeProgram={setProgramScope}
         onChangeProject={setProjectScope}
         onChangeSubProject={setSubProjectScope}
@@ -1037,118 +1115,28 @@ export default function ShareView({ token }) {
               </div>
             </GlassCard>
 
-            <div className="grid grid-cols-1 xl:grid-cols-[280px_minmax(0,1fr)] gap-4 items-start">
-              <div className="space-y-4 xl:sticky xl:top-6 self-start">
-                <GlassCard padding="p-4">
-                  <div className="flex items-center justify-between gap-2 mb-3">
-                    <div className="flex items-center gap-2">
-                      <div
-                        className="w-8 h-8 rounded-2xl flex items-center justify-center"
-                        style={{ background: 'rgba(var(--accent-rgb),0.1)', border: '1px solid rgba(var(--accent-rgb),0.18)' }}
-                      >
-                        <Filter size={14} style={{ color: 'var(--accent)' }} />
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Scope Filters</p>
-                        <p className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>Narrow the dashboard to a program, project, or sub-project.</p>
-                      </div>
-                    </div>
-                    <button
-                      onClick={clearScopeFilters}
-                      className="px-2.5 py-1.5 rounded-xl text-[11px]"
-                      style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)', border: '1px solid rgba(255,255,255,0.1)' }}
-                    >
-                      Clear
-                    </button>
-                  </div>
-
-                  <div className="space-y-3">
-                    <div>
-                      <p className="text-[10px] mb-1 uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>Program</p>
-                      <select
-                        value={selectedProgramId}
-                        onChange={(event) => {
-                          setSelectedProgramId(event.target.value)
-                          setSelectedProjectId('')
-                          setSelectedSubProjectId('')
-                        }}
-                        className="w-full px-3 py-2.5 rounded-xl text-xs"
-                        style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-primary)' }}
-                      >
-                        <option value="">All programs</option>
-                        {programs.map((program) => (
-                          <option key={program.id} value={program.id}>{program.name}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <p className="text-[10px] mb-1 uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>Project</p>
-                      <select
-                        value={selectedProjectId}
-                        onChange={(event) => {
-                          setSelectedProjectId(event.target.value)
-                          setSelectedSubProjectId('')
-                        }}
-                        className="w-full px-3 py-2.5 rounded-xl text-xs"
-                        style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-primary)' }}
-                      >
-                        <option value="">All projects</option>
-                        {visibleTopProjects.map((project) => (
-                          <option key={project.id} value={project.id}>{project.name}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <p className="text-[10px] mb-1 uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>Sub-project</p>
-                      <select
-                        value={selectedSubProjectId}
-                        onChange={(event) => setSelectedSubProjectId(event.target.value)}
-                        className="w-full px-3 py-2.5 rounded-xl text-xs"
-                        style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-primary)' }}
-                      >
-                        <option value="">All sub-projects</option>
-                        {visibleSubProjects.map((project) => (
-                          <option key={project.id} value={project.id}>{project.name}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                </GlassCard>
-
-                <GlassCard padding="p-4">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>
-                    Active View
-                  </p>
-                  <p className="mt-2 text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-                    {activeSectionMeta?.label || 'Overview'}
-                  </p>
-                  <p className="mt-1 text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-                    {activeSectionMeta?.meta}
-                  </p>
-                  <div className="mt-3 flex gap-2 flex-wrap">
-                    {selectedProgramId && (
-                      <span className="px-2.5 py-1 rounded-full text-[11px]" style={{ background: 'rgba(var(--accent-rgb),0.12)', color: 'var(--accent)' }}>
-                        {programById.get(selectedProgramId)?.name || 'Program'}
-                      </span>
-                    )}
-                    {selectedProjectId && (
-                      <span className="px-2.5 py-1 rounded-full text-[11px]" style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--text-secondary)' }}>
-                        {projectById.get(selectedProjectId)?.name || 'Project'}
-                      </span>
-                    )}
-                    {selectedSubProjectId && (
-                      <span className="px-2.5 py-1 rounded-full text-[11px]" style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--text-secondary)' }}>
-                        {projectById.get(selectedSubProjectId)?.name || 'Sub-project'}
-                      </span>
-                    )}
-                    {!selectedProgramId && !selectedProjectId && !selectedSubProjectId && (
-                      <span className="px-2.5 py-1 rounded-full text-[11px]" style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--text-secondary)' }}>
-                        Entire scope
-                      </span>
-                    )}
-                  </div>
-                </GlassCard>
-              </div>
+            <div className="space-y-4 min-w-0">
+              <ScopeFilterBar
+                activeSectionMeta={activeSectionMeta}
+                selectedProgramId={selectedProgramId}
+                selectedProjectId={selectedProjectId}
+                selectedSubProjectId={selectedSubProjectId}
+                programs={programs}
+                visibleTopProjects={visibleTopProjects}
+                visibleSubProjects={visibleSubProjects}
+                projectById={projectById}
+                onChangeProgram={(value) => {
+                  setSelectedProgramId(value)
+                  setSelectedProjectId('')
+                  setSelectedSubProjectId('')
+                }}
+                onChangeProject={(value) => {
+                  setSelectedProjectId(value)
+                  setSelectedSubProjectId('')
+                }}
+                onChangeSubProject={setSelectedSubProjectId}
+                onClear={clearScopeFilters}
+              />
 
               <div className="space-y-4 min-w-0">
                 {activeSection === 'overview' && (
@@ -1419,32 +1407,40 @@ export default function ShareView({ token }) {
                     {filteredMilestones.length === 0 ? (
                       <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>No milestones available in this scope.</p>
                     ) : (
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-xs min-w-[520px]">
-                          <thead>
-                            <tr style={{ color: 'var(--text-secondary)' }}>
-                              <th className="text-left py-2">Milestone</th>
-                              <th className="text-left py-2">Project</th>
-                              <th className="text-left py-2">Due Date</th>
-                              <th className="text-left py-2">Status</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {filteredMilestones.map((milestone) => {
-                              const project = milestone.projectId ? projectById.get(milestone.projectId) : null
-                              return (
-                                <tr key={milestone.id} style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-                                  <td className="py-2.5" style={{ color: 'var(--text-primary)' }}>{milestone.name}</td>
-                                  <td className="py-2.5" style={{ color: 'var(--text-secondary)' }}>{project?.name || '—'}</td>
-                                  <td className="py-2.5" style={{ color: 'var(--text-secondary)' }}>{fmtDate(milestone.dueDate)}</td>
-                                  <td className="py-2.5" style={{ color: milestone.completed ? '#10b981' : '#f59e0b' }}>
-                                    {milestone.completed ? 'Completed' : milestone.status}
-                                  </td>
-                                </tr>
-                              )
-                            })}
-                          </tbody>
-                        </table>
+                      <div className="space-y-4">
+                        <MilestoneTimeline
+                          milestones={milestoneTimelineItems}
+                          compact
+                          emptyLabel="No milestone dates in this shared scope."
+                        />
+
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-xs min-w-[520px]">
+                            <thead>
+                              <tr style={{ color: 'var(--text-secondary)' }}>
+                                <th className="text-left py-2">Milestone</th>
+                                <th className="text-left py-2">Project</th>
+                                <th className="text-left py-2">Due Date</th>
+                                <th className="text-left py-2">Status</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {filteredMilestones.map((milestone) => {
+                                const project = milestone.projectId ? projectById.get(milestone.projectId) : null
+                                return (
+                                  <tr key={milestone.id} style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                                    <td className="py-2.5" style={{ color: 'var(--text-primary)' }}>{milestone.name}</td>
+                                    <td className="py-2.5" style={{ color: 'var(--text-secondary)' }}>{project?.name || '—'}</td>
+                                    <td className="py-2.5" style={{ color: 'var(--text-secondary)' }}>{fmtDate(milestone.dueDate)}</td>
+                                    <td className="py-2.5" style={{ color: milestone.completed ? '#10b981' : '#f59e0b' }}>
+                                      {milestone.completed ? 'Completed' : milestone.status}
+                                    </td>
+                                  </tr>
+                                )
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
                       </div>
                     )}
                   </Section>

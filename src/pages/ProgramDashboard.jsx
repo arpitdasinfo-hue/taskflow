@@ -1,4 +1,4 @@
-import { memo, useMemo } from 'react'
+import { memo, useEffect, useMemo, useState } from 'react'
 import { BarChart3, CheckCircle2, Clock, AlertTriangle, TrendingUp, CalendarClock, ArrowRight } from 'lucide-react'
 import Header from '../components/layout/Header'
 import { ProgramStatusBadge, ProgramHealthBadge } from '../components/common/ProgramStatusBadge'
@@ -132,15 +132,7 @@ const ProgramCard = memo(function ProgramCard({ program, stats }) {
 })
 
 // ── Overall summary ───────────────────────────────────────────────────────────
-const OverallSummary = memo(function OverallSummary({ allStats, programs }) {
-  const total    = Object.values(allStats).reduce((s, st) => s + st.total, 0)
-  const done     = Object.values(allStats).reduce((s, st) => s + st.done, 0)
-  const overdue  = Object.values(allStats).reduce((s, st) => s + st.overdue, 0)
-  const completion = total ? Math.round((done / total) * 100) : 0
-
-  const atRisk    = programs.filter((p) => allStats[p.id]?.health === 'at-risk').length
-  const offTrack  = programs.filter((p) => allStats[p.id]?.health === 'off-track').length
-
+const OverallSummary = memo(function OverallSummary({ summary }) {
   return (
     <div className="rounded-2xl p-5 mb-6"
       style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(var(--accent-rgb),0.15)' }}>
@@ -154,21 +146,21 @@ const OverallSummary = memo(function OverallSummary({ allStats, programs }) {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
         <div>
           <p className="text-[10px] font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>Total Tasks</p>
-          <p className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>{total}</p>
+          <p className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>{summary.total}</p>
         </div>
         <div>
           <p className="text-[10px] font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>Completed</p>
-          <p className="text-2xl font-bold" style={{ color: '#10b981' }}>{done}</p>
+          <p className="text-2xl font-bold" style={{ color: '#10b981' }}>{summary.done}</p>
         </div>
         <div>
           <p className="text-[10px] font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>Overdue</p>
-          <p className="text-2xl font-bold" style={{ color: overdue > 0 ? '#ef4444' : 'var(--text-secondary)' }}>{overdue}</p>
+          <p className="text-2xl font-bold" style={{ color: summary.overdue > 0 ? '#ef4444' : 'var(--text-secondary)' }}>{summary.overdue}</p>
         </div>
         <div>
           <p className="text-[10px] font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>Portfolio Health</p>
           <p className="text-sm font-semibold mt-1"
-            style={{ color: offTrack > 0 ? '#ef4444' : atRisk > 0 ? '#f59e0b' : '#10b981' }}>
-            {offTrack > 0 ? `${offTrack} off-track` : atRisk > 0 ? `${atRisk} at-risk` : 'On track'}
+            style={{ color: summary.offTrack > 0 ? '#ef4444' : summary.atRisk > 0 ? '#f59e0b' : '#10b981' }}>
+            {summary.offTrack > 0 ? `${summary.offTrack} off-track` : summary.atRisk > 0 ? `${summary.atRisk} at-risk` : 'On track'}
           </p>
         </div>
       </div>
@@ -176,11 +168,11 @@ const OverallSummary = memo(function OverallSummary({ allStats, programs }) {
       <div>
         <div className="flex justify-between text-[10px] mb-1.5" style={{ color: 'var(--text-secondary)' }}>
           <span>Portfolio Completion</span>
-          <span style={{ color: 'var(--accent)', fontWeight: 600 }}>{completion}%</span>
+          <span style={{ color: 'var(--accent)', fontWeight: 600 }}>{summary.completion}%</span>
         </div>
         <div className="h-2 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.07)' }}>
           <div className="h-full rounded-full transition-all duration-700"
-            style={{ width: `${completion}%`, background: 'linear-gradient(90deg, var(--accent-dark), var(--accent))' }} />
+            style={{ width: `${summary.completion}%`, background: 'linear-gradient(90deg, var(--accent-dark), var(--accent))' }} />
         </div>
       </div>
     </div>
@@ -196,18 +188,97 @@ const ProgramDashboard = memo(function ProgramDashboard() {
   const setPage   = useSettingsStore((s) => s.setPage)
   const setGanttConfig = useSettingsStore((s) => s.setGanttConfig)
   const allStats  = useAllProgramStats()
+  const [selectedProgramId, setSelectedProgramId] = useState('')
+  const [selectedProjectId, setSelectedProjectId] = useState('')
   const insights  = useTimelineIntelligence({
     programs,
     projects,
     tasks,
-    filteredProgramIds: new Set(),
-    filteredProjectIds: new Set(),
+    filteredProgramIds: new Set(selectedProgramId ? [selectedProgramId] : []),
+    filteredProjectIds: new Set(selectedProjectId ? [selectedProjectId] : []),
     filteredSubProjectIds: new Set(),
   })
   const projectById = useMemo(() => new Map(projects.map((project) => [project.id, project])), [projects])
+  const visibleProjects = useMemo(
+    () => selectedProgramId ? projects.filter((project) => project.programId === selectedProgramId) : projects,
+    [projects, selectedProgramId]
+  )
+
+  useEffect(() => {
+    if (!selectedProgramId) return
+    if (!programs.some((program) => program.id === selectedProgramId)) {
+      setSelectedProgramId('')
+      setSelectedProjectId('')
+    }
+  }, [selectedProgramId, programs])
+
+  useEffect(() => {
+    if (!selectedProjectId) return
+    if (!visibleProjects.some((project) => project.id === selectedProjectId)) {
+      setSelectedProjectId('')
+    }
+  }, [selectedProjectId, visibleProjects])
+
+  const scopedProjects = useMemo(() => {
+    let scoped = projects
+    if (selectedProgramId) scoped = scoped.filter((project) => project.programId === selectedProgramId)
+    if (!selectedProjectId) return scoped
+
+    const selected = scoped.find((project) => project.id === selectedProjectId)
+    if (!selected) return []
+
+    const scopedIds = new Set([selected.id])
+    if (!selected.parentId) {
+      scoped.filter((project) => project.parentId === selected.id).forEach((project) => scopedIds.add(project.id))
+    } else {
+      scopedIds.add(selected.parentId)
+    }
+    return scoped.filter((project) => scopedIds.has(project.id))
+  }, [projects, selectedProgramId, selectedProjectId])
+
+  const scopedProgramIds = useMemo(
+    () => new Set(scopedProjects.map((project) => project.programId).filter(Boolean)),
+    [scopedProjects]
+  )
+
+  const scopedPrograms = useMemo(() => {
+    if (selectedProgramId) return programs.filter((program) => program.id === selectedProgramId)
+    if (!selectedProjectId) return programs
+    return programs.filter((program) => scopedProgramIds.has(program.id))
+  }, [programs, scopedProgramIds, selectedProgramId, selectedProjectId])
+
+  const scopedProjectIds = useMemo(() => new Set(scopedProjects.map((project) => project.id)), [scopedProjects])
+
+  const scopedTasks = useMemo(() => {
+    if (selectedProjectId) {
+      return tasks.filter((task) => task.projectId && scopedProjectIds.has(task.projectId))
+    }
+    if (selectedProgramId) {
+      return tasks.filter((task) => {
+        const taskProgramId = task.programId ?? (task.projectId ? projectById.get(task.projectId)?.programId : null)
+        return taskProgramId === selectedProgramId
+      })
+    }
+    return tasks
+  }, [tasks, selectedProgramId, selectedProjectId, scopedProjectIds, projectById])
+
+  const scopedMilestones = useMemo(
+    () => milestones.filter((milestone) => milestone.projectId && scopedProjectIds.has(milestone.projectId)),
+    [milestones, scopedProjectIds]
+  )
+
+  const summary = useMemo(() => {
+    const total = scopedTasks.length
+    const done = scopedTasks.filter((task) => task.status === 'done').length
+    const overdue = scopedTasks.filter((task) => task.dueDate && new Date(task.dueDate) < new Date() && task.status !== 'done').length
+    const completion = total ? Math.round((done / total) * 100) : 0
+    const atRisk = scopedPrograms.filter((program) => allStats[program.id]?.health === 'at-risk').length
+    const offTrack = scopedPrograms.filter((program) => allStats[program.id]?.health === 'off-track').length
+    return { total, done, overdue, completion, atRisk, offTrack }
+  }, [scopedTasks, scopedPrograms, allStats])
 
   const milestoneTimelineItems = useMemo(
-    () => milestones
+    () => scopedMilestones
       .filter((milestone) => milestone.dueDate)
       .map((milestone) => {
         const project = milestone.projectId ? projectById.get(milestone.projectId) : null
@@ -221,7 +292,39 @@ const ProgramDashboard = memo(function ProgramDashboard() {
           context: project ? `${program?.name ? `${program.name} · ` : ''}${project.name}` : program?.name || 'Unassigned',
         }
       }),
-    [milestones, projectById, programs]
+    [scopedMilestones, projectById, programs]
+  )
+
+  const scopedProgramCards = useMemo(
+    () => scopedPrograms.map((program) => {
+      const programProjects = scopedProjects.filter((project) => project.programId === program.id)
+      const programProjectIds = new Set(programProjects.map((project) => project.id))
+      const programTasks = scopedTasks.filter((task) => {
+        const taskProgramId = task.programId ?? (task.projectId ? projectById.get(task.projectId)?.programId : null)
+        return taskProgramId === program.id && (!task.projectId || programProjectIds.has(task.projectId))
+      })
+      const programMilestones = scopedMilestones.filter((milestone) => milestone.projectId && programProjectIds.has(milestone.projectId))
+      const done = programTasks.filter((task) => task.status === 'done').length
+      return {
+        program,
+        stats: {
+          total: programTasks.length,
+          done,
+          inProgress: programTasks.filter((task) => task.status === 'in-progress').length,
+          blocked: programTasks.filter((task) => task.status === 'blocked').length,
+          overdue: programTasks.filter((task) => task.dueDate && new Date(task.dueDate) < new Date() && task.status !== 'done').length,
+          critical: programTasks.filter((task) => task.priority === 'critical').length,
+          completion: programTasks.length ? Math.round((done / programTasks.length) * 100) : 0,
+          projectCount: programProjects.filter((project) => !project.parentId).length,
+          health: allStats[program.id]?.health ?? 'on-track',
+          upcomingMilestones: programMilestones
+            .filter((milestone) => milestone.status !== 'completed' && milestone.dueDate)
+            .sort((left, right) => new Date(left.dueDate) - new Date(right.dueDate))
+            .slice(0, 3),
+        },
+      }
+    }),
+    [scopedPrograms, scopedProjects, scopedTasks, scopedMilestones, projectById, allStats]
   )
 
   return (
@@ -241,7 +344,55 @@ const ProgramDashboard = memo(function ProgramDashboard() {
           </div>
         ) : (
           <>
-            <OverallSummary allStats={allStats} programs={programs} />
+            <div className="flex items-start justify-between gap-4 mb-4 flex-wrap">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>
+                  Analytics Scope
+                </p>
+                <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>
+                  Filter portfolio analytics by program or project.
+                </p>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <select
+                  value={selectedProgramId}
+                  onChange={(event) => {
+                    setSelectedProgramId(event.target.value)
+                    setSelectedProjectId('')
+                  }}
+                  className="text-xs px-3 py-2 rounded-xl min-w-[160px]"
+                  style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-primary)' }}
+                >
+                  <option value="">All programs</option>
+                  {programs.map((program) => (
+                    <option key={program.id} value={program.id}>{program.name}</option>
+                  ))}
+                </select>
+                <select
+                  value={selectedProjectId}
+                  onChange={(event) => {
+                    const nextProjectId = event.target.value
+                    setSelectedProjectId(nextProjectId)
+                    if (!nextProjectId) return
+                    const project = projectById.get(nextProjectId)
+                    if (project?.programId && project.programId !== selectedProgramId) {
+                      setSelectedProgramId(project.programId)
+                    }
+                  }}
+                  className="text-xs px-3 py-2 rounded-xl min-w-[180px]"
+                  style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-primary)' }}
+                >
+                  <option value="">All projects</option>
+                  {visibleProjects.map((project) => {
+                    const parent = project.parentId ? projectById.get(project.parentId) : null
+                    const label = parent ? `${parent.name} / ${project.name}` : project.name
+                    return <option key={project.id} value={project.id}>{label}</option>
+                  })}
+                </select>
+              </div>
+            </div>
+
+            <OverallSummary summary={summary} />
 
             <GlassCard padding="p-5">
               <div className="flex items-center gap-2 mb-4">
@@ -259,11 +410,11 @@ const ProgramDashboard = memo(function ProgramDashboard() {
             </GlassCard>
 
             <div className="grid gap-4 md:grid-cols-2">
-              {programs.map((program) => (
+              {scopedProgramCards.map(({ program, stats }) => (
                 <ProgramCard
                   key={program.id}
                   program={program}
-                  stats={allStats[program.id] || { total: 0, done: 0, inProgress: 0, blocked: 0, overdue: 0, critical: 0, completion: 0, projectCount: 0, health: 'on-track', upcomingMilestones: [] }}
+                  stats={stats}
                 />
               ))}
             </div>

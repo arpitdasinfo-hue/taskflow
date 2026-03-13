@@ -66,6 +66,7 @@ const TimelineToolbar = memo(function TimelineToolbar({
   expandableProjectCount = 0,
   readOnly = false,
   compact = false,
+  hideScopeControls = false,
   isCustomRange = false,
   customRangeStart = '',
   customRangeEnd = '',
@@ -190,7 +191,7 @@ const TimelineToolbar = memo(function TimelineToolbar({
         </div>
 
         <div className={scopeActionsClass}>
-          <div className={searchScopeLayoutClass}>
+          <div className={hideScopeControls ? 'grid grid-cols-1 gap-2' : searchScopeLayoutClass}>
             <label className={searchFieldClass}>
               <Search
                 size={14}
@@ -210,51 +211,55 @@ const TimelineToolbar = memo(function TimelineToolbar({
               />
             </label>
 
-            <label className="flex flex-col gap-1.5">
-              <ControlLabel compact={compact}>Program</ControlLabel>
-              <select
-                value={selectedProgramId}
-                onChange={(event) => onChangeProgram(event.target.value)}
-                className={selectClass}
-                style={selectStyle}
-              >
-                <option value="">All programs</option>
-                {visiblePrograms.map((program) => (
-                  <option key={program.id} value={program.id}>{program.name}</option>
-                ))}
-              </select>
-            </label>
+            {!hideScopeControls && (
+              <>
+                <label className="flex flex-col gap-1.5">
+                  <ControlLabel compact={compact}>Program</ControlLabel>
+                  <select
+                    value={selectedProgramId}
+                    onChange={(event) => onChangeProgram(event.target.value)}
+                    className={selectClass}
+                    style={selectStyle}
+                  >
+                    <option value="">All programs</option>
+                    {visiblePrograms.map((program) => (
+                      <option key={program.id} value={program.id}>{program.name}</option>
+                    ))}
+                  </select>
+                </label>
 
-            <label className="flex flex-col gap-1.5">
-              <ControlLabel compact={compact}>Project</ControlLabel>
-              <select
-                value={selectedProjectId}
-                onChange={(event) => onChangeProject(event.target.value)}
-                className={selectClass}
-                style={selectStyle}
-              >
-                <option value="">All projects</option>
-                {visibleProjects.map((project) => (
-                  <option key={project.id} value={project.id}>{project.name}</option>
-                ))}
-              </select>
-            </label>
+                <label className="flex flex-col gap-1.5">
+                  <ControlLabel compact={compact}>Project</ControlLabel>
+                  <select
+                    value={selectedProjectId}
+                    onChange={(event) => onChangeProject(event.target.value)}
+                    className={selectClass}
+                    style={selectStyle}
+                  >
+                    <option value="">All projects</option>
+                    {visibleProjects.map((project) => (
+                      <option key={project.id} value={project.id}>{project.name}</option>
+                    ))}
+                  </select>
+                </label>
 
-            <label className="flex flex-col gap-1.5">
-              <ControlLabel compact={compact}>Sub-project</ControlLabel>
-              <select
-                value={selectedSubProjectId}
-                onChange={(event) => onChangeSubProject(event.target.value)}
-                className={selectClass}
-                style={selectStyle}
-                disabled={visibleSubProjects.length === 0}
-              >
-                <option value="">All sub-projects</option>
-                {visibleSubProjects.map((project) => (
-                  <option key={project.id} value={project.id}>{project.name}</option>
-                ))}
-              </select>
-            </label>
+                <label className="flex flex-col gap-1.5">
+                  <ControlLabel compact={compact}>Sub-project</ControlLabel>
+                  <select
+                    value={selectedSubProjectId}
+                    onChange={(event) => onChangeSubProject(event.target.value)}
+                    className={selectClass}
+                    style={selectStyle}
+                    disabled={visibleSubProjects.length === 0}
+                  >
+                    <option value="">All sub-projects</option>
+                    {visibleSubProjects.map((project) => (
+                      <option key={project.id} value={project.id}>{project.name}</option>
+                    ))}
+                  </select>
+                </label>
+              </>
+            )}
           </div>
 
           <div className={actionLayoutClass}>
