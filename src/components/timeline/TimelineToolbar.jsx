@@ -1,5 +1,5 @@
 import { memo } from 'react'
-import { ChevronLeft, ChevronRight, Filter, Target } from 'lucide-react'
+import { ChevronDownSquare, ChevronLeft, ChevronRight, ChevronUpSquare, Filter, Search, Target } from 'lucide-react'
 import { TIMELINE_VIEW_MODES, ZOOM_CONFIGS } from './timelineConfig'
 
 const ControlLabel = ({ children }) => (
@@ -27,14 +27,20 @@ const TimelineToolbar = memo(function TimelineToolbar({
   viewMode,
   activeFilterCount,
   filterPanelOpen,
+  searchQuery = '',
+  visibleCounts = { programs: 0, projects: 0, tasks: 0 },
+  expandableProjectCount = 0,
   readOnly = false,
   onChangeProgram,
   onChangeProject,
   onChangeSubProject,
   onChangeViewMode,
+  onSearchChange,
   onChangeZoom,
   onShiftRange,
   onResetToToday,
+  onExpandAll,
+  onCollapseAll,
   onToggleFilterPanel,
 }) {
   const currentView = TIMELINE_VIEW_MODES[viewMode] ?? TIMELINE_VIEW_MODES.roadmap
@@ -63,6 +69,15 @@ const TimelineToolbar = memo(function TimelineToolbar({
           </div>
 
           <div className="flex items-center gap-1.5 text-[11px] flex-wrap">
+            <span className="px-2.5 py-1 rounded-full" style={{ background: 'rgba(var(--accent-rgb),0.08)', color: 'var(--accent)' }}>
+              {visibleCounts.programs} programs
+            </span>
+            <span className="px-2.5 py-1 rounded-full" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)' }}>
+              {visibleCounts.projects} projects
+            </span>
+            <span className="px-2.5 py-1 rounded-full" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)' }}>
+              {visibleCounts.tasks} tasks
+            </span>
             <span className="px-2.5 py-1 rounded-full" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)' }}>
               {stats.scheduledCount} scheduled
             </span>
@@ -75,6 +90,48 @@ const TimelineToolbar = memo(function TimelineToolbar({
             <span className="px-2.5 py-1 rounded-full" style={{ background: 'rgba(239,68,68,0.15)', color: '#f87171' }}>
               {stats.criticalCount} critical
             </span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_auto] gap-3 mb-3">
+          <label className="relative block">
+            <Search
+              size={14}
+              className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
+              style={{ color: 'var(--text-secondary)' }}
+            />
+            <input
+              value={searchQuery}
+              onChange={(event) => onSearchChange?.(event.target.value)}
+              placeholder="Search programs, projects, tasks, or schedule notes"
+              className="w-full rounded-2xl pl-10 pr-4 py-2.5 text-sm outline-none"
+              style={{
+                background: 'rgba(255,255,255,0.04)',
+                border: '1px solid rgba(255,255,255,0.09)',
+                color: 'var(--text-primary)',
+              }}
+            />
+          </label>
+
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={onExpandAll}
+              disabled={expandableProjectCount === 0}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium disabled:opacity-40"
+              style={{ background: 'rgba(255,255,255,0.04)', color: 'var(--text-secondary)', border: '1px solid rgba(255,255,255,0.08)' }}
+            >
+              <ChevronDownSquare size={13} />
+              Expand all
+            </button>
+            <button
+              onClick={onCollapseAll}
+              disabled={expandableProjectCount === 0}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium disabled:opacity-40"
+              style={{ background: 'rgba(255,255,255,0.04)', color: 'var(--text-secondary)', border: '1px solid rgba(255,255,255,0.08)' }}
+            >
+              <ChevronUpSquare size={13} />
+              Collapse all
+            </button>
           </div>
         </div>
 

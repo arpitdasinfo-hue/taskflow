@@ -1,7 +1,7 @@
-import { memo } from 'react'
+import { memo, useRef, useState } from 'react'
 import { CheckSquare2, ChevronDown, ChevronRight, FolderKanban, GitBranch, Layers3, Link2 } from 'lucide-react'
 import { ROW_HEIGHT, STATUS_COLOR } from './timelineConfig'
-import { clamp, diffDays, startOfDay, toDisplayDate } from './timelineUtils'
+import { addDays, clamp, diffDays, startOfDay, toDisplayDate } from './timelineUtils'
 import TimelineProjectBar from './TimelineProjectBar'
 import TimelineTaskBar from './TimelineTaskBar'
 
@@ -54,13 +54,86 @@ const TimelineRow = memo(function TimelineRow({
   onSelectTask,
   onUpdateTaskSchedule,
   onUpdateProjectSchedule,
+  onCreateTaskInRange,
   readOnly = false,
 }) {
   const height = ROW_HEIGHT[row.type] ?? 36
   const todayOffset = diffDays(startDate, startOfDay(new Date()))
   const isProject = row.type === 'project'
   const isTask = row.type === 'task'
+  const canCreateTask = !readOnly && (row.type === 'program' || row.type === 'project')
   const RowIcon = getRowIcon(row.type)
+  const createSurfaceRef = useRef(null)
+  const createInteractionRef = useRef(null)
+  const [createDraft, setCreateDraft] = useState(null)
+
+  const resolveCreateOffset = (clientX) => {
+    const rect = createSurfaceRef.current?.getBoundingClientRect()
+    if (!rect) return 0
+    return clamp(Math.floor((clientX - rect.left) / cellWidth), 0, days - 1)
+  }
+
+  const beginCreateTask = (event) => {
+    if (!canCreateTask || event.button !== 0 || !createSurfaceRef.current) return
+    event.preventDefault()
+    event.stopPropagation()
+
+    const startOffset = resolveCreateOffset(event.clientX)
+    createInteractionRef.current = { pointerId: event.pointerId, startOffset }
+    setCreateDraft({ startOffset, endOffset: startOffset })
+
+    try {
+      createSurfaceRef.current.setPointerCapture(event.pointerId)
+    } catch {
+      // Safe no-op when pointer capture is unavailable.
+    }
+  }
+
+  const moveCreateTask = (event) => {
+    const interaction = createInteractionRef.current
+    if (!interaction || interaction.pointerId !== event.pointerId) return
+    event.preventDefault()
+    const nextOffset = resolveCreateOffset(event.clientX)
+    setCreateDraft({
+      startOffset: Math.min(interaction.startOffset, nextOffset),
+      endOffset: Math.max(interaction.startOffset, nextOffset),
+    })
+  }
+
+  const finishCreateTask = (event) => {
+    const interaction = createInteractionRef.current
+    if (!interaction || interaction.pointerId !== event.pointerId) return
+    event.preventDefault()
+    event.stopPropagation()
+
+    try {
+      if (createSurfaceRef.current?.hasPointerCapture(event.pointerId)) {
+        createSurfaceRef.current.releasePointerCapture(event.pointerId)
+      }
+    } catch {
+      // Safe no-op if the pointer was already released.
+    }
+
+    const finalDraft = createDraft ?? {
+      startOffset: interaction.startOffset,
+      endOffset: interaction.startOffset,
+    }
+    createInteractionRef.current = null
+    setCreateDraft(null)
+
+    const start = addDays(startOfDay(startDate), finalDraft.startOffset)
+    const end = addDays(startOfDay(startDate), finalDraft.endOffset)
+    onCreateTaskInRange?.({
+      rowType: row.type,
+      rowLabel: row.label,
+      programId: row.programId ?? null,
+      projectId: row.projectId ?? null,
+      startDate: start.toISOString(),
+      dueDate: end.toISOString(),
+    })
+  }
+
+  const showSummaryBadges = !isTask
 
   return (
     <div className="flex" style={{ minHeight: height, borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
@@ -110,8 +183,18 @@ const TimelineRow = memo(function TimelineRow({
           ) : null}
         </div>
 
-        {isProject && (
+        {showSummaryBadges && (
           <div className="flex items-center gap-1 flex-shrink-0">
+            {typeof row.projectCount === 'number' && row.projectCount > 0 && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(var(--accent-rgb),0.12)', color: 'var(--accent)' }}>
+                {row.projectCount} projects
+              </span>
+            )}
+            {typeof row.childProjectCount === 'number' && row.childProjectCount > 0 && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)' }}>
+                {row.childProjectCount} sub-projects
+              </span>
+            )}
             {row.unscheduledCount > 0 && (
               <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(255,255,255,0.08)', color: '#cbd5e1' }}>
                 {row.unscheduledCount} unscheduled
@@ -145,6 +228,19 @@ const TimelineRow = memo(function TimelineRow({
           }}
         />
 
+        {canCreateTask && (
+          <div
+            ref={createSurfaceRef}
+            className="absolute inset-0 z-[1]"
+            onPointerDown={beginCreateTask}
+            onPointerMove={moveCreateTask}
+            onPointerUp={finishCreateTask}
+            onPointerCancel={finishCreateTask}
+            style={{ cursor: 'crosshair' }}
+            title={`Drag on empty space to create a task in ${row.label}`}
+          />
+        )}
+
         {todayOffset >= 0 && todayOffset < days && (
           <div
             className="absolute top-0 bottom-0 z-[2]"
@@ -153,6 +249,22 @@ const TimelineRow = memo(function TimelineRow({
               width: 2,
               background: 'rgba(var(--accent-rgb),0.6)',
               boxShadow: '0 0 16px rgba(var(--accent-rgb),0.24)',
+            }}
+          />
+        )}
+
+        {createDraft && (
+          <div
+            className="absolute rounded-full z-[3]"
+            style={{
+              left: createDraft.startOffset * cellWidth + 1,
+              top: '50%',
+              transform: 'translateY(-50%)',
+              width: Math.max(10, (createDraft.endOffset - createDraft.startOffset + 1) * cellWidth - 2),
+              height: row.type === 'program' ? 18 : 16,
+              background: 'rgba(var(--accent-rgb),0.18)',
+              border: '1px dashed rgba(var(--accent-rgb),0.5)',
+              boxShadow: '0 0 0 1px rgba(var(--accent-rgb),0.18), 0 8px 22px rgba(var(--accent-rgb),0.16)',
             }}
           />
         )}

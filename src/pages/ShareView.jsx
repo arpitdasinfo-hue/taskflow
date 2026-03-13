@@ -144,6 +144,7 @@ const ManagerGantt = ({ programs, projects, tasks, milestones }) => {
   const [filteredSubProjectIds, setFilteredSubProjectIds] = useState(() => new Set())
   const [expandedProjectIds, setExpandedProjectIds] = useState(() => new Set())
   const [viewMode, setViewMode] = useState('roadmap')
+  const [searchQuery, setSearchQuery] = useState('')
   const [onlyDelayed, setOnlyDelayed] = useState(false)
   const [onlyCritical, setOnlyCritical] = useState(false)
   const [onlyDependencyRisk, setOnlyDependencyRisk] = useState(false)
@@ -172,6 +173,7 @@ const ManagerGantt = ({ programs, projects, tasks, milestones }) => {
     onlyDelayed,
     onlyCritical,
     onlyDependencyRisk,
+    searchQuery,
   })
 
   const selectedProgramId = [...filteredProgramIds][0] ?? ''
@@ -226,6 +228,16 @@ const ManagerGantt = ({ programs, projects, tasks, milestones }) => {
     })
   }
 
+  const expandableProjectIds = rows
+    .filter((row) => row.type === 'project' && row.expandable && row.projectId)
+    .map((row) => row.projectId)
+
+  const visibleCounts = {
+    programs: rows.filter((row) => row.type === 'program').length,
+    projects: rows.filter((row) => row.type === 'project').length,
+    tasks: rows.filter((row) => row.type === 'task').length,
+  }
+
   const clearFilters = () => {
     setOnlyDelayed(false)
     setOnlyCritical(false)
@@ -269,7 +281,8 @@ const ManagerGantt = ({ programs, projects, tasks, milestones }) => {
     filteredSubProjectIds.size > 0 ||
     onlyDelayed ||
     onlyCritical ||
-    onlyDependencyRisk
+    onlyDependencyRisk ||
+    searchQuery.trim().length > 0
 
   const activeFilterCount =
     Number(onlyDelayed) +
@@ -290,6 +303,9 @@ const ManagerGantt = ({ programs, projects, tasks, milestones }) => {
         visibleProjects={visibleProjects}
         visibleSubProjects={visibleSubProjects}
         viewMode={viewMode}
+        searchQuery={searchQuery}
+        visibleCounts={visibleCounts}
+        expandableProjectCount={expandableProjectIds.length}
         activeFilterCount={activeFilterCount}
         filterPanelOpen={showFilterPanel}
         readOnly
@@ -297,9 +313,12 @@ const ManagerGantt = ({ programs, projects, tasks, milestones }) => {
         onChangeProject={setProjectScope}
         onChangeSubProject={setSubProjectScope}
         onChangeViewMode={applyViewMode}
+        onSearchChange={setSearchQuery}
         onChangeZoom={changeZoom}
         onShiftRange={shiftRange}
         onResetToToday={resetToToday}
+        onExpandAll={() => setExpandedProjectIds(new Set(expandableProjectIds))}
+        onCollapseAll={() => setExpandedProjectIds(new Set())}
         onToggleFilterPanel={() => setShowFilterPanel((value) => !value)}
       />
 
@@ -309,9 +328,6 @@ const ManagerGantt = ({ programs, projects, tasks, milestones }) => {
           onlyCritical={onlyCritical}
           onlyDependencyRisk={onlyDependencyRisk}
           showDependencies={showDependencies}
-          onToggleProgram={toggleProgram}
-          onToggleProject={toggleProject}
-          onToggleSubProject={toggleSubProject}
           onToggleOnlyDelayed={() => setOnlyDelayed((value) => !value)}
           onToggleOnlyCritical={() => setOnlyCritical((value) => !value)}
           onToggleOnlyDependencyRisk={() => setOnlyDependencyRisk((value) => !value)}

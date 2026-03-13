@@ -5,11 +5,42 @@ import TimelineFilterBar from '../components/timeline/TimelineFilterBar'
 import TimelineLegend from '../components/timeline/TimelineLegend'
 import TimelineGrid from '../components/timeline/TimelineGrid'
 import TimelineEmptyState from '../components/timeline/TimelineEmptyState'
+import TimelinePlanningPanel from '../components/timeline/TimelinePlanningPanel'
+import TimelineActionToast from '../components/timeline/TimelineActionToast'
 import useProjectStore from '../store/useProjectStore'
 import useTaskStore from '../store/useTaskStore'
 import useSettingsStore from '../store/useSettingsStore'
 import useTimelineScale from '../hooks/useTimelineScale'
 import useTimelineRows from '../hooks/useTimelineRows'
+import useTimelineIntelligence from '../hooks/useTimelineIntelligence'
+
+const NOTICE_TIMEOUT_MS = 6000
+
+const normalizeArray = (value) => [...(value ?? [])].sort()
+
+const configsMatch = (left = {}, right = {}) => {
+  const compareKeys = [
+    'zoom',
+    'viewMode',
+    'showDependencies',
+    'onlyDelayed',
+    'onlyCritical',
+    'onlyDependencyRisk',
+    'rangeStart',
+    'searchQuery',
+  ]
+
+  const primitiveMatch = compareKeys.every((key) => (left?.[key] ?? null) === (right?.[key] ?? null))
+  if (!primitiveMatch) return false
+
+  return ['filteredProgramIds', 'filteredProjectIds', 'filteredSubProjectIds', 'expandedProjectIds']
+    .every((key) => {
+      const a = normalizeArray(left?.[key])
+      const b = normalizeArray(right?.[key])
+      if (a.length !== b.length) return false
+      return a.every((value, index) => value === b[index])
+    })
+}
 
 const Timeline = memo(function Timeline() {
   const programs = useProjectStore((s) => s.programs)
@@ -17,22 +48,31 @@ const Timeline = memo(function Timeline() {
   const milestones = useProjectStore((s) => s.milestones)
   const updateProject = useProjectStore((s) => s.updateProject)
   const tasks = useTaskStore((s) => s.tasks)
+  const addTask = useTaskStore((s) => s.addTask)
   const updateTask = useTaskStore((s) => s.updateTask)
   const selectTask = useSettingsStore((s) => s.selectTask)
   const ganttConfig = useSettingsStore((s) => s.ganttConfig)
   const setGanttConfig = useSettingsStore((s) => s.setGanttConfig)
+  const savedGanttViews = useSettingsStore((s) => s.savedGanttViews)
+  const saveGanttView = useSettingsStore((s) => s.saveGanttView)
+  const deleteGanttView = useSettingsStore((s) => s.deleteGanttView)
 
   const [filteredProgramIds, setFilteredProgramIds] = useState(() => new Set(ganttConfig.filteredProgramIds ?? []))
   const [filteredProjectIds, setFilteredProjectIds] = useState(() => new Set(ganttConfig.filteredProjectIds ?? []))
   const [filteredSubProjectIds, setFilteredSubProjectIds] = useState(() => new Set(ganttConfig.filteredSubProjectIds ?? []))
   const [expandedProjectIds, setExpandedProjectIds] = useState(() => new Set(ganttConfig.expandedProjectIds ?? []))
   const [viewMode, setViewMode] = useState(ganttConfig.viewMode ?? 'roadmap')
+  const [searchQuery, setSearchQuery] = useState(ganttConfig.searchQuery ?? '')
   const [onlyDelayed, setOnlyDelayed] = useState(Boolean(ganttConfig.onlyDelayed))
   const [onlyCritical, setOnlyCritical] = useState(Boolean(ganttConfig.onlyCritical))
   const [onlyDependencyRisk, setOnlyDependencyRisk] = useState(Boolean(ganttConfig.onlyDependencyRisk))
   const [showDependencies, setShowDependencies] = useState(ganttConfig.showDependencies ?? true)
   const [showFilterPanel, setShowFilterPanel] = useState(false)
+  const [scheduleNotice, setScheduleNotice] = useState(null)
+
   const initializedExpandedRef = useRef((ganttConfig.expandedProjectIds ?? []).length > 0)
+  const restoredScaleRef = useRef(false)
+  const scheduleNoticeTimerRef = useRef(null)
 
   useEffect(() => {
     if (initializedExpandedRef.current || projects.length === 0 || tasks.length === 0) return
@@ -62,12 +102,25 @@ const Timeline = memo(function Timeline() {
     changeZoom,
     shiftRange,
     resetToToday,
+    restoreScale,
   } = useTimelineScale({ initialZoom: ganttConfig.zoom })
+
+  useEffect(() => {
+    if (restoredScaleRef.current) return
+    if (!ganttConfig.rangeStart && !ganttConfig.zoom) return
+    restoreScale({ zoom: ganttConfig.zoom, rangeStart: ganttConfig.rangeStart })
+    restoredScaleRef.current = true
+  }, [ganttConfig.rangeStart, ganttConfig.zoom, restoreScale])
+
+  useEffect(() => () => {
+    if (scheduleNoticeTimerRef.current) clearTimeout(scheduleNoticeTimerRef.current)
+  }, [])
 
   useEffect(() => {
     setGanttConfig({
       zoom,
       viewMode,
+      searchQuery,
       showDependencies,
       onlyDelayed,
       onlyCritical,
@@ -82,6 +135,7 @@ const Timeline = memo(function Timeline() {
   }, [
     zoom,
     viewMode,
+    searchQuery,
     showDependencies,
     onlyDelayed,
     onlyCritical,
@@ -149,7 +203,80 @@ const Timeline = memo(function Timeline() {
     onlyDelayed,
     onlyCritical,
     onlyDependencyRisk,
+    searchQuery,
   })
+
+  const insights = useTimelineIntelligence({
+    programs,
+    projects,
+    tasks,
+    filteredProgramIds,
+    filteredProjectIds,
+    filteredSubProjectIds,
+  })
+
+  const visibleCounts = useMemo(() => ({
+    programs: rows.filter((row) => row.type === 'program').length,
+    projects: rows.filter((row) => row.type === 'project').length,
+    tasks: rows.filter((row) => row.type === 'task').length,
+  }), [rows])
+
+  const expandableProjectIds = useMemo(
+    () => rows
+      .filter((row) => row.type === 'project' && row.expandable && row.projectId)
+      .map((row) => row.projectId),
+    [rows]
+  )
+
+  const currentViewSnapshot = useMemo(() => ({
+    zoom,
+    viewMode,
+    searchQuery: searchQuery.trim(),
+    showDependencies,
+    onlyDelayed,
+    onlyCritical,
+    onlyDependencyRisk,
+    filteredProgramIds: normalizeArray(filteredProgramIds),
+    filteredProjectIds: normalizeArray(filteredProjectIds),
+    filteredSubProjectIds: normalizeArray(filteredSubProjectIds),
+    expandedProjectIds: normalizeArray(expandedProjectIds),
+    rangeStart: startDate?.toISOString?.() ?? null,
+    rangeEnd: endDate?.toISOString?.() ?? null,
+  }), [
+    zoom,
+    viewMode,
+    searchQuery,
+    showDependencies,
+    onlyDelayed,
+    onlyCritical,
+    onlyDependencyRisk,
+    filteredProgramIds,
+    filteredProjectIds,
+    filteredSubProjectIds,
+    expandedProjectIds,
+    startDate,
+    endDate,
+  ])
+
+  const activeSavedViewId = useMemo(
+    () => savedGanttViews.find((view) => configsMatch(view.config, currentViewSnapshot))?.id ?? null,
+    [savedGanttViews, currentViewSnapshot]
+  )
+
+  const publishScheduleNotice = (nextNotice) => {
+    if (scheduleNoticeTimerRef.current) clearTimeout(scheduleNoticeTimerRef.current)
+    setScheduleNotice(nextNotice)
+    scheduleNoticeTimerRef.current = setTimeout(() => {
+      setScheduleNotice(null)
+      scheduleNoticeTimerRef.current = null
+    }, NOTICE_TIMEOUT_MS)
+  }
+
+  const dismissScheduleNotice = () => {
+    if (scheduleNoticeTimerRef.current) clearTimeout(scheduleNoticeTimerRef.current)
+    scheduleNoticeTimerRef.current = null
+    setScheduleNotice(null)
+  }
 
   const setProgramScope = (id) => {
     setFilteredProgramIds(id ? new Set([id]) : new Set())
@@ -178,6 +305,14 @@ const Timeline = memo(function Timeline() {
       else next.add(projectId)
       return next
     })
+  }
+
+  const expandAllProjects = () => {
+    setExpandedProjectIds(new Set(expandableProjectIds))
+  }
+
+  const collapseAllProjects = () => {
+    setExpandedProjectIds(new Set())
   }
 
   const clearFilters = () => {
@@ -215,13 +350,89 @@ const Timeline = memo(function Timeline() {
       return
     }
 
-    if (nextViewMode === 'risk') {
-      setOnlyDelayed(true)
-      setOnlyCritical(true)
-      setOnlyDependencyRisk(true)
-      setShowDependencies(true)
-      setExpandedProjectIds(projectIdsWithTasks)
+    setOnlyDelayed(true)
+    setOnlyCritical(true)
+    setOnlyDependencyRisk(true)
+    setShowDependencies(true)
+    setExpandedProjectIds(projectIdsWithTasks)
+  }
+
+  const applySavedView = (viewId) => {
+    const nextView = savedGanttViews.find((view) => view.id === viewId)
+    if (!nextView) return
+
+    const configToApply = nextView.config ?? {}
+    setViewMode(configToApply.viewMode ?? 'roadmap')
+    setSearchQuery(configToApply.searchQuery ?? '')
+    setShowDependencies(configToApply.showDependencies ?? true)
+    setOnlyDelayed(Boolean(configToApply.onlyDelayed))
+    setOnlyCritical(Boolean(configToApply.onlyCritical))
+    setOnlyDependencyRisk(Boolean(configToApply.onlyDependencyRisk))
+    setFilteredProgramIds(new Set(configToApply.filteredProgramIds ?? []))
+    setFilteredProjectIds(new Set(configToApply.filteredProjectIds ?? []))
+    setFilteredSubProjectIds(new Set(configToApply.filteredSubProjectIds ?? []))
+    setExpandedProjectIds(new Set(configToApply.expandedProjectIds ?? []))
+    restoreScale({ zoom: configToApply.zoom, rangeStart: configToApply.rangeStart })
+    setShowFilterPanel(false)
+  }
+
+  const saveCurrentView = (name) => {
+    saveGanttView({
+      name,
+      config: currentViewSnapshot,
+    })
+  }
+
+  const handleTaskScheduleUpdate = (taskId, updates, previous) => {
+    const taskLabel = tasks.find((task) => task.id === taskId)?.title ?? 'Task'
+    updateTask(taskId, updates)
+    publishScheduleNotice({
+      kind: 'task',
+      id: taskId,
+      previous,
+      itemLabel: taskLabel,
+      actionLabel: 'Task schedule updated',
+    })
+  }
+
+  const handleProjectScheduleUpdate = (projectId, updates, previous) => {
+    const projectLabel = projects.find((project) => project.id === projectId)?.name ?? 'Project'
+    updateProject(projectId, updates)
+    publishScheduleNotice({
+      kind: 'project',
+      id: projectId,
+      previous,
+      itemLabel: projectLabel,
+      actionLabel: 'Project schedule updated',
+    })
+  }
+
+  const undoScheduleChange = () => {
+    if (!scheduleNotice?.previous) return
+
+    if (scheduleNotice.kind === 'task') {
+      updateTask(scheduleNotice.id, scheduleNotice.previous)
+    } else if (scheduleNotice.kind === 'project') {
+      updateProject(scheduleNotice.id, scheduleNotice.previous)
     }
+
+    dismissScheduleNotice()
+  }
+
+  const createTaskInRange = ({ rowType, programId, projectId, startDate: nextStartDate, dueDate: nextDueDate }) => {
+    const created = addTask({
+      title: 'New task',
+      programId: programId ?? null,
+      projectId: projectId ?? null,
+      startDate: nextStartDate,
+      dueDate: nextDueDate,
+    })
+
+    if (rowType === 'project' && projectId) {
+      setExpandedProjectIds((previous) => new Set([...previous, projectId]))
+    }
+
+    selectTask(created.id)
   }
 
   const filtered =
@@ -230,7 +441,8 @@ const Timeline = memo(function Timeline() {
     filteredSubProjectIds.size > 0 ||
     onlyDelayed ||
     onlyCritical ||
-    onlyDependencyRisk
+    onlyDependencyRisk ||
+    searchQuery.trim().length > 0
 
   const activeFilterCount =
     Number(onlyDelayed) +
@@ -253,16 +465,33 @@ const Timeline = memo(function Timeline() {
         visibleProjects={visibleProjects}
         visibleSubProjects={visibleSubProjects}
         viewMode={viewMode}
+        searchQuery={searchQuery}
+        visibleCounts={visibleCounts}
+        expandableProjectCount={expandableProjectIds.length}
         activeFilterCount={activeFilterCount}
         filterPanelOpen={showFilterPanel}
         onChangeProgram={setProgramScope}
         onChangeProject={setProjectScope}
         onChangeSubProject={setSubProjectScope}
         onChangeViewMode={applyViewMode}
+        onSearchChange={setSearchQuery}
         onChangeZoom={changeZoom}
         onShiftRange={shiftRange}
         onResetToToday={resetToToday}
+        onExpandAll={expandAllProjects}
+        onCollapseAll={collapseAllProjects}
         onToggleFilterPanel={() => setShowFilterPanel((value) => !value)}
+      />
+
+      <TimelinePlanningPanel
+        savedViews={savedGanttViews}
+        activeSavedViewId={activeSavedViewId}
+        onApplySavedView={applySavedView}
+        onSaveCurrentView={saveCurrentView}
+        onDeleteSavedView={deleteGanttView}
+        onOpenRiskView={() => applyViewMode('risk')}
+        onExpandAll={expandAllProjects}
+        insights={insights}
       />
 
       {showFilterPanel && (
@@ -293,12 +522,21 @@ const Timeline = memo(function Timeline() {
           zoom={zoom}
           onToggleProject={toggleExpandedProject}
           onSelectTask={selectTask}
-          onUpdateTaskSchedule={(taskId, updates) => updateTask(taskId, updates)}
-          onUpdateProjectSchedule={(projectId, updates) => updateProject(projectId, updates)}
+          onUpdateTaskSchedule={handleTaskScheduleUpdate}
+          onUpdateProjectSchedule={handleProjectScheduleUpdate}
+          onCreateTaskInRange={createTaskInRange}
           showDependencies={showDependencies}
           onlyDependencyRisk={onlyDependencyRisk}
         />
       )}
+
+      <TimelineActionToast
+        itemLabel={scheduleNotice?.itemLabel}
+        actionLabel={scheduleNotice?.actionLabel}
+        showUndo={Boolean(scheduleNotice?.previous)}
+        onUndo={scheduleNotice?.previous ? undoScheduleChange : dismissScheduleNotice}
+        onDismiss={dismissScheduleNotice}
+      />
     </div>
   )
 })

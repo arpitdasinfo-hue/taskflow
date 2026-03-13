@@ -171,6 +171,9 @@ const TimelineProjectBar = memo(function TimelineProjectBar({
       onUpdateProjectSchedule?.(projectId, {
         startDate: nextStart.toISOString(),
         dueDate: nextEnd.toISOString(),
+      }, {
+        startDate: item.startDate ?? null,
+        dueDate: item.dueDate ?? null,
       })
     }
 

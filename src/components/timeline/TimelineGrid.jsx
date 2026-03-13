@@ -22,6 +22,7 @@ const TimelineGrid = memo(function TimelineGrid({
   onSelectTask,
   onUpdateTaskSchedule,
   onUpdateProjectSchedule,
+  onCreateTaskInRange,
   showDependencies,
   onlyDependencyRisk,
   readOnly = false,
@@ -210,6 +211,7 @@ const TimelineGrid = memo(function TimelineGrid({
               onSelectTask={onSelectTask}
               onUpdateTaskSchedule={onUpdateTaskSchedule}
               onUpdateProjectSchedule={onUpdateProjectSchedule}
+              onCreateTaskInRange={onCreateTaskInRange}
               readOnly={readOnly}
             />
           ))}

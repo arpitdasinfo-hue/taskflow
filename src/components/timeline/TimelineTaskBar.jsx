@@ -171,6 +171,9 @@ const TimelineTaskBar = memo(function TimelineTaskBar({
       onUpdateTaskSchedule?.(taskId, {
         startDate: nextStart.toISOString(),
         dueDate: nextEnd.toISOString(),
+      }, {
+        startDate: item.startDate ?? null,
+        dueDate: item.dueDate ?? null,
       })
     }
 

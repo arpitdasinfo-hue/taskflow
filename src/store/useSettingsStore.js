@@ -1,11 +1,13 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import { immer } from 'zustand/middleware/immer'
+import { nanoid } from 'nanoid'
 import { THEMES, THEME_ROTATION_DAYS } from '../themes'
 
 const DEFAULT_GANTT_CONFIG = {
   zoom: 'month',
   viewMode: 'roadmap',
+  searchQuery: '',
   showDependencies: true,
   onlyDelayed: false,
   onlyCritical: false,
@@ -94,6 +96,7 @@ const useSettingsStore = create(
       sortBy: 'createdAt',
       sidebarCollapsed: false,
       ganttConfig: DEFAULT_GANTT_CONFIG,
+      savedGanttViews: [],
 
       applyCurrentTheme: () => {
         const { themeIndex, contrastMode, uiDensity } = get()
@@ -175,6 +178,32 @@ const useSettingsStore = create(
       resetGanttConfig: () =>
         set((state) => { state.ganttConfig = { ...DEFAULT_GANTT_CONFIG } }),
 
+      saveGanttView: ({ id = null, name, config }) => {
+        const normalizedName = String(name || '').trim() || 'Saved view'
+        const nextView = {
+          id: id ?? nanoid(),
+          name: normalizedName,
+          config: {
+            ...DEFAULT_GANTT_CONFIG,
+            ...(config ?? {}),
+          },
+          updatedAt: new Date().toISOString(),
+        }
+
+        set((state) => {
+          const existingIndex = state.savedGanttViews.findIndex((view) => view.id === nextView.id)
+          if (existingIndex === -1) state.savedGanttViews.unshift(nextView)
+          else state.savedGanttViews[existingIndex] = nextView
+        })
+
+        return nextView
+      },
+
+      deleteGanttView: (id) =>
+        set((state) => {
+          state.savedGanttViews = state.savedGanttViews.filter((view) => view.id !== id)
+        }),
+
       // ── Navigation ────────────────────────────────────────────────────
       setPage: (page) => set((s) => {
         s.activePage = page
@@ -236,7 +265,7 @@ const useSettingsStore = create(
     {
       name: 'taskflow-settings',
       storage: createJSONStorage(() => localStorage),
-      version: 4,
+      version: 6,
       partialize: (state) => {
         const { selectedTaskId: _s1, selectedTaskIds: _s2, ...rest } = state
         return rest
@@ -263,6 +292,28 @@ const useSettingsStore = create(
               ...DEFAULT_GANTT_CONFIG,
               ...(s?.ganttConfig ?? {}),
               viewMode: s?.ganttConfig?.viewMode ?? 'roadmap',
+            },
+          }
+        }
+        if (version < 5) {
+          s = {
+            ...s,
+            savedGanttViews: Array.isArray(s?.savedGanttViews) ? s.savedGanttViews : [],
+            ganttConfig: {
+              ...DEFAULT_GANTT_CONFIG,
+              ...(s?.ganttConfig ?? {}),
+              viewMode: s?.ganttConfig?.viewMode ?? 'roadmap',
+            },
+          }
+        }
+        if (version < 6) {
+          s = {
+            ...s,
+            savedGanttViews: Array.isArray(s?.savedGanttViews) ? s.savedGanttViews : [],
+            ganttConfig: {
+              ...DEFAULT_GANTT_CONFIG,
+              ...(s?.ganttConfig ?? {}),
+              searchQuery: s?.ganttConfig?.searchQuery ?? '',
             },
           }
         }

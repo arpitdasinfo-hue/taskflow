@@ -12,6 +12,8 @@ const STATUS_LABEL = {
 
 const hasSchedule = (item) => !!(item?.startDate || item?.dueDate)
 
+const normalizeSearchText = (value) => String(value || '').trim().toLowerCase()
+
 const getTaskSortValue = (task) => {
   const date = toDisplayDate(task.dueDate) || toDisplayDate(task.startDate)
   return date ? date.getTime() : Number.MAX_SAFE_INTEGER
@@ -93,13 +95,16 @@ const useTimelineRows = ({
   onlyDelayed,
   onlyCritical,
   onlyDependencyRisk,
+  searchQuery = '',
 }) => useMemo(() => {
   const today = toDisplayDate(new Date())
+  const normalizedSearch = normalizeSearchText(searchQuery)
   const hasProgramFilter = filteredProgramIds.size > 0
   const hasProjectFilter = filteredProjectIds.size > 0
   const hasSubProjectFilter = filteredSubProjectIds.size > 0
   const hasHierarchyFilter = hasProjectFilter || hasSubProjectFilter
   const hasQuickFilter = onlyDelayed || onlyCritical || onlyDependencyRisk
+  const hasSearch = normalizedSearch.length > 0
 
   const childProjectsByParent = new Map()
   projects.forEach((project) => {
@@ -202,6 +207,11 @@ const useTimelineRows = ({
     return enabledChecks.some(Boolean)
   }
 
+  const matchesSearch = (...values) => {
+    if (!hasSearch) return true
+    return values.some((value) => normalizeSearchText(value).includes(normalizedSearch))
+  }
+
   const buildProjectRows = (project, depth, options = {}) => {
     const ancestorSelected = options.ancestorSelected ?? false
     const programAllowed = !hasProgramFilter || filteredProgramIds.has(project.programId)
@@ -235,6 +245,13 @@ const useTimelineRows = ({
       .filter((task) => !hasSchedule(task))
       .filter(taskMatchesQuickFilters)
 
+    const matchedScheduledTasks = scheduledTasks.filter((task) =>
+      matchesSearch(task.title, task.description, task.priority, task.status)
+    )
+    const matchedUnscheduledTasks = unscheduledTasks.filter((task) =>
+      matchesSearch(task.title, task.description, task.priority, task.status)
+    )
+
     const hasOwnSchedule = !!(project.startDate || project.dueDate)
     const hasAnyTask = scheduledTasks.length > 0 || unscheduledTasks.length > 0
 
@@ -246,10 +263,13 @@ const useTimelineRows = ({
       return { rows: [], stats: ZERO_STATS }
     }
 
+    const visibleScheduledTasks = hasSearch ? matchedScheduledTasks : scheduledTasks
+    const visibleUnscheduledTasks = hasSearch ? matchedUnscheduledTasks : unscheduledTasks
+
     const doneCount = allTasks.filter((task) => task.status === 'done').length
-    const delayedTasks = scheduledTasks.filter(isTaskDelayed)
-    const criticalTasks = [...scheduledTasks, ...unscheduledTasks].filter(isTaskCritical)
-    const dependencyRiskTasks = [...scheduledTasks, ...unscheduledTasks].filter(isTaskDependencyRisk)
+    const delayedTasks = visibleScheduledTasks.filter(isTaskDelayed)
+    const criticalTasks = [...visibleScheduledTasks, ...visibleUnscheduledTasks].filter(isTaskCritical)
+    const dependencyRiskTasks = [...visibleScheduledTasks, ...visibleUnscheduledTasks].filter(isTaskDependencyRisk)
 
     const range = getRangeFromTasks(scheduledTasks)
     const summaryBar = buildRangeBar({
@@ -263,6 +283,13 @@ const useTimelineRows = ({
     })
 
     const projectSubtitle = `${doneCount}/${allTasks.length} done${unscheduledTasks.length ? ` · ${unscheduledTasks.length} unscheduled` : ''}`
+    const rowMatchesSearch = matchesSearch(project.name, project.description, projectSubtitle)
+    const matchedOwnTaskCount = matchedScheduledTasks.length + matchedUnscheduledTasks.length
+    const shouldRevealTasks = expandedProjectIds.has(project.id) || (hasSearch && matchedOwnTaskCount > 0)
+
+    if (hasSearch && !rowMatchesSearch && matchedOwnTaskCount === 0 && childRows.length === 0) {
+      return { rows: [], stats: ZERO_STATS }
+    }
 
     const projectRow = {
       id: `project-${project.id}`,
@@ -276,25 +303,26 @@ const useTimelineRows = ({
       bars: summaryBar ? [summaryBar] : [],
       milestones: milestonesByProject.get(project.id) ?? [],
       expandable: hasAnyTask,
-      expanded: expandedProjectIds.has(project.id),
+      expanded: shouldRevealTasks,
       delayedCount: delayedTasks.length,
       criticalCount: criticalTasks.length,
       dependencyRiskCount: dependencyRiskTasks.length,
       totalCount: allTasks.length,
       unscheduledCount: unscheduledTasks.length,
+      childProjectCount: childRows.filter((row) => row.type === 'project' && row.depth === depth + 1).length,
     }
 
     const ownStats = {
-      scheduledCount: scheduledTasks.length,
-      unscheduledCount: unscheduledTasks.length,
+      scheduledCount: visibleScheduledTasks.length,
+      unscheduledCount: visibleUnscheduledTasks.length,
       delayedCount: delayedTasks.length,
       criticalCount: criticalTasks.length,
       dependencyRiskCount: dependencyRiskTasks.length,
     }
 
-    const taskRows = expandedProjectIds.has(project.id)
+    const taskRows = shouldRevealTasks
       ? [
-          ...scheduledTasks.map((task) => ({
+          ...visibleScheduledTasks.map((task) => ({
             id: `task-${task.id}`,
             type: 'task',
             taskId: task.id,
@@ -311,7 +339,7 @@ const useTimelineRows = ({
             dependencyRiskCount: isTaskDependencyRisk(task) ? 1 : 0,
             unscheduled: false,
           })),
-          ...unscheduledTasks.map((task) => ({
+          ...visibleUnscheduledTasks.map((task) => ({
             id: `task-${task.id}`,
             type: 'task',
             taskId: task.id,
@@ -348,15 +376,19 @@ const useTimelineRows = ({
       const sectionStats = programResults.reduce((acc, result) => mergeStats(acc, result.stats), ZERO_STATS)
       const directProgramTasks = (directTasksByProgram.get(program.id) ?? [])
         .filter(taskMatchesQuickFilters)
+        .filter((task) => matchesSearch(task.title, task.description, task.priority, task.status))
       const directScheduledTasks = (scheduledDirectTasksByProgram.get(program.id) ?? [])
         .filter(taskMatchesQuickFilters)
+        .filter((task) => matchesSearch(task.title, task.description, task.priority, task.status))
         .sort((a, b) => getTaskSortValue(a) - getTaskSortValue(b))
       const directUnscheduledTasks = directProgramTasks
         .filter((task) => !hasSchedule(task))
         .sort((a, b) => getTaskSortValue(a) - getTaskSortValue(b))
 
       const projectRows = programRows.filter((row) => row.type === 'project')
-      if (projectRows.length === 0 && directProgramTasks.length === 0) return { rows: [], stats: sectionStats }
+      const programSubtitle = `${projectRows.length} projects · ${directScheduledTasks.length} scheduled${directUnscheduledTasks.length ? ` · ${directUnscheduledTasks.length} unscheduled` : ''}`
+      const rowMatchesSearch = matchesSearch(program.name, program.description, programSubtitle)
+      if (!rowMatchesSearch && projectRows.length === 0 && directProgramTasks.length === 0) return { rows: [], stats: sectionStats }
 
       const projectIds = new Set(projectRows.map((row) => row.projectId))
       const projectTasks = tasks.filter((task) =>
@@ -433,6 +465,12 @@ const useTimelineRows = ({
           }),
         ].filter(Boolean),
         milestones: [],
+        delayedCount: sectionStats.delayedCount + directStats.delayedCount,
+        criticalCount: sectionStats.criticalCount + directStats.criticalCount,
+        dependencyRiskCount: sectionStats.dependencyRiskCount + directStats.dependencyRiskCount,
+        unscheduledCount: sectionStats.unscheduledCount + directStats.unscheduledCount,
+        totalCount: programTasks.length,
+        projectCount: projectRows.length,
       }
 
       return {
@@ -483,6 +521,12 @@ const useTimelineRows = ({
             }),
           ].filter(Boolean),
           milestones: [],
+          delayedCount: sectionStats.delayedCount,
+          criticalCount: sectionStats.criticalCount,
+          dependencyRiskCount: sectionStats.dependencyRiskCount,
+          unscheduledCount: sectionStats.unscheduledCount,
+          totalCount: unassignedTasks.length,
+          projectCount: unassignedProjectRows.length,
         }
 
         return {
@@ -512,6 +556,7 @@ const useTimelineRows = ({
   onlyDelayed,
   onlyCritical,
   onlyDependencyRisk,
+  searchQuery,
 ])
 
 export default useTimelineRows
