@@ -26,7 +26,9 @@ const TimelineGrid = memo(function TimelineGrid({
   showDependencies,
   onlyDependencyRisk,
   readOnly = false,
+  compact = false,
 }) {
+  const leftColumnWidth = compact ? 250 : LEFT_COLUMN_WIDTH
   const dependencyLayer = useMemo(() => {
     const rowOffsets = new Map()
     let totalHeight = 0
@@ -120,19 +122,19 @@ const TimelineGrid = memo(function TimelineGrid({
 
   return (
     <div className="overflow-x-auto overflow-y-visible min-h-[360px]" style={{ scrollbarWidth: 'thin' }}>
-      <div style={{ minWidth: LEFT_COLUMN_WIDTH + days * cellWidth }}>
+      <div style={{ minWidth: leftColumnWidth + days * cellWidth }}>
         <TimelineHeader
           startDate={startDate}
           days={days}
           cellWidth={cellWidth}
-          leftColumnWidth={LEFT_COLUMN_WIDTH}
+          leftColumnWidth={leftColumnWidth}
           zoom={zoom}
         />
 
         <div className="relative">
           <div
             className="absolute pointer-events-none z-0"
-            style={{ left: LEFT_COLUMN_WIDTH, top: 0, width: days * cellWidth, height: dependencyLayer.totalHeight }}
+            style={{ left: leftColumnWidth, top: 0, width: days * cellWidth, height: dependencyLayer.totalHeight }}
           >
             {calendarLayer.map((column) => (
               <div
@@ -167,7 +169,7 @@ const TimelineGrid = memo(function TimelineGrid({
             <svg
               className="absolute pointer-events-none z-[1]"
               style={{
-                left: LEFT_COLUMN_WIDTH,
+                left: leftColumnWidth,
                 top: 0,
                 width: days * cellWidth,
                 height: dependencyLayer.totalHeight,
@@ -206,7 +208,7 @@ const TimelineGrid = memo(function TimelineGrid({
               startDate={startDate}
               days={days}
               cellWidth={cellWidth}
-              leftColumnWidth={LEFT_COLUMN_WIDTH}
+              leftColumnWidth={leftColumnWidth}
               onToggleProject={onToggleProject}
               onSelectTask={onSelectTask}
               onUpdateTaskSchedule={onUpdateTaskSchedule}

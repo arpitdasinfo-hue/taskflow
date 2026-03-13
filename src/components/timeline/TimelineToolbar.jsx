@@ -12,8 +12,8 @@ import {
 import InfoTooltip from '../common/InfoTooltip'
 import { TIMELINE_VIEW_MODES, ZOOM_CONFIGS } from './timelineConfig'
 
-const ControlLabel = ({ children }) => (
-  <span className="text-[10px] font-semibold uppercase tracking-[0.18em]" style={{ color: 'var(--text-secondary)' }}>
+const ControlLabel = ({ children, compact = false }) => (
+  <span className={`font-semibold uppercase ${compact ? 'text-[9px] tracking-[0.14em]' : 'text-[10px] tracking-[0.18em]'}`} style={{ color: 'var(--text-secondary)' }}>
     {children}
   </span>
 )
@@ -35,13 +35,13 @@ const SummaryChip = ({ label, value, tone = 'neutral', compact = false }) => {
 
   return (
     <div
-      className={`rounded-2xl px-3 py-2 ${compact ? 'min-w-0' : 'min-w-[96px]'}`}
+      className={`rounded-2xl ${compact ? 'min-w-0 px-2.5 py-2' : 'min-w-[96px] px-3 py-2'}`}
       style={{ background: palette.background, border: `1px solid ${palette.border}` }}
     >
-      <p className="text-[10px] uppercase tracking-[0.16em]" style={{ color: 'var(--text-secondary)' }}>
+      <p className={`${compact ? 'text-[9px] tracking-[0.12em]' : 'text-[10px] tracking-[0.16em]'} uppercase`} style={{ color: 'var(--text-secondary)' }}>
         {label}
       </p>
-      <p className="text-sm font-semibold mt-1" style={{ color: palette.color }}>
+      <p className={`${compact ? 'text-xs mt-1' : 'text-sm mt-1'} font-semibold whitespace-nowrap`} style={{ color: palette.color }}>
         {value}
       </p>
     </div>
@@ -102,7 +102,7 @@ const TimelineToolbar = memo(function TimelineToolbar({
   }
 
   const headerLayoutClass = compact
-    ? 'grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_360px]'
+    ? 'grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_300px]'
     : 'flex items-start justify-between gap-4 flex-wrap'
 
   const summaryLayoutClass = compact
@@ -110,10 +110,10 @@ const TimelineToolbar = memo(function TimelineToolbar({
     : 'flex flex-wrap gap-2'
 
   const searchScopeLayoutClass = compact
-    ? 'grid grid-cols-1 gap-2.5 md:grid-cols-2 xl:grid-cols-4'
+    ? 'grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-[minmax(220px,1.2fr)_repeat(3,minmax(0,0.92fr))]'
     : 'grid grid-cols-1 gap-2 lg:grid-cols-[minmax(0,1fr)_repeat(3,minmax(0,0.72fr))]'
 
-  const searchFieldClass = compact ? 'relative block md:col-span-2 xl:col-span-4' : 'relative block'
+  const searchFieldClass = compact ? 'relative block md:col-span-2 xl:col-span-1' : 'relative block'
 
   const actionLayoutClass = compact
     ? 'flex flex-wrap items-center gap-2'
@@ -128,31 +128,41 @@ const TimelineToolbar = memo(function TimelineToolbar({
     : 'grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_auto] gap-3 items-start'
 
   const viewZoomLayoutClass = compact
-    ? 'grid grid-cols-1 gap-3'
+    ? 'grid grid-cols-1 gap-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]'
     : 'grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(320px,0.95fr)] gap-3'
+
+  const shellPaddingClass = compact ? 'rounded-[20px] p-3 md:p-4' : 'rounded-[24px] p-4 md:p-5'
+  const inputClass = compact ? 'w-full rounded-xl pl-10 pr-4 py-2 text-xs outline-none' : 'w-full rounded-2xl pl-10 pr-4 py-2.5 text-sm outline-none'
+  const selectClass = compact ? 'w-full text-xs px-3 py-2 rounded-xl' : 'w-full text-sm px-3 py-2 rounded-xl'
+  const actionButtonClass = compact ? 'inline-flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-xl text-[11px] font-medium transition-colors hover:bg-white/10' : 'inline-flex items-center justify-center gap-1 px-3 py-2 rounded-xl text-xs font-medium transition-colors hover:bg-white/10'
+  const secondaryButtonClass = compact ? 'inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[11px] font-medium disabled:opacity-40' : 'inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium disabled:opacity-40'
+  const toggleButtonClass = compact ? 'inline-flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-xl text-[11px] font-medium transition-colors' : 'inline-flex items-center justify-center gap-1 px-3 py-2 rounded-xl text-xs font-medium transition-colors'
+  const segmentedButtonClass = compact ? 'flex-1 px-2 py-1.5 rounded-lg text-[11px] font-medium transition-colors min-w-0 whitespace-nowrap' : 'flex-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors'
 
   return (
     <div className="px-4 md:px-6 pb-3">
       <div
-        className="rounded-[24px] p-4 md:p-5"
+        className={shellPaddingClass}
         style={{
           background: 'linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.02))',
           border: '1px solid rgba(255,255,255,0.09)',
-          boxShadow: '0 20px 48px rgba(0,0,0,0.2)',
+          boxShadow: compact ? '0 12px 28px rgba(0,0,0,0.16)' : '0 20px 48px rgba(0,0,0,0.2)',
         }}
       >
-        <div className={`${headerLayoutClass} mb-4`}>
+        <div className={`${headerLayoutClass} ${compact ? 'mb-3' : 'mb-4'}`}>
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--accent)' }}>
                 {readOnly ? 'Gantt' : `${currentView.label} view`}
               </span>
-              <span
-                className="text-[10px] px-2 py-0.5 rounded-full"
-                style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--text-secondary)' }}
-              >
-                {rangeLabel}
-              </span>
+              {!compact && (
+                <span
+                  className="text-[10px] px-2 py-0.5 rounded-full"
+                  style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--text-secondary)' }}
+                >
+                  {rangeLabel}
+                </span>
+              )}
               {activeFilterCount > 0 && (
                 <span
                   className="text-[10px] px-2 py-0.5 rounded-full"
@@ -164,7 +174,7 @@ const TimelineToolbar = memo(function TimelineToolbar({
             </div>
 
             <div className="flex items-center gap-2 mt-2">
-              <span className="text-sm md:text-[15px] font-medium" style={{ color: 'var(--text-primary)' }}>
+              <span className={`${compact ? 'text-[13px]' : 'text-sm md:text-[15px]'} font-medium`} style={{ color: 'var(--text-primary)' }}>
                 {readOnly ? `${currentView.label} timeline` : `${currentView.label} focus`}
               </span>
               <InfoTooltip text={currentView.description} widthClassName="w-64" />
@@ -191,7 +201,7 @@ const TimelineToolbar = memo(function TimelineToolbar({
                 value={searchQuery}
                 onChange={(event) => onSearchChange?.(event.target.value)}
                 placeholder="Search workstreams, projects, or tasks"
-                className="w-full rounded-2xl pl-10 pr-4 py-2.5 text-sm outline-none"
+                className={inputClass}
                 style={{
                   background: 'rgba(255,255,255,0.04)',
                   border: '1px solid rgba(255,255,255,0.09)',
@@ -201,11 +211,11 @@ const TimelineToolbar = memo(function TimelineToolbar({
             </label>
 
             <label className="flex flex-col gap-1.5">
-              <ControlLabel>Program</ControlLabel>
+              <ControlLabel compact={compact}>Program</ControlLabel>
               <select
                 value={selectedProgramId}
                 onChange={(event) => onChangeProgram(event.target.value)}
-                className="w-full text-sm px-3 py-2 rounded-xl"
+                className={selectClass}
                 style={selectStyle}
               >
                 <option value="">All programs</option>
@@ -216,11 +226,11 @@ const TimelineToolbar = memo(function TimelineToolbar({
             </label>
 
             <label className="flex flex-col gap-1.5">
-              <ControlLabel>Project</ControlLabel>
+              <ControlLabel compact={compact}>Project</ControlLabel>
               <select
                 value={selectedProjectId}
                 onChange={(event) => onChangeProject(event.target.value)}
-                className="w-full text-sm px-3 py-2 rounded-xl"
+                className={selectClass}
                 style={selectStyle}
               >
                 <option value="">All projects</option>
@@ -231,11 +241,11 @@ const TimelineToolbar = memo(function TimelineToolbar({
             </label>
 
             <label className="flex flex-col gap-1.5">
-              <ControlLabel>Sub-project</ControlLabel>
+              <ControlLabel compact={compact}>Sub-project</ControlLabel>
               <select
                 value={selectedSubProjectId}
                 onChange={(event) => onChangeSubProject(event.target.value)}
-                className="w-full text-sm px-3 py-2 rounded-xl"
+                className={selectClass}
                 style={selectStyle}
                 disabled={visibleSubProjects.length === 0}
               >
@@ -272,7 +282,7 @@ const TimelineToolbar = memo(function TimelineToolbar({
 
             <button
               onClick={onResetToToday}
-              className="inline-flex items-center justify-center gap-1 px-3 py-2 rounded-xl text-xs font-medium transition-colors hover:bg-white/10"
+              className={actionButtonClass}
               style={{ color: 'var(--accent)', background: 'rgba(var(--accent-rgb),0.08)', border: '1px solid rgba(var(--accent-rgb),0.22)' }}
             >
               <Target size={12} />
@@ -283,7 +293,7 @@ const TimelineToolbar = memo(function TimelineToolbar({
               <button
                 onClick={onExpandAll}
                 disabled={expandableProjectCount === 0}
-                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium disabled:opacity-40"
+                className={secondaryButtonClass}
                 style={{ background: 'rgba(255,255,255,0.04)', color: 'var(--text-secondary)', border: '1px solid rgba(255,255,255,0.08)' }}
               >
                 <ChevronDownSquare size={13} />
@@ -293,7 +303,7 @@ const TimelineToolbar = memo(function TimelineToolbar({
               <button
                 onClick={onCollapseAll}
                 disabled={expandableProjectCount === 0}
-                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium disabled:opacity-40"
+                className={secondaryButtonClass}
                 style={{ background: 'rgba(255,255,255,0.04)', color: 'var(--text-secondary)', border: '1px solid rgba(255,255,255,0.08)' }}
               >
                 <ChevronUpSquare size={13} />
@@ -303,7 +313,7 @@ const TimelineToolbar = memo(function TimelineToolbar({
 
             <button
               onClick={onToggleFilterPanel}
-              className="inline-flex items-center justify-center gap-1 px-3 py-2 rounded-xl text-xs font-medium transition-colors"
+              className={toggleButtonClass}
               style={filterPanelOpen
                 ? { background: 'rgba(var(--accent-rgb),0.15)', color: 'var(--accent)', border: '1px solid rgba(var(--accent-rgb),0.45)' }
                 : { background: 'rgba(255,255,255,0.04)', color: 'var(--text-secondary)', border: '1px solid rgba(255,255,255,0.1)' }}
@@ -322,13 +332,13 @@ const TimelineToolbar = memo(function TimelineToolbar({
         <div className={modeLayoutClass}>
           <div className={viewZoomLayoutClass}>
             <div className="flex flex-col gap-1.5">
-              <ControlLabel>View</ControlLabel>
+              <ControlLabel compact={compact}>View</ControlLabel>
               <div className="flex items-center gap-1 p-1 rounded-xl" style={{ background: 'rgba(255,255,255,0.04)' }}>
                 {Object.values(TIMELINE_VIEW_MODES).map((mode) => (
                   <button
                     key={mode.id}
                     onClick={() => onChangeViewMode(mode.id)}
-                    className="flex-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors"
+                    className={segmentedButtonClass}
                     style={viewMode === mode.id
                       ? { background: 'var(--accent)', color: '#fff', boxShadow: '0 8px 20px rgba(var(--accent-rgb),0.25)' }
                       : { color: 'var(--text-secondary)' }}
@@ -340,13 +350,13 @@ const TimelineToolbar = memo(function TimelineToolbar({
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <ControlLabel>Time Window</ControlLabel>
+              <ControlLabel compact={compact}>Time Window</ControlLabel>
               <div className="flex items-center gap-1 p-1 rounded-xl flex-wrap" style={{ background: 'rgba(255,255,255,0.04)' }}>
                 {Object.values(ZOOM_CONFIGS).map((cfg) => (
                   <button
                     key={cfg.id}
                     onClick={() => handleZoomChange(cfg.id)}
-                    className="flex-1 min-w-[78px] px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors"
+                    className={`${segmentedButtonClass} ${compact ? 'min-w-[72px]' : 'min-w-[78px]'}`}
                     style={zoom === cfg.id
                       ? { background: 'rgba(var(--accent-rgb),0.16)', color: 'var(--accent)', border: '1px solid rgba(var(--accent-rgb),0.34)' }
                       : { color: 'var(--text-secondary)' }}

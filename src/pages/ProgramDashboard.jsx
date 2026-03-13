@@ -1,7 +1,9 @@
-import { memo } from 'react'
-import { BarChart3, CheckCircle2, Clock, AlertTriangle, TrendingUp, Milestone, ArrowRight } from 'lucide-react'
+import { memo, useMemo } from 'react'
+import { BarChart3, CheckCircle2, Clock, AlertTriangle, TrendingUp, CalendarClock, ArrowRight } from 'lucide-react'
 import Header from '../components/layout/Header'
 import { ProgramStatusBadge, ProgramHealthBadge } from '../components/common/ProgramStatusBadge'
+import GlassCard from '../components/common/GlassCard'
+import MilestoneTimeline from '../components/common/MilestoneTimeline'
 import TimelinePlanningPanel from '../components/timeline/TimelinePlanningPanel'
 import useTaskStore from '../store/useTaskStore'
 import useTimelineIntelligence from '../hooks/useTimelineIntelligence'
@@ -189,6 +191,7 @@ const OverallSummary = memo(function OverallSummary({ allStats, programs }) {
 const ProgramDashboard = memo(function ProgramDashboard() {
   const programs  = useProjectStore((s) => s.programs)
   const projects  = useProjectStore((s) => s.projects)
+  const milestones = useProjectStore((s) => s.milestones)
   const tasks     = useTaskStore((s) => s.tasks)
   const setPage   = useSettingsStore((s) => s.setPage)
   const setGanttConfig = useSettingsStore((s) => s.setGanttConfig)
@@ -201,6 +204,25 @@ const ProgramDashboard = memo(function ProgramDashboard() {
     filteredProjectIds: new Set(),
     filteredSubProjectIds: new Set(),
   })
+  const projectById = useMemo(() => new Map(projects.map((project) => [project.id, project])), [projects])
+
+  const milestoneTimelineItems = useMemo(
+    () => milestones
+      .filter((milestone) => milestone.dueDate)
+      .map((milestone) => {
+        const project = milestone.projectId ? projectById.get(milestone.projectId) : null
+        const program = project?.programId ? programs.find((entry) => entry.id === project.programId) : null
+        return {
+          id: milestone.id,
+          name: milestone.name,
+          dueDate: milestone.dueDate,
+          completed: milestone.completed || milestone.status === 'completed',
+          color: project?.color || program?.color || '#38bdf8',
+          context: project ? `${program?.name ? `${program.name} · ` : ''}${project.name}` : program?.name || 'Unassigned',
+        }
+      }),
+    [milestones, projectById, programs]
+  )
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
@@ -220,6 +242,21 @@ const ProgramDashboard = memo(function ProgramDashboard() {
         ) : (
           <>
             <OverallSummary allStats={allStats} programs={programs} />
+
+            <GlassCard padding="p-5">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-8 h-8 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(var(--accent-rgb),0.1)', border: '1px solid rgba(var(--accent-rgb),0.18)' }}>
+                  <CalendarClock size={15} style={{ color: 'var(--accent)' }} />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Milestone Timeline</p>
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>
+                    Zoomed-out launch view of the next checkpoints across programs.
+                  </p>
+                </div>
+              </div>
+              <MilestoneTimeline milestones={milestoneTimelineItems} />
+            </GlassCard>
 
             <div className="grid gap-4 md:grid-cols-2">
               {programs.map((program) => (

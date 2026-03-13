@@ -25,6 +25,28 @@ const STATUS_COLUMNS = [
   { id: 'blocked',     label: 'Blocked',     color: '#ef4444' },
 ]
 
+const InlineDateField = memo(function InlineDateField({ label, value, onChange }) {
+  return (
+    <label className="flex flex-col gap-1 min-w-[108px]" onClick={(event) => event.stopPropagation()}>
+      <span className="text-[9px] font-semibold uppercase tracking-[0.16em]" style={{ color: 'var(--text-secondary)' }}>
+        {label}
+      </span>
+      <input
+        type="date"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="w-full text-[11px] px-2.5 py-1.5 rounded-xl"
+        style={{
+          background: 'rgba(255,255,255,0.05)',
+          border: '1px solid rgba(255,255,255,0.08)',
+          color: 'var(--text-primary)',
+          colorScheme: 'dark',
+        }}
+      />
+    </label>
+  )
+})
+
 // ── Board Column ─────────────────────────────────────────────────────────────
 const BoardColumn = memo(function BoardColumn({ column, tasks, provided, snapshot, selectMode }) {
   const selectedTaskIds     = useSettingsStore((s) => s.selectedTaskIds)
@@ -89,6 +111,7 @@ const TaskRow = memo(function TaskRow({ task, selectMode }) {
   const selectTask          = useSettingsStore((s) => s.selectTask)
   const selectedTaskIds     = useSettingsStore((s) => s.selectedTaskIds)
   const toggleTaskSelection = useSettingsStore((s) => s.toggleTaskSelection)
+  const updateTask          = useTaskStore((s) => s.updateTask)
   const projects            = useProjectStore((s) => s.projects)
   const programs            = useProjectStore((s) => s.programs)
   const project    = projects.find((p) => p.id === task.projectId)
@@ -105,8 +128,12 @@ const TaskRow = memo(function TaskRow({ task, selectMode }) {
     else selectTask(task.id)
   }
 
+  const updateDateField = useCallback((field, nextValue) => {
+    updateTask(task.id, { [field]: nextValue ? new Date(nextValue).toISOString() : null })
+  }, [task.id, updateTask])
+
   return (
-    <button onClick={handleClick}
+    <div
       className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-colors hover:bg-white/5 group"
       style={{
         borderBottom: '1px solid rgba(255,255,255,0.04)',
@@ -126,15 +153,17 @@ const TaskRow = memo(function TaskRow({ task, selectMode }) {
           style={{ background: PRIORITY_COLOR[task.priority] }} />
       )}
 
-      <div className="flex-1 min-w-0">
-        <p className="text-sm truncate"
-          style={{ color: isDone ? 'var(--text-secondary)' : 'var(--text-primary)', textDecoration: isDone ? 'line-through' : 'none' }}>
-          {task.title}
-        </p>
-        {task.description && (
-          <p className="text-[11px] truncate" style={{ color: 'var(--text-secondary)' }}>{task.description}</p>
-        )}
-      </div>
+      <button onClick={handleClick} className="flex-1 min-w-0 text-left bg-transparent border-0 p-0">
+        <div className="flex-1 min-w-0">
+          <p className="text-sm truncate"
+            style={{ color: isDone ? 'var(--text-secondary)' : 'var(--text-primary)', textDecoration: isDone ? 'line-through' : 'none' }}>
+            {task.title}
+          </p>
+          {task.description && (
+            <p className="text-[11px] truncate" style={{ color: 'var(--text-secondary)' }}>{task.description}</p>
+          )}
+        </div>
+      </button>
 
       {(project || program) && (
         <span className="hidden sm:inline text-[10px] px-1.5 py-0.5 rounded-full flex-shrink-0"
@@ -145,6 +174,19 @@ const TaskRow = memo(function TaskRow({ task, selectMode }) {
           {project?.name ?? `${program?.name} · Program`}
         </span>
       )}
+
+      <div className="hidden lg:grid grid-cols-2 gap-2 flex-shrink-0">
+        <InlineDateField
+          label="Start"
+          value={task.startDate ? new Date(task.startDate).toISOString().split('T')[0] : ''}
+          onChange={(nextValue) => updateDateField('startDate', nextValue)}
+        />
+        <InlineDateField
+          label="Due"
+          value={task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : ''}
+          onChange={(nextValue) => updateDateField('dueDate', nextValue)}
+        />
+      </div>
 
       {totalSubs > 0 && (
         <span className="text-[10px] flex-shrink-0" style={{ color: 'var(--text-secondary)' }}>
@@ -170,7 +212,7 @@ const TaskRow = memo(function TaskRow({ task, selectMode }) {
         <ChevronRight size={12} style={{ color: 'var(--text-secondary)', flexShrink: 0 }}
           className="opacity-0 group-hover:opacity-100 transition-opacity" />
       )}
-    </button>
+    </div>
   )
 })
 

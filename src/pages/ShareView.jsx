@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import GlassCard from '../components/common/GlassCard'
 import InfoTooltip from '../components/common/InfoTooltip'
+import MilestoneTimeline from '../components/common/MilestoneTimeline'
 import { supabase } from '../lib/supabase'
 import {
   DEFAULT_SHARE_CONFIG,
@@ -414,7 +415,7 @@ const ManagerGantt = ({ programs, projects, tasks, milestones }) => {
         />
       )}
 
-      <TimelineLegend readOnly />
+      <TimelineLegend readOnly compact />
 
       {rows.length === 0 ? (
         <div className="px-2 py-3 text-xs" style={{ color: 'var(--text-secondary)' }}>
@@ -438,6 +439,7 @@ const ManagerGantt = ({ programs, projects, tasks, milestones }) => {
             showDependencies={showDependencies}
             onlyDependencyRisk={onlyDependencyRisk}
             readOnly
+            compact
           />
         </div>
       )}
@@ -801,6 +803,21 @@ export default function ShareView({ token }) {
 
   const projectById = useMemo(() => new Map(filteredProjects.map((project) => [project.id, project])), [filteredProjects])
   const programById = useMemo(() => new Map(programs.map((program) => [program.id, program])), [programs])
+  const milestoneTimelineItems = useMemo(
+    () => filteredMilestones.map((milestone) => {
+      const project = milestone.projectId ? projectById.get(milestone.projectId) : null
+      const program = project?.programId ? programById.get(project.programId) : null
+      return {
+        id: milestone.id,
+        name: milestone.name,
+        dueDate: milestone.dueDate,
+        completed: milestone.completed || milestone.status === 'completed',
+        color: project?.color || program?.color || '#38bdf8',
+        context: project ? `${program?.name ? `${program.name} · ` : ''}${project.name}` : program?.name || 'Unassigned',
+      }
+    }),
+    [filteredMilestones, projectById, programById]
+  )
 
   const stats = useMemo(() => {
     const total = filteredTasks.length
@@ -1194,6 +1211,16 @@ export default function ShareView({ token }) {
                     description="Portfolio roll-up by program for quick scanning of scope, delivery load, blocked work, and completion."
                     icon={BarChart3}
                   >
+                    {milestoneTimelineItems.length > 0 && (
+                      <div className="mb-4">
+                        <MilestoneTimeline
+                          milestones={milestoneTimelineItems}
+                          compact
+                          emptyLabel="No milestone dates in this shared scope."
+                        />
+                      </div>
+                    )}
+
                     {programStats.length === 0 ? (
                       <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>No program analytics available.</p>
                     ) : (
