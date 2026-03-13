@@ -5,8 +5,9 @@ import FilterBar from '../components/tasks/FilterBar'
 import BulkActionBar from '../components/tasks/BulkActionBar'
 import CommitTaskMenu from '../components/planning/CommitTaskMenu'
 import EmptyState from '../components/common/EmptyState'
+import { InlineDateChip, InlineStatusChip } from '../components/common/InlineFieldChips'
 import Header from '../components/layout/Header'
-import { ListTodo, ChevronRight, CheckSquare, CalendarDays, ChevronDown } from 'lucide-react'
+import { ListTodo, ChevronRight, CheckSquare } from 'lucide-react'
 import useSettingsStore from '../store/useSettingsStore'
 import useTaskStore from '../store/useTaskStore'
 import useProjectStore from '../store/useProjectStore'
@@ -24,85 +25,6 @@ const STATUS_COLUMNS = [
   { id: 'done',        label: 'Done',        color: '#10b981' },
   { id: 'blocked',     label: 'Blocked',     color: '#ef4444' },
 ]
-
-const STATUS_OPTIONS = Object.entries(STATUS_LABEL).map(([value, label]) => ({ value, label }))
-
-const toInputDateValue = (value) => {
-  if (!value) return ''
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return ''
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
-
-const formatInlineDate = (value, emptyLabel) => {
-  if (!value) return emptyLabel
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return emptyLabel
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-}
-
-const InlineDateChip = memo(function InlineDateChip({ label, value, onChange, tone = 'default' }) {
-  const palette = tone === 'danger'
-    ? { background: 'rgba(239,68,68,0.12)', border: 'rgba(239,68,68,0.24)', color: '#fca5a5' }
-    : { background: 'rgba(255,255,255,0.05)', border: 'rgba(255,255,255,0.08)', color: 'var(--text-secondary)' }
-
-  return (
-    <label
-      className="relative flex-shrink-0"
-      onClick={(event) => event.stopPropagation()}
-      title={label}
-    >
-      <input
-        type="date"
-        value={toInputDateValue(value)}
-        onChange={(event) => onChange(event.target.value)}
-        className="absolute inset-0 opacity-0 cursor-pointer"
-        style={{ colorScheme: 'light' }}
-      />
-      <span
-        className="pointer-events-none inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[10px] font-medium whitespace-nowrap"
-        style={{
-          background: palette.background,
-          border: `1px solid ${palette.border}`,
-          color: palette.color,
-        }}
-      >
-        <CalendarDays size={11} />
-        {formatInlineDate(value, label)}
-      </span>
-    </label>
-  )
-})
-
-const InlineStatusChip = memo(function InlineStatusChip({ value, onChange }) {
-  return (
-    <label
-      className="relative flex-shrink-0"
-      onClick={(event) => event.stopPropagation()}
-      title="Status"
-    >
-      <select
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="absolute inset-0 opacity-0 cursor-pointer"
-      >
-        {STATUS_OPTIONS.map((option) => (
-          <option key={option.value} value={option.value}>{option.label}</option>
-        ))}
-      </select>
-      <span
-        className="pointer-events-none inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[10px] font-medium whitespace-nowrap"
-        style={{ background: `${STATUS_COLOR[value]}18`, color: STATUS_COLOR[value] }}
-      >
-        {STATUS_LABEL[value]}
-        <ChevronDown size={11} />
-      </span>
-    </label>
-  )
-})
 
 // ── Board Column ─────────────────────────────────────────────────────────────
 const BoardColumn = memo(function BoardColumn({ column, tasks, provided, snapshot, selectMode }) {
@@ -256,7 +178,7 @@ const TaskRow = memo(function TaskRow({ task, selectMode }) {
         </span>
       )}
 
-      <InlineStatusChip value={task.status} onChange={updateStatusField} />
+      <InlineStatusChip value={task.status} onChange={updateStatusField} labels={STATUS_LABEL} colors={STATUS_COLOR} />
 
       {!selectMode && <CommitTaskMenu taskId={task.id} compact />}
 

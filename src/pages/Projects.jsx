@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'
 import GlassCard from '../components/common/GlassCard'
 import InfoTooltip from '../components/common/InfoTooltip'
+import { InlineDateChip, InlineStatusChip } from '../components/common/InlineFieldChips'
 import ColorPalettePicker from '../components/common/ColorPalettePicker'
 import ShareModal from '../components/ShareModal'
 import { ProgramStatusBadge, STATUS_CONFIG, STATUS_OPTIONS } from '../components/common/ProgramStatusBadge'
@@ -196,12 +197,15 @@ const ColorDot = memo(function ColorDot({ color, onChange }) {
 // ── Task row (list view) ──────────────────────────────────────────────────────
 const TaskRow = memo(function TaskRow({ task, onDragStart, onDragOver, onDrop }) {
   const selectTask = useSettingsStore((s) => s.selectTask)
+  const updateTask = useTaskStore((s) => s.updateTask)
   const now = new Date()
   const isOverdue = task.dueDate && new Date(task.dueDate) < now && task.status !== 'done'
+  const updateDateField = (field, nextValue) => {
+    updateTask(task.id, { [field]: nextValue ? new Date(nextValue).toISOString() : null })
+  }
 
   return (
-    <button
-      onClick={() => selectTask(task.id)}
+    <div
       draggable
       onDragStart={(event) => onDragStart?.(event, task)}
       onDragOver={(event) => onDragOver?.(event, task)}
@@ -210,24 +214,35 @@ const TaskRow = memo(function TaskRow({ task, onDragStart, onDragOver, onDrop })
       style={{ border: '1px solid rgba(255,255,255,0.04)' }}
     >
       <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: PRIORITY_COLOR[task.priority] }} />
-      <span className="flex-1 text-sm truncate" style={{ color: task.status === 'done' ? 'var(--text-secondary)' : 'var(--text-primary)', textDecoration: task.status === 'done' ? 'line-through' : 'none' }}>
-        {task.title}
-      </span>
+      <button
+        type="button"
+        onClick={() => selectTask(task.id)}
+        className="flex-1 min-w-0 bg-transparent border-0 p-0 text-left"
+      >
+        <span className="block text-sm truncate" style={{ color: task.status === 'done' ? 'var(--text-secondary)' : 'var(--text-primary)', textDecoration: task.status === 'done' ? 'line-through' : 'none' }}>
+          {task.title}
+        </span>
+      </button>
+      <div className="hidden md:flex items-center gap-2 flex-shrink-0">
+        <InlineDateChip
+          label="Start"
+          value={task.startDate}
+          onChange={(nextValue) => updateDateField('startDate', nextValue)}
+        />
+        <InlineDateChip
+          label="Due"
+          value={task.dueDate}
+          tone={isOverdue ? 'danger' : 'default'}
+          onChange={(nextValue) => updateDateField('dueDate', nextValue)}
+        />
+      </div>
       {task.subtasks?.length > 0 && (
         <span className="text-[10px] flex-shrink-0" style={{ color: 'var(--text-secondary)' }}>
           {task.subtasks.filter((s) => s.completed).length}/{task.subtasks.length}
         </span>
       )}
-      {task.dueDate && (
-        <span className="text-[10px] flex-shrink-0" style={{ color: isOverdue ? '#ef4444' : 'var(--text-secondary)' }}>
-          {new Date(task.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-        </span>
-      )}
-      <span className="text-[10px] px-1.5 py-0.5 rounded-full flex-shrink-0 font-medium"
-        style={{ background: `${STATUS_COLOR[task.status]}18`, color: STATUS_COLOR[task.status] }}>
-        {STATUS_LABEL[task.status]}
-      </span>
-    </button>
+      <InlineStatusChip value={task.status} onChange={(nextStatus) => updateTask(task.id, { status: nextStatus })} labels={STATUS_LABEL} colors={STATUS_COLOR} />
+    </div>
   )
 })
 
