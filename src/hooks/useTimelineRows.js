@@ -61,9 +61,9 @@ const getRangeFromTasks = (tasks = []) => {
 
 const getTaskSubtitle = (task, unscheduled = false, dependencyRisk = false) => {
   const priority = task.priority ? task.priority[0].toUpperCase() + task.priority.slice(1) : 'Medium'
-  const parts = [`${priority} priority`, STATUS_LABEL[task.status] ?? task.status]
-  if (unscheduled) parts.push('No dates set')
-  if (dependencyRisk) parts.push('Dependency risk')
+  const parts = [priority, STATUS_LABEL[task.status] ?? task.status]
+  if (unscheduled) parts.push('Unscheduled')
+  if (dependencyRisk) parts.push('Needs dependency')
   return parts.join(' · ')
 }
 
@@ -308,6 +308,7 @@ const useTimelineRows = ({
       criticalCount: criticalTasks.length,
       dependencyRiskCount: dependencyRiskTasks.length,
       totalCount: allTasks.length,
+      doneCount,
       unscheduledCount: unscheduledTasks.length,
       childProjectCount: childRows.filter((row) => row.type === 'project' && row.depth === depth + 1).length,
     }
@@ -470,6 +471,7 @@ const useTimelineRows = ({
         dependencyRiskCount: sectionStats.dependencyRiskCount + directStats.dependencyRiskCount,
         unscheduledCount: sectionStats.unscheduledCount + directStats.unscheduledCount,
         totalCount: programTasks.length,
+        doneCount: programTasks.filter((task) => task.status === 'done').length,
         projectCount: projectRows.length,
       }
 
@@ -526,6 +528,7 @@ const useTimelineRows = ({
           dependencyRiskCount: sectionStats.dependencyRiskCount,
           unscheduledCount: sectionStats.unscheduledCount,
           totalCount: unassignedTasks.length,
+          doneCount: unassignedTasks.filter((task) => task.status === 'done').length,
           projectCount: unassignedProjectRows.length,
         }
 

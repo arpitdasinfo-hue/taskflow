@@ -1,5 +1,5 @@
-import { memo, useRef, useState } from 'react'
-import { CheckSquare2, ChevronDown, ChevronRight, FolderKanban, GitBranch, Layers3, Link2 } from 'lucide-react'
+import { memo, useMemo, useRef, useState } from 'react'
+import { CheckSquare2, ChevronDown, ChevronRight, FolderKanban, Layers3 } from 'lucide-react'
 import { ROW_HEIGHT, STATUS_COLOR } from './timelineConfig'
 import { addDays, clamp, diffDays, startOfDay, toDisplayDate } from './timelineUtils'
 import TimelineProjectBar from './TimelineProjectBar'
@@ -22,6 +22,42 @@ const getRowIcon = (type) => {
   if (type === 'program') return Layers3
   if (type === 'project') return FolderKanban
   return CheckSquare2
+}
+
+const getSummaryChips = (row, compact) => {
+  if (row.type === 'task') return []
+
+  const chips = []
+
+  if (row.type === 'program' && typeof row.projectCount === 'number' && row.projectCount > 0) {
+    chips.push({ label: `${row.projectCount} projects`, tone: 'accent' })
+  } else if (row.type === 'project' && typeof row.childProjectCount === 'number' && row.childProjectCount > 0) {
+    chips.push({ label: `${row.childProjectCount} sub-projects`, tone: 'muted' })
+  } else if (typeof row.totalCount === 'number' && row.totalCount > 0) {
+    chips.push({ label: `${row.totalCount} tasks`, tone: 'muted' })
+  }
+
+  if (typeof row.doneCount === 'number' && typeof row.totalCount === 'number' && row.totalCount > 0) {
+    chips.push({ label: `${row.doneCount}/${row.totalCount} done`, tone: 'success' })
+  }
+
+  if (row.criticalCount > 0) chips.push({ label: `${row.criticalCount} critical`, tone: 'danger' })
+  else if (row.delayedCount > 0) chips.push({ label: `${row.delayedCount} late`, tone: 'warning' })
+  else if (row.dependencyRiskCount > 0) chips.push({ label: `${row.dependencyRiskCount} at risk`, tone: 'risk' })
+  else if (row.unscheduledCount > 0) chips.push({ label: `${row.unscheduledCount} unscheduled`, tone: 'muted' })
+  else if (row.type === 'program') chips.push({ label: 'On track', tone: 'calm' })
+
+  return chips.slice(0, compact ? 2 : 3)
+}
+
+const getChipStyle = (tone) => {
+  if (tone === 'accent') return { background: 'rgba(var(--accent-rgb),0.12)', color: 'var(--accent)' }
+  if (tone === 'success') return { background: 'rgba(16,185,129,0.14)', color: '#34d399' }
+  if (tone === 'danger') return { background: 'rgba(239,68,68,0.14)', color: '#f87171' }
+  if (tone === 'warning') return { background: 'rgba(249,115,22,0.14)', color: '#fb923c' }
+  if (tone === 'risk') return { background: 'rgba(56,189,248,0.14)', color: '#7dd3fc' }
+  if (tone === 'calm') return { background: 'rgba(148,163,184,0.12)', color: '#cbd5e1' }
+  return { background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)' }
 }
 
 const getFallbackBarStyle = (row, item, width) => {
@@ -56,6 +92,7 @@ const TimelineRow = memo(function TimelineRow({
   onUpdateProjectSchedule,
   onCreateTaskInRange,
   readOnly = false,
+  compact = false,
 }) {
   const height = ROW_HEIGHT[row.type] ?? 36
   const todayOffset = diffDays(startDate, startOfDay(new Date()))
@@ -66,6 +103,17 @@ const TimelineRow = memo(function TimelineRow({
   const createSurfaceRef = useRef(null)
   const createInteractionRef = useRef(null)
   const [createDraft, setCreateDraft] = useState(null)
+  const summaryChips = useMemo(() => getSummaryChips(row, compact), [row, compact])
+  const laneBackground = row.type === 'program'
+    ? 'linear-gradient(90deg, rgba(255,255,255,0.03), rgba(255,255,255,0.008))'
+    : row.type === 'project'
+      ? 'rgba(255,255,255,0.012)'
+      : 'rgba(255,255,255,0.003)'
+  const railBackground = row.type === 'program'
+    ? 'linear-gradient(180deg, rgba(10,26,42,0.98), rgba(7,18,31,0.95))'
+    : row.type === 'project'
+      ? 'rgba(8,20,35,0.9)'
+      : 'rgba(8,20,35,0.82)'
 
   const resolveCreateOffset = (clientX) => {
     const rect = createSurfaceRef.current?.getBoundingClientRect()
@@ -136,14 +184,20 @@ const TimelineRow = memo(function TimelineRow({
   const showSummaryBadges = !isTask
 
   return (
-    <div className="flex" style={{ minHeight: height, borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+    <div
+      className="flex"
+      style={{
+        minHeight: height,
+        borderBottom: row.type === 'program' ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(255,255,255,0.04)',
+      }}
+    >
       <div
-        className="flex-shrink-0 sticky left-0 z-10 border-r px-3 flex items-center gap-2"
+        className="flex-shrink-0 sticky left-0 z-10 border-r px-3 flex items-center gap-2.5"
         style={{
           width: leftColumnWidth,
           borderColor: 'rgba(255,255,255,0.08)',
-          background: row.type === 'program' ? 'rgba(8,20,35,0.97)' : 'rgba(8,20,35,0.92)',
-          paddingLeft: `${12 + row.depth * 14}px`,
+          background: railBackground,
+          paddingLeft: `${12 + row.depth * 12}px`,
         }}
       >
         {isProject && row.expandable ? (
@@ -159,68 +213,41 @@ const TimelineRow = memo(function TimelineRow({
           <span className="w-3 flex-shrink-0" />
         )}
 
-        {isTask ? <GitBranch size={10} style={{ color: 'var(--text-secondary)' }} /> : <RowIcon size={12} style={{ color: 'var(--text-secondary)' }} />}
+        <div
+          className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-xl"
+          style={{ background: row.type === 'program' ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.05)' }}
+        >
+          <RowIcon size={compact ? 12 : 13} style={{ color: 'var(--text-secondary)' }} />
+        </div>
         <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: row.color }} />
 
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 overflow-hidden">
           <div className="flex items-center gap-2 min-w-0">
-            <p className={`truncate ${isTask ? 'text-[11px]' : 'text-xs font-semibold'}`} style={{ color: 'var(--text-primary)' }}>
+            <p className={`truncate ${isTask ? 'text-[11px] font-medium' : 'text-[12px] font-semibold'}`} style={{ color: 'var(--text-primary)' }}>
               {row.label}
             </p>
-            {!isTask && (
-              <span
-                className="text-[9px] uppercase tracking-[0.18em] px-1.5 py-0.5 rounded-full flex-shrink-0"
-                style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)' }}
-              >
-                {row.type}
-              </span>
-            )}
           </div>
-          {row.subtitle ? (
+          {showSummaryBadges ? (
+            <div className="mt-1 flex items-center gap-1.5 overflow-hidden">
+              {summaryChips.map((chip) => (
+                <span
+                  key={`${row.id}-${chip.label}`}
+                  className="max-w-[110px] truncate rounded-full px-1.5 py-0.5 text-[9px] font-medium"
+                  style={getChipStyle(chip.tone)}
+                >
+                  {chip.label}
+                </span>
+              ))}
+            </div>
+          ) : row.subtitle ? (
             <p className="text-[10px] truncate" style={{ color: 'var(--text-secondary)' }}>
               {row.subtitle}
             </p>
           ) : null}
         </div>
-
-        {showSummaryBadges && (
-          <div className="flex items-center gap-1 flex-shrink-0">
-            {typeof row.projectCount === 'number' && row.projectCount > 0 && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(var(--accent-rgb),0.12)', color: 'var(--accent)' }}>
-                {row.projectCount} projects
-              </span>
-            )}
-            {typeof row.childProjectCount === 'number' && row.childProjectCount > 0 && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)' }}>
-                {row.childProjectCount} sub-projects
-              </span>
-            )}
-            {row.unscheduledCount > 0 && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(255,255,255,0.08)', color: '#cbd5e1' }}>
-                {row.unscheduledCount} unscheduled
-              </span>
-            )}
-            {row.delayedCount > 0 && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(249,115,22,0.2)', color: '#fb923c' }}>
-                {row.delayedCount} late
-              </span>
-            )}
-            {row.criticalCount > 0 && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(239,68,68,0.2)', color: '#f87171' }}>
-                {row.criticalCount} critical
-              </span>
-            )}
-            {row.dependencyRiskCount > 0 && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded-full flex items-center gap-1" style={{ background: 'rgba(56,189,248,0.16)', color: '#7dd3fc' }}>
-                <Link2 size={9} />
-                {row.dependencyRiskCount}
-              </span>
-            )}
-          </div>
-        )}
       </div>
 
-      <div className="relative flex-1" style={{ minWidth: days * cellWidth, height }}>
+      <div className="relative flex-1" style={{ minWidth: days * cellWidth, height, background: laneBackground }}>
         <div
           className="absolute inset-0"
           style={{
@@ -237,7 +264,6 @@ const TimelineRow = memo(function TimelineRow({
             onPointerUp={finishCreateTask}
             onPointerCancel={finishCreateTask}
             style={{ cursor: 'crosshair' }}
-            title={`Drag on empty space to create a task in ${row.label}`}
           />
         )}
 

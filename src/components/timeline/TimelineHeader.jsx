@@ -27,11 +27,11 @@ const TimelineHeader = memo(function TimelineHeader({ startDate, days, cellWidth
     <div className="sticky top-0 z-20">
       <div className="flex" style={{ background: 'rgba(7,18,31,0.97)', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
         <div className="flex-shrink-0 border-r px-3 py-1.5" style={{ width: leftColumnWidth, borderColor: 'rgba(255,255,255,0.08)' }}>
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center justify-between gap-2 min-w-0">
             <span className="text-[10px] font-semibold uppercase tracking-[0.18em]" style={{ color: 'var(--text-secondary)' }}>
               Workstream
             </span>
-            <span className="text-[10px]" style={{ color: 'var(--text-secondary)' }}>
+            <span className="text-[10px] truncate" style={{ color: 'var(--text-secondary)' }}>
               {zoom === 'week' ? 'Day view' : zoom === 'month' ? 'Delivery view' : 'Roadmap view'}
             </span>
           </div>
