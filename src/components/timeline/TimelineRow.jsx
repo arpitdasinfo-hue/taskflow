@@ -24,30 +24,42 @@ const getRowIcon = (type) => {
   return CheckSquare2
 }
 
-const getSummaryChips = (row, compact) => {
-  if (row.type === 'task') return []
+const getSummaryLine = (row) => {
+  if (row.type === 'task') return row.subtitle || 'Task'
 
-  const chips = []
+  const pieces = [row.type === 'program' ? 'Program' : 'Project']
 
   if (row.type === 'program' && typeof row.projectCount === 'number' && row.projectCount > 0) {
-    chips.push({ label: `${row.projectCount} projects`, tone: 'accent' })
-  } else if (row.type === 'project' && typeof row.childProjectCount === 'number' && row.childProjectCount > 0) {
-    chips.push({ label: `${row.childProjectCount} sub-projects`, tone: 'muted' })
-  } else if (typeof row.totalCount === 'number' && row.totalCount > 0) {
-    chips.push({ label: `${row.totalCount} tasks`, tone: 'muted' })
+    pieces.push(`${row.projectCount} projects`)
   }
 
-  if (typeof row.doneCount === 'number' && typeof row.totalCount === 'number' && row.totalCount > 0) {
-    chips.push({ label: `${row.doneCount}/${row.totalCount} done`, tone: 'success' })
+  if (row.type === 'project' && typeof row.childProjectCount === 'number' && row.childProjectCount > 0) {
+    pieces.push(`${row.childProjectCount} sub-projects`)
   }
 
-  if (row.criticalCount > 0) chips.push({ label: `${row.criticalCount} critical`, tone: 'danger' })
-  else if (row.delayedCount > 0) chips.push({ label: `${row.delayedCount} late`, tone: 'warning' })
-  else if (row.dependencyRiskCount > 0) chips.push({ label: `${row.dependencyRiskCount} at risk`, tone: 'risk' })
-  else if (row.unscheduledCount > 0) chips.push({ label: `${row.unscheduledCount} unscheduled`, tone: 'muted' })
-  else if (row.type === 'program') chips.push({ label: 'On track', tone: 'calm' })
+  if (typeof row.totalCount === 'number' && row.totalCount > 0) {
+    pieces.push(`${row.totalCount} tasks`)
+  }
 
-  return chips.slice(0, compact ? 2 : 3)
+  return pieces.join(' • ')
+}
+
+const getStatusPills = (row, compact) => {
+  if (row.type === 'task') return []
+
+  const pills = []
+
+  if (typeof row.doneCount === 'number' && row.doneCount > 0) {
+    pills.push({ label: `${row.doneCount} done`, tone: 'success' })
+  }
+
+  if (row.criticalCount > 0) pills.push({ label: `${row.criticalCount} critical`, tone: 'danger' })
+  else if (row.delayedCount > 0) pills.push({ label: `${row.delayedCount} late`, tone: 'warning' })
+  else if (row.dependencyRiskCount > 0) pills.push({ label: `${row.dependencyRiskCount} at risk`, tone: 'risk' })
+  else if (row.unscheduledCount > 0) pills.push({ label: `${row.unscheduledCount} unscheduled`, tone: 'muted' })
+  else pills.push({ label: 'On track', tone: 'calm' })
+
+  return pills.slice(0, compact ? 1 : 2)
 }
 
 const getChipStyle = (tone) => {
@@ -103,7 +115,8 @@ const TimelineRow = memo(function TimelineRow({
   const createSurfaceRef = useRef(null)
   const createInteractionRef = useRef(null)
   const [createDraft, setCreateDraft] = useState(null)
-  const summaryChips = useMemo(() => getSummaryChips(row, compact), [row, compact])
+  const summaryLine = useMemo(() => getSummaryLine(row), [row])
+  const statusPills = useMemo(() => getStatusPills(row, compact), [row, compact])
   const laneBackground = row.type === 'program'
     ? 'linear-gradient(90deg, rgba(255,255,255,0.03), rgba(255,255,255,0.008))'
     : row.type === 'project'
@@ -180,9 +193,6 @@ const TimelineRow = memo(function TimelineRow({
       dueDate: end.toISOString(),
     })
   }
-
-  const showSummaryBadges = !isTask
-
   return (
     <div
       className="flex"
@@ -223,28 +233,28 @@ const TimelineRow = memo(function TimelineRow({
 
         <div className="min-w-0 flex-1 overflow-hidden">
           <div className="flex items-center gap-2 min-w-0">
-            <p className={`truncate ${isTask ? 'text-[11px] font-medium' : 'text-[12px] font-semibold'}`} style={{ color: 'var(--text-primary)' }}>
+            <p className={`truncate ${isTask ? 'text-[11px] font-medium' : 'text-[13px] font-semibold'}`} style={{ color: 'var(--text-primary)' }}>
               {row.label}
             </p>
           </div>
-          {showSummaryBadges ? (
-            <div className="mt-1 flex items-center gap-1.5 overflow-hidden">
-              {summaryChips.map((chip) => (
-                <span
-                  key={`${row.id}-${chip.label}`}
-                  className="max-w-[110px] truncate rounded-full px-1.5 py-0.5 text-[9px] font-medium"
-                  style={getChipStyle(chip.tone)}
-                >
-                  {chip.label}
-                </span>
-              ))}
-            </div>
-          ) : row.subtitle ? (
-            <p className="text-[10px] truncate" style={{ color: 'var(--text-secondary)' }}>
-              {row.subtitle}
-            </p>
-          ) : null}
+          <p className={`mt-0.5 truncate ${isTask ? 'text-[10px]' : 'text-[11px]'}`} style={{ color: 'var(--text-secondary)' }}>
+            {summaryLine}
+          </p>
         </div>
+
+        {!isTask && statusPills.length > 0 ? (
+          <div className="flex flex-col items-end gap-1 pl-2 flex-shrink-0">
+            {statusPills.map((pill) => (
+              <span
+                key={`${row.id}-${pill.label}`}
+                className={`rounded-full px-2 py-0.5 font-medium whitespace-nowrap ${compact ? 'text-[9px]' : 'text-[10px]'}`}
+                style={getChipStyle(pill.tone)}
+              >
+                {pill.label}
+              </span>
+            ))}
+          </div>
+        ) : null}
       </div>
 
       <div className="relative flex-1" style={{ minWidth: days * cellWidth, height, background: laneBackground }}>

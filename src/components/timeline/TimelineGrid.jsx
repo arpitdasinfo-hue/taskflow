@@ -4,7 +4,7 @@ import TimelineRow from './TimelineRow'
 import { ROW_HEIGHT } from './timelineConfig'
 import { addDays, clamp, diffDays, startOfDay, toDisplayDate } from './timelineUtils'
 
-const LEFT_COLUMN_WIDTH = 280
+const LEFT_COLUMN_WIDTH = 312
 
 const getItemRange = (item) => {
   const start = toDisplayDate(item.startDate) || toDisplayDate(item.dueDate)
@@ -28,7 +28,7 @@ const TimelineGrid = memo(function TimelineGrid({
   readOnly = false,
   compact = false,
 }) {
-  const leftColumnWidth = compact ? 220 : LEFT_COLUMN_WIDTH
+  const leftColumnWidth = compact ? 268 : LEFT_COLUMN_WIDTH
   const dependencyLayer = useMemo(() => {
     const rowOffsets = new Map()
     let totalHeight = 0
