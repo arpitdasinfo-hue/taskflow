@@ -493,7 +493,7 @@ const ManagerGantt = ({ programs, projects, tasks, milestones }) => {
         />
       )}
 
-      <TimelineLegend readOnly compact />
+      <TimelineLegend readOnly />
 
       {rows.length === 0 ? (
         <div className="px-2 py-3 text-xs" style={{ color: 'var(--text-secondary)' }}>
@@ -517,7 +517,6 @@ const ManagerGantt = ({ programs, projects, tasks, milestones }) => {
             showDependencies={showDependencies}
             onlyDependencyRisk={onlyDependencyRisk}
             readOnly
-            compact
           />
         </div>
       )}
