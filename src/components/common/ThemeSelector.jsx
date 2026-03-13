@@ -48,7 +48,9 @@ const ThemeSelector = memo(function ThemeSelector() {
           {' '}
           {contrastMode === 'high' ? 'High contrast' : 'Standard contrast'} ·
           {' '}
-          {uiDensity === 'compact' ? 'Compact density' : 'Comfortable density'}
+          {uiDensity === 'compact' ? 'Compact density' : 'Comfortable density'} ·
+          {' '}
+          Synced across signed-in devices
         </span>
       </div>
 

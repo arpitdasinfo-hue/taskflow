@@ -26,14 +26,16 @@ const ISSUE_TONE = {
 }
 
 const TimelinePlanningPanel = memo(function TimelinePlanningPanel({
-  savedViews,
-  activeSavedViewId,
+  savedViews = [],
+  activeSavedViewId = null,
   onApplySavedView,
   onSaveCurrentView,
   onDeleteSavedView,
   onOpenRiskView,
   onExpandAll,
-  insights,
+  insights = { cards: [], issues: [], scopeSummary: { programCount: 0, projectCount: 0, taskCount: 0 } },
+  showSavedViews = true,
+  showInsights = true,
 }) {
   const [composerOpen, setComposerOpen] = useState(false)
   const [draftName, setDraftName] = useState('')
@@ -46,9 +48,15 @@ const TimelinePlanningPanel = memo(function TimelinePlanningPanel({
     setComposerOpen(false)
   }
 
+  const panelCount = Number(showSavedViews) + Number(showInsights)
+  const gridClass = panelCount > 1 ? 'grid grid-cols-1 xl:grid-cols-[1.1fr_1.3fr] gap-3' : 'grid grid-cols-1 gap-3'
+
+  if (!showSavedViews && !showInsights) return null
+
   return (
     <div className="px-4 md:px-6 pb-3">
-      <div className="grid grid-cols-1 xl:grid-cols-[1.1fr_1.3fr] gap-3">
+      <div className={gridClass}>
+        {showSavedViews && (
         <section
           className="rounded-[20px] p-4"
           style={{
@@ -183,7 +191,9 @@ const TimelinePlanningPanel = memo(function TimelinePlanningPanel({
             </div>
           )}
         </section>
+        )}
 
+        {showInsights && (
         <section
           className="rounded-[20px] p-4"
           style={{
@@ -277,6 +287,7 @@ const TimelinePlanningPanel = memo(function TimelinePlanningPanel({
             </div>
           )}
         </section>
+        )}
       </div>
     </div>
   )

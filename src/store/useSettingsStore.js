@@ -79,6 +79,25 @@ const applyThemeToDom = (theme, { contrastMode = 'standard', uiDensity = 'comfor
   if (meta) meta.setAttribute('content', tokens.accent)
 }
 
+const normalizeThemePreferences = (raw) => {
+  const candidate = raw && typeof raw === 'object' ? raw : {}
+  const nextThemeIndex = Number(candidate.themeIndex)
+  const nextRotationDays = Number(candidate.themeRotationDays)
+
+  return {
+    themeIndex: Number.isFinite(nextThemeIndex)
+      ? Math.max(0, Math.min(THEMES.length - 1, Math.round(nextThemeIndex)))
+      : 0,
+    themeLastChanged: candidate.themeLastChanged || new Date().toISOString(),
+    themeMode: candidate.themeMode === 'manual' ? 'manual' : 'auto',
+    themeRotationDays: Number.isFinite(nextRotationDays) && nextRotationDays > 0
+      ? Math.round(nextRotationDays)
+      : THEME_ROTATION_DAYS,
+    contrastMode: candidate.contrastMode === 'high' ? 'high' : 'standard',
+    uiDensity: candidate.uiDensity === 'compact' ? 'compact' : 'comfortable',
+  }
+}
+
 const useSettingsStore = create(
   persist(
     immer((set, get) => ({
@@ -103,6 +122,34 @@ const useSettingsStore = create(
       applyCurrentTheme: () => {
         const { themeIndex, contrastMode, uiDensity } = get()
         applyThemeToDom(THEMES[themeIndex] ?? THEMES[0], { contrastMode, uiDensity })
+      },
+
+      getThemeSyncPayload: () => {
+        const state = get()
+        return normalizeThemePreferences({
+          themeIndex: state.themeIndex,
+          themeLastChanged: state.themeLastChanged,
+          themeMode: state.themeMode,
+          themeRotationDays: state.themeRotationDays,
+          contrastMode: state.contrastMode,
+          uiDensity: state.uiDensity,
+        })
+      },
+
+      hydrateThemeFromRemote: (raw) => {
+        const next = normalizeThemePreferences(raw)
+        set((state) => {
+          state.themeIndex = next.themeIndex
+          state.themeLastChanged = next.themeLastChanged
+          state.themeMode = next.themeMode
+          state.themeRotationDays = next.themeRotationDays
+          state.contrastMode = next.contrastMode
+          state.uiDensity = next.uiDensity
+          applyThemeToDom(THEMES[state.themeIndex] ?? THEMES[0], {
+            contrastMode: state.contrastMode,
+            uiDensity: state.uiDensity,
+          })
+        })
       },
 
       // ── Theme ─────────────────────────────────────────────────────────

@@ -57,6 +57,13 @@ const useAuthStore = create((set, get) => ({
       }
     }
 
+    if (restoredSession?.user) {
+      const { data: freshUser, error } = await supabase.auth.getUser()
+      if (!error && freshUser?.user) {
+        restoredSession = { ...restoredSession, user: freshUser.user }
+      }
+    }
+
     storeSessionBackup(restoredSession)
     set({ session: restoredSession, user: restoredSession?.user ?? null, loading: false })
 

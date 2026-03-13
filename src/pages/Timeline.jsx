@@ -12,7 +12,6 @@ import useTaskStore from '../store/useTaskStore'
 import useSettingsStore from '../store/useSettingsStore'
 import useTimelineScale from '../hooks/useTimelineScale'
 import useTimelineRows from '../hooks/useTimelineRows'
-import useTimelineIntelligence from '../hooks/useTimelineIntelligence'
 
 const NOTICE_TIMEOUT_MS = 6000
 
@@ -246,15 +245,6 @@ const Timeline = memo(function Timeline() {
     onlyCritical,
     onlyDependencyRisk,
     searchQuery,
-  })
-
-  const insights = useTimelineIntelligence({
-    programs,
-    projects,
-    tasks,
-    filteredProgramIds,
-    filteredProjectIds,
-    filteredSubProjectIds,
   })
 
   const visibleCounts = useMemo(() => ({
@@ -549,9 +539,7 @@ const Timeline = memo(function Timeline() {
         onApplySavedView={applySavedView}
         onSaveCurrentView={saveCurrentView}
         onDeleteSavedView={deleteGanttView}
-        onOpenRiskView={() => applyViewMode('risk')}
-        onExpandAll={expandAllProjects}
-        insights={insights}
+        showInsights={false}
       />
 
       {showFilterPanel && (

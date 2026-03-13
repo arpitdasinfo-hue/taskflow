@@ -2,6 +2,9 @@ import { memo } from 'react'
 import { BarChart3, CheckCircle2, Clock, AlertTriangle, TrendingUp, Milestone, ArrowRight } from 'lucide-react'
 import Header from '../components/layout/Header'
 import { ProgramStatusBadge, ProgramHealthBadge } from '../components/common/ProgramStatusBadge'
+import TimelinePlanningPanel from '../components/timeline/TimelinePlanningPanel'
+import useTaskStore from '../store/useTaskStore'
+import useTimelineIntelligence from '../hooks/useTimelineIntelligence'
 import { useAllProgramStats } from '../hooks/useProgramStats'
 import useProjectStore from '../store/useProjectStore'
 import useSettingsStore from '../store/useSettingsStore'
@@ -185,7 +188,19 @@ const OverallSummary = memo(function OverallSummary({ allStats, programs }) {
 // ── Program Dashboard page ────────────────────────────────────────────────────
 const ProgramDashboard = memo(function ProgramDashboard() {
   const programs  = useProjectStore((s) => s.programs)
+  const projects  = useProjectStore((s) => s.projects)
+  const tasks     = useTaskStore((s) => s.tasks)
+  const setPage   = useSettingsStore((s) => s.setPage)
+  const setGanttConfig = useSettingsStore((s) => s.setGanttConfig)
   const allStats  = useAllProgramStats()
+  const insights  = useTimelineIntelligence({
+    programs,
+    projects,
+    tasks,
+    filteredProgramIds: new Set(),
+    filteredProjectIds: new Set(),
+    filteredSubProjectIds: new Set(),
+  })
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
@@ -205,6 +220,29 @@ const ProgramDashboard = memo(function ProgramDashboard() {
         ) : (
           <>
             <OverallSummary allStats={allStats} programs={programs} />
+
+            <TimelinePlanningPanel
+              showSavedViews={false}
+              insights={insights}
+              onOpenRiskView={() => {
+                setGanttConfig({
+                  viewMode: 'risk',
+                  showDependencies: true,
+                  onlyDelayed: true,
+                  onlyCritical: true,
+                  onlyDependencyRisk: true,
+                })
+                setPage('timeline')
+              }}
+              onExpandAll={() => {
+                setGanttConfig({
+                  expandedProjectIds: projects
+                    .filter((project) => tasks.some((task) => task.projectId === project.id))
+                    .map((project) => project.id),
+                })
+                setPage('timeline')
+              }}
+            />
 
             <div className="grid gap-4 md:grid-cols-2">
               {programs.map((program) => (

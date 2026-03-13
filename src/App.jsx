@@ -1,4 +1,4 @@
-import { useEffect, lazy, Suspense, Component, useRef, useState } from 'react'
+import { useEffect, lazy, Suspense, Component, useMemo, useRef, useState } from 'react'
 import { registerSW } from 'virtual:pwa-register'
 import Sidebar from './components/layout/Sidebar'
 import BottomNav from './components/layout/BottomNav'
@@ -148,6 +148,13 @@ export default function App() {
 
   const activePage     = useSettingsStore((s) => s.activePage)
   const selectedTaskId = useSettingsStore((s) => s.selectedTaskId)
+  const themeIndex     = useSettingsStore((s) => s.themeIndex)
+  const themeLastChanged = useSettingsStore((s) => s.themeLastChanged)
+  const themeMode      = useSettingsStore((s) => s.themeMode)
+  const themeRotationDays = useSettingsStore((s) => s.themeRotationDays)
+  const contrastMode   = useSettingsStore((s) => s.contrastMode)
+  const uiDensity      = useSettingsStore((s) => s.uiDensity)
+  const hydrateThemeFromRemote = useSettingsStore((s) => s.hydrateThemeFromRemote)
   const session        = useAuthStore((s) => s.session)
   const user           = useAuthStore((s) => s.user)
   const loading        = useAuthStore((s) => s.loading)
@@ -161,6 +168,34 @@ export default function App() {
   const [needRefresh, setNeedRefresh] = useState(false)
   const [offlineReady, setOfflineReady] = useState(false)
   const updateServiceWorkerRef = useRef(() => {})
+  const themeSyncTimerRef = useRef(null)
+  const lastAppliedRemoteThemeRef = useRef('')
+
+  const themeSyncPayload = useMemo(() => ({
+    themeIndex,
+    themeLastChanged,
+    themeMode,
+    themeRotationDays,
+    contrastMode,
+    uiDensity,
+  }), [
+    themeIndex,
+    themeLastChanged,
+    themeMode,
+    themeRotationDays,
+    contrastMode,
+    uiDensity,
+  ])
+
+  const themeSyncPayloadJson = useMemo(
+    () => JSON.stringify(themeSyncPayload),
+    [themeSyncPayload]
+  )
+
+  const remoteThemePayloadJson = useMemo(
+    () => JSON.stringify(user?.user_metadata?.taskflow_theme_preferences ?? null),
+    [user?.user_metadata]
+  )
 
   const shareToken = window.location.pathname.startsWith('/share/')
     ? window.location.pathname.split('/share/')[1]
@@ -178,6 +213,53 @@ export default function App() {
 
     updateServiceWorkerRef.current = updateServiceWorker
   }, [])
+
+  useEffect(() => () => {
+    if (themeSyncTimerRef.current) clearTimeout(themeSyncTimerRef.current)
+  }, [])
+
+  useEffect(() => {
+    if (!user?.id) {
+      lastAppliedRemoteThemeRef.current = ''
+      return
+    }
+
+    if (remoteThemePayloadJson === lastAppliedRemoteThemeRef.current) return
+
+    const remoteTheme = user?.user_metadata?.taskflow_theme_preferences ?? null
+    if (remoteTheme) {
+      hydrateThemeFromRemote(remoteTheme)
+    }
+
+    lastAppliedRemoteThemeRef.current = remoteThemePayloadJson
+  }, [user?.id, user?.user_metadata, remoteThemePayloadJson, hydrateThemeFromRemote])
+
+  useEffect(() => {
+    if (!session || !user?.id) return
+    if (themeSyncPayloadJson === remoteThemePayloadJson) return
+
+    if (themeSyncTimerRef.current) clearTimeout(themeSyncTimerRef.current)
+    themeSyncTimerRef.current = setTimeout(async () => {
+      const latestUser = useAuthStore.getState().user
+      const latestRemoteJson = JSON.stringify(latestUser?.user_metadata?.taskflow_theme_preferences ?? null)
+      if (latestRemoteJson === themeSyncPayloadJson) return
+
+      const { error } = await supabase.auth.updateUser({
+        data: {
+          ...(latestUser?.user_metadata ?? {}),
+          taskflow_theme_preferences: themeSyncPayload,
+        },
+      })
+
+      if (!error) {
+        lastAppliedRemoteThemeRef.current = themeSyncPayloadJson
+      }
+    }, 450)
+
+    return () => {
+      if (themeSyncTimerRef.current) clearTimeout(themeSyncTimerRef.current)
+    }
+  }, [session, user?.id, remoteThemePayloadJson, themeSyncPayload, themeSyncPayloadJson])
 
   useEffect(() => {
     let cancelled = false
