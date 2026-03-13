@@ -6,7 +6,7 @@ import BulkActionBar from '../components/tasks/BulkActionBar'
 import CommitTaskMenu from '../components/planning/CommitTaskMenu'
 import EmptyState from '../components/common/EmptyState'
 import Header from '../components/layout/Header'
-import { ListTodo, ChevronRight, CheckSquare } from 'lucide-react'
+import { ListTodo, ChevronRight, CheckSquare, CalendarDays, ChevronDown } from 'lucide-react'
 import useSettingsStore from '../store/useSettingsStore'
 import useTaskStore from '../store/useTaskStore'
 import useProjectStore from '../store/useProjectStore'
@@ -25,24 +25,81 @@ const STATUS_COLUMNS = [
   { id: 'blocked',     label: 'Blocked',     color: '#ef4444' },
 ]
 
-const InlineDateField = memo(function InlineDateField({ label, value, onChange }) {
+const STATUS_OPTIONS = Object.entries(STATUS_LABEL).map(([value, label]) => ({ value, label }))
+
+const toInputDateValue = (value) => {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+const formatInlineDate = (value, emptyLabel) => {
+  if (!value) return emptyLabel
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return emptyLabel
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+
+const InlineDateChip = memo(function InlineDateChip({ label, value, onChange, tone = 'default' }) {
+  const palette = tone === 'danger'
+    ? { background: 'rgba(239,68,68,0.12)', border: 'rgba(239,68,68,0.24)', color: '#fca5a5' }
+    : { background: 'rgba(255,255,255,0.05)', border: 'rgba(255,255,255,0.08)', color: 'var(--text-secondary)' }
+
   return (
-    <label className="flex flex-col gap-1 min-w-[108px]" onClick={(event) => event.stopPropagation()}>
-      <span className="text-[9px] font-semibold uppercase tracking-[0.16em]" style={{ color: 'var(--text-secondary)' }}>
-        {label}
-      </span>
+    <label
+      className="relative flex-shrink-0"
+      onClick={(event) => event.stopPropagation()}
+      title={label}
+    >
       <input
         type="date"
+        value={toInputDateValue(value)}
+        onChange={(event) => onChange(event.target.value)}
+        className="absolute inset-0 opacity-0 cursor-pointer"
+        style={{ colorScheme: 'light' }}
+      />
+      <span
+        className="pointer-events-none inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[10px] font-medium whitespace-nowrap"
+        style={{
+          background: palette.background,
+          border: `1px solid ${palette.border}`,
+          color: palette.color,
+        }}
+      >
+        <CalendarDays size={11} />
+        {formatInlineDate(value, label)}
+      </span>
+    </label>
+  )
+})
+
+const InlineStatusChip = memo(function InlineStatusChip({ value, onChange }) {
+  return (
+    <label
+      className="relative flex-shrink-0"
+      onClick={(event) => event.stopPropagation()}
+      title="Status"
+    >
+      <select
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="w-full text-[11px] px-2.5 py-1.5 rounded-xl"
-        style={{
-          background: 'rgba(255,255,255,0.05)',
-          border: '1px solid rgba(255,255,255,0.08)',
-          color: 'var(--text-primary)',
-          colorScheme: 'dark',
-        }}
-      />
+        className="absolute inset-0 opacity-0 cursor-pointer"
+      >
+        {STATUS_OPTIONS.map((option) => (
+          <option key={option.value} value={option.value}>{option.label}</option>
+        ))}
+      </select>
+      <span
+        className="pointer-events-none inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[10px] font-medium whitespace-nowrap"
+        style={{ background: `${STATUS_COLOR[value]}18`, color: STATUS_COLOR[value] }}
+      >
+        {STATUS_LABEL[value]}
+        <ChevronDown size={11} />
+      </span>
     </label>
   )
 })
@@ -132,6 +189,10 @@ const TaskRow = memo(function TaskRow({ task, selectMode }) {
     updateTask(task.id, { [field]: nextValue ? new Date(nextValue).toISOString() : null })
   }, [task.id, updateTask])
 
+  const updateStatusField = useCallback((nextStatus) => {
+    updateTask(task.id, { status: nextStatus })
+  }, [task.id, updateTask])
+
   return (
     <div
       className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-colors hover:bg-white/5 group"
@@ -166,7 +227,7 @@ const TaskRow = memo(function TaskRow({ task, selectMode }) {
       </button>
 
       {(project || program) && (
-        <span className="hidden sm:inline text-[10px] px-1.5 py-0.5 rounded-full flex-shrink-0"
+        <span className="hidden xl:inline text-[10px] px-1.5 py-0.5 rounded-full flex-shrink-0 max-w-[180px] truncate"
           style={{
             background: `${(project?.color ?? program?.color) || '#94a3b8'}18`,
             color: (project?.color ?? program?.color) || '#94a3b8',
@@ -175,15 +236,16 @@ const TaskRow = memo(function TaskRow({ task, selectMode }) {
         </span>
       )}
 
-      <div className="hidden lg:grid grid-cols-2 gap-2 flex-shrink-0">
-        <InlineDateField
+      <div className="hidden md:flex items-center gap-2 flex-shrink-0">
+        <InlineDateChip
           label="Start"
-          value={task.startDate ? new Date(task.startDate).toISOString().split('T')[0] : ''}
+          value={task.startDate}
           onChange={(nextValue) => updateDateField('startDate', nextValue)}
         />
-        <InlineDateField
+        <InlineDateChip
           label="Due"
-          value={task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : ''}
+          value={task.dueDate}
+          tone={isOverdue ? 'danger' : 'default'}
           onChange={(nextValue) => updateDateField('dueDate', nextValue)}
         />
       </div>
@@ -194,17 +256,7 @@ const TaskRow = memo(function TaskRow({ task, selectMode }) {
         </span>
       )}
 
-      {task.dueDate && (
-        <span className="text-[10px] flex-shrink-0"
-          style={{ color: isOverdue ? '#ef4444' : 'var(--text-secondary)' }}>
-          {new Date(task.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-        </span>
-      )}
-
-      <span className="text-[10px] px-1.5 py-0.5 rounded-full flex-shrink-0 font-medium"
-        style={{ background: `${STATUS_COLOR[task.status]}18`, color: STATUS_COLOR[task.status] }}>
-        {STATUS_LABEL[task.status]}
-      </span>
+      <InlineStatusChip value={task.status} onChange={updateStatusField} />
 
       {!selectMode && <CommitTaskMenu taskId={task.id} compact />}
 

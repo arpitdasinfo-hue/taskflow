@@ -10,9 +10,9 @@ const TimelineLegend = memo(function TimelineLegend({ readOnly = false, compact 
   ]
 
   return (
-    <div className={`px-4 md:px-6 ${compact ? 'pb-1.5' : 'pb-2'}`}>
+    <div className={compact ? 'px-2 pb-1.5' : 'px-4 md:px-6 pb-2'}>
       <div
-        className={`flex items-center gap-2 flex-wrap rounded-2xl ${compact ? 'px-2.5 py-1.5 overflow-x-auto whitespace-nowrap' : 'px-3 py-2'}`}
+        className={`flex items-center gap-2 flex-wrap rounded-2xl ${compact ? 'px-2 py-1.5 overflow-x-auto whitespace-nowrap' : 'px-3 py-2'}`}
         style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)' }}
       >
         <span className={`${compact ? 'text-[9px]' : 'text-[10px]'} uppercase tracking-wider font-semibold`} style={{ color: 'var(--text-secondary)' }}>

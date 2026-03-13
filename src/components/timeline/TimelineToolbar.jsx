@@ -35,13 +35,13 @@ const SummaryChip = ({ label, value, tone = 'neutral', compact = false }) => {
 
   return (
     <div
-      className={`rounded-2xl ${compact ? 'min-w-0 px-2.5 py-2' : 'min-w-[96px] px-3 py-2'}`}
+      className={`rounded-2xl ${compact ? 'min-w-0 px-2 py-1.5' : 'min-w-[96px] px-3 py-2'}`}
       style={{ background: palette.background, border: `1px solid ${palette.border}` }}
     >
-      <p className={`${compact ? 'text-[9px] tracking-[0.12em]' : 'text-[10px] tracking-[0.16em]'} uppercase`} style={{ color: 'var(--text-secondary)' }}>
+      <p className={`${compact ? 'text-[8px] tracking-[0.12em]' : 'text-[10px] tracking-[0.16em]'} uppercase truncate`} style={{ color: 'var(--text-secondary)' }}>
         {label}
       </p>
-      <p className={`${compact ? 'text-xs mt-1' : 'text-sm mt-1'} font-semibold whitespace-nowrap`} style={{ color: palette.color }}>
+      <p className={`${compact ? 'text-[11px] mt-0.5' : 'text-sm mt-1'} font-semibold whitespace-nowrap overflow-hidden text-ellipsis`} style={{ color: palette.color }}>
         {value}
       </p>
     </div>
@@ -103,7 +103,7 @@ const TimelineToolbar = memo(function TimelineToolbar({
   }
 
   const headerLayoutClass = compact
-    ? 'grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_300px]'
+    ? 'grid grid-cols-1 gap-2.5 xl:grid-cols-[minmax(0,1fr)_minmax(260px,320px)]'
     : 'flex items-start justify-between gap-4 flex-wrap'
 
   const summaryLayoutClass = compact
@@ -132,16 +132,16 @@ const TimelineToolbar = memo(function TimelineToolbar({
     ? 'grid grid-cols-1 gap-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]'
     : 'grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(320px,0.95fr)] gap-3'
 
-  const shellPaddingClass = compact ? 'rounded-[20px] p-3 md:p-4' : 'rounded-[24px] p-4 md:p-5'
-  const inputClass = compact ? 'w-full rounded-xl pl-10 pr-4 py-2 text-xs outline-none' : 'w-full rounded-2xl pl-10 pr-4 py-2.5 text-sm outline-none'
+  const shellPaddingClass = compact ? 'rounded-[18px] p-2.5 md:p-3' : 'rounded-[24px] p-4 md:p-5'
+  const inputClass = compact ? 'w-full rounded-xl pl-9 pr-3 py-2 text-xs outline-none' : 'w-full rounded-2xl pl-10 pr-4 py-2.5 text-sm outline-none'
   const selectClass = compact ? 'w-full text-xs px-3 py-2 rounded-xl' : 'w-full text-sm px-3 py-2 rounded-xl'
-  const actionButtonClass = compact ? 'inline-flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-xl text-[11px] font-medium transition-colors hover:bg-white/10' : 'inline-flex items-center justify-center gap-1 px-3 py-2 rounded-xl text-xs font-medium transition-colors hover:bg-white/10'
-  const secondaryButtonClass = compact ? 'inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[11px] font-medium disabled:opacity-40' : 'inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium disabled:opacity-40'
-  const toggleButtonClass = compact ? 'inline-flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-xl text-[11px] font-medium transition-colors' : 'inline-flex items-center justify-center gap-1 px-3 py-2 rounded-xl text-xs font-medium transition-colors'
+  const actionButtonClass = compact ? 'inline-flex items-center justify-center gap-1 px-2 py-1.5 rounded-xl text-[11px] font-medium transition-colors hover:bg-white/10' : 'inline-flex items-center justify-center gap-1 px-3 py-2 rounded-xl text-xs font-medium transition-colors hover:bg-white/10'
+  const secondaryButtonClass = compact ? 'inline-flex items-center gap-1.5 px-2 py-1.5 rounded-xl text-[11px] font-medium disabled:opacity-40' : 'inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium disabled:opacity-40'
+  const toggleButtonClass = compact ? 'inline-flex items-center justify-center gap-1 px-2 py-1.5 rounded-xl text-[11px] font-medium transition-colors' : 'inline-flex items-center justify-center gap-1 px-3 py-2 rounded-xl text-xs font-medium transition-colors'
   const segmentedButtonClass = compact ? 'flex-1 px-2 py-1.5 rounded-lg text-[11px] font-medium transition-colors min-w-0 whitespace-nowrap' : 'flex-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors'
 
   return (
-    <div className="px-4 md:px-6 pb-3">
+    <div className={compact ? 'px-2 pb-2' : 'px-4 md:px-6 pb-3'}>
       <div
         className={shellPaddingClass}
         style={{
@@ -201,7 +201,7 @@ const TimelineToolbar = memo(function TimelineToolbar({
               <input
                 value={searchQuery}
                 onChange={(event) => onSearchChange?.(event.target.value)}
-                placeholder="Search workstreams, projects, or tasks"
+                placeholder={compact ? 'Search workstreams or tasks' : 'Search workstreams, projects, or tasks'}
                 className={inputClass}
                 style={{
                   background: 'rgba(255,255,255,0.04)',
@@ -263,7 +263,7 @@ const TimelineToolbar = memo(function TimelineToolbar({
           </div>
 
           <div className={actionLayoutClass}>
-            <div className="flex items-center justify-between gap-1 rounded-xl px-2 py-1.5" style={{ background: 'rgba(255,255,255,0.04)' }}>
+            <div className="flex items-center justify-between gap-1 rounded-xl px-2 py-1.5 min-w-0" style={{ background: 'rgba(255,255,255,0.04)' }}>
               <button
                 onClick={() => onShiftRange(-1)}
                 className="p-1.5 rounded-lg hover:bg-white/10 transition-colors"
@@ -272,7 +272,7 @@ const TimelineToolbar = memo(function TimelineToolbar({
               >
                 <ChevronLeft size={15} />
               </button>
-              <span className="text-[11px] px-2 font-medium" style={{ color: 'var(--text-primary)' }}>
+              <span className="text-[11px] px-2 font-medium whitespace-nowrap overflow-hidden text-ellipsis" style={{ color: 'var(--text-primary)' }}>
                 {rangeLabel}
               </span>
               <button

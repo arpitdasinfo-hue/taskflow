@@ -130,8 +130,8 @@ const StatCard = ({ label, value, color }) => (
   </div>
 )
 
-const Section = ({ title, description, icon: Icon, action = null, children }) => (
-  <GlassCard padding="p-5">
+const Section = ({ title, description, icon: Icon, action = null, padding = 'p-5', children }) => (
+  <GlassCard padding={padding}>
     <div className="flex items-center justify-between gap-3 mb-4">
       <div className="flex items-center gap-2 min-w-0">
         <div
@@ -1451,6 +1451,7 @@ export default function ShareView({ token }) {
                     title="Gantt"
                     description="Timeline view of programs, projects, tasks, and milestones with the same filters available in this dashboard."
                     icon={ShieldCheck}
+                    padding="p-4"
                   >
                     <ManagerGantt
                       programs={filteredPrograms}
