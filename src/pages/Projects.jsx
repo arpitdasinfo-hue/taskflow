@@ -1213,28 +1213,33 @@ const StructureExplorer = memo(function StructureExplorer({
   const topLevelProjects = useMemo(() => projects.filter((project) => !project.parentId), [projects])
 
   return (
-    <GlassCard padding="p-4" rounded="rounded-[28px]" className="sticky top-4">
-      <div className="flex items-start justify-between gap-3 mb-4">
+    <GlassCard padding="p-3.5" rounded="rounded-[28px]" className="sticky top-4">
+      <div className="flex items-start justify-between gap-3 mb-3">
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>
             Structure
           </p>
-          <p className="mt-2 text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+          <p className="mt-1.5 text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
             Programs & Projects
           </p>
-          <p className="mt-1 text-xs leading-6" style={{ color: 'var(--text-secondary)' }}>
-            Navigate the portfolio structure without opening every workstream at once.
-          </p>
         </div>
-        <span
-          className="px-2 py-1 rounded-full text-[10px] font-semibold"
-          style={{ background: 'rgba(var(--accent-rgb),0.12)', color: 'var(--accent)' }}
-        >
-          {programs.length} programs
-        </span>
+        <div className="flex items-center gap-1.5 flex-wrap justify-end">
+          <span
+            className="px-2 py-1 rounded-full text-[10px] font-semibold"
+            style={{ background: 'rgba(var(--accent-rgb),0.12)', color: 'var(--accent)' }}
+          >
+            {programs.length} programs
+          </span>
+          <span
+            className="px-2 py-1 rounded-full text-[10px] font-semibold"
+            style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)' }}
+          >
+            {topLevelProjects.length} top-level projects
+          </span>
+        </div>
       </div>
 
-      <div className="space-y-3">
+      <div className="space-y-2.5">
         {programs.map((program) => {
           const programProjects = topLevelProjects.filter((project) => project.programId === program.id)
           const programTasks = tasks.filter((task) => taskMatchesProgram(task, program.id, projects))
@@ -1245,7 +1250,7 @@ const StructureExplorer = memo(function StructureExplorer({
           return (
             <div
               key={program.id}
-              className="rounded-2xl px-3 py-3"
+              className="rounded-2xl px-3 py-2.5"
               style={{
                 background: isExpanded ? `${program.color}10` : 'rgba(255,255,255,0.03)',
                 border: `1px solid ${isExpanded ? `${program.color}30` : 'rgba(255,255,255,0.06)'}`,
@@ -1259,17 +1264,15 @@ const StructureExplorer = memo(function StructureExplorer({
                     {programProjects.length} projects
                   </span>
                 </div>
-                <div className="mt-2 pl-5 text-[11px] flex items-center gap-2 flex-wrap" style={{ color: 'var(--text-secondary)' }}>
+                <div className="mt-1.5 pl-5 text-[11px] flex items-center gap-2 flex-wrap" style={{ color: 'var(--text-secondary)' }}>
                   <span>{programTasks.length} tasks</span>
                   <span>{programTasks.filter((task) => task.status === 'done').length} done</span>
-                  {isProgramActive && !activeProjectId && (
-                    <span style={{ color: 'var(--accent)' }}>Open in detail</span>
-                  )}
+                  {isProgramActive && !activeProjectId && <span style={{ color: 'var(--accent)' }}>Selected</span>}
                 </div>
               </button>
 
               {isExpanded && programProjects.length > 0 && (
-                <div className="mt-3 pl-5 space-y-1.5">
+                <div className="mt-2.5 pl-5 space-y-1.5">
                   {programProjects.map((project) => {
                     const projectTasks = tasks.filter((task) => task.projectId === project.id)
                     const isProjectActive = activeProjectId === project.id
@@ -1303,7 +1306,7 @@ const StructureExplorer = memo(function StructureExplorer({
           <button
             type="button"
             onClick={onSelectUnassigned}
-            className="w-full text-left rounded-2xl px-3 py-3 transition-colors"
+            className="w-full text-left rounded-2xl px-3 py-2.5 transition-colors"
             style={{
               background: !activeProgramId && activeProjectId && !projects.find((project) => project.id === activeProjectId)?.programId
                 ? 'rgba(var(--accent-rgb),0.12)'
@@ -1318,8 +1321,8 @@ const StructureExplorer = memo(function StructureExplorer({
                 {unassignedProjects.filter((project) => !project.parentId).length}
               </span>
             </div>
-            <div className="mt-2 text-[11px]" style={{ color: 'var(--text-secondary)' }}>
-              Projects not yet attached to a program
+            <div className="mt-1.5 text-[11px]" style={{ color: 'var(--text-secondary)' }}>
+              Review detached work
             </div>
           </button>
         )}
@@ -1476,23 +1479,22 @@ const Projects = memo(function Projects() {
     setActiveProgram(null)
   }
 
-  const modeDescription = projectsViewMode === 'execution'
-    ? 'Execution mode keeps working rows and task movement visible inside the hierarchy.'
-    : 'Portfolio mode keeps structure first: programs, projects, milestones, then work on demand.'
-
   return (
     <div className="flex-1 overflow-y-auto px-4 md:px-6 pb-24 md:pb-8">
-      <div className="py-4 mb-4">
+      <div className="py-2 mb-3">
         <PageHero
-          eyebrow="Structure workspace"
+          eyebrow="Programs"
           title={headerTitle}
-          description={modeDescription}
+          description={focusedProgram
+            ? 'Review structure, milestones, and work only where delivery needs attention.'
+            : 'Browse the portfolio, pick a program, and open work only when you want to operate inside it.'}
           stats={[
             { label: 'Programs', value: programs.length, tone: 'accent' },
             { label: 'Projects', value: topLevelProjectCount, tone: 'default' },
             { label: 'Tasks done', value: `${doneTasks}/${totalTasks}`, tone: 'success' },
             { label: 'Mode', value: projectsViewMode === 'execution' ? 'Execution' : 'Portfolio', tone: 'default' },
           ]}
+          compact
           actions={
             <>
               {focusedProgram && (
@@ -1521,7 +1523,20 @@ const Projects = memo(function Projects() {
               </button>
             </>
           }
-        />
+        >
+          <div className="flex flex-wrap items-center gap-2 text-[11px]" style={{ color: 'var(--text-secondary)' }}>
+            <span className="px-2.5 py-1 rounded-full" style={{ background: 'rgba(255,255,255,0.05)' }}>
+              {projectsViewMode === 'execution'
+                ? 'Execution view keeps working rows and task movement visible.'
+                : 'Portfolio view keeps hierarchy first and work on demand.'}
+            </span>
+            {focusedProgram && (
+              <span className="px-2.5 py-1 rounded-full" style={{ background: `${focusedProgram.color}18`, color: focusedProgram.color }}>
+                {visibleProjects.filter((project) => !project.parentId).length} active project lanes
+              </span>
+            )}
+          </div>
+        </PageHero>
       </div>
 
       {addingProgram && <NewProgramForm onDone={() => setAddingProgram(false)} />}
@@ -1540,7 +1555,7 @@ const Projects = memo(function Projects() {
           </button>
         </div>
       ) : projectsViewMode === 'portfolio' ? (
-        <div className="grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
+        <div className="grid gap-4 xl:grid-cols-[292px_minmax(0,1fr)]">
           <StructureExplorer
             programs={programs}
             projects={projects}

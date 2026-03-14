@@ -62,6 +62,13 @@ const clearTaskSyncError = (set) => {
   })
 }
 
+const markTaskSyncSuccess = (set) => {
+  set((state) => {
+    state.syncError = ''
+    state.lastSyncedAt = now()
+  })
+}
+
 const hasOwn = (value, key) => Object.prototype.hasOwnProperty.call(value, key)
 
 const getProgramIdForProject = (projectId) => {
@@ -282,6 +289,7 @@ const useTaskStore = create(
       trashTasks: [],
       syncing: false,
       syncError: '',
+      lastSyncedAt: null,
 
       clearSyncError: () => clearTaskSyncError(set),
 
@@ -319,7 +327,7 @@ const useTaskStore = create(
             .upsert(toTaskRow(created, workspaceId, userId))
             .then(({ error }) => {
               if (error) reportTaskSyncError(set, error, 'create task')
-              else clearTaskSyncError(set)
+              else markTaskSyncSuccess(set)
             })
         }
 
@@ -338,7 +346,7 @@ const useTaskStore = create(
         if (workspaceId && updated) {
           const patch = buildTaskPatchFromUpdates(updated, updates)
           void persistTaskPatch(updated, patch, workspaceId, userId)
-            .then(() => clearTaskSyncError(set))
+            .then(() => markTaskSyncSuccess(set))
             .catch((error) => reportTaskSyncError(set, error, 'update task'))
         }
       },
@@ -380,7 +388,7 @@ const useTaskStore = create(
         if (workspaceId && updated) {
           const patch = buildTaskPatchFromUpdates(updated, { projectId: updated.projectId, programId: updated.programId })
           void persistTaskPatch(updated, patch, workspaceId, userId)
-            .then(() => clearTaskSyncError(set))
+            .then(() => markTaskSyncSuccess(set))
             .catch((error) => reportTaskSyncError(set, error, 'move task'))
         }
       },
@@ -404,7 +412,7 @@ const useTaskStore = create(
         if (workspaceId && deletedTask) {
           const patch = buildTaskPatchFromUpdates(deletedTask, { deletedAt: deletedTask.deletedAt })
           void persistTaskPatch(deletedTask, patch, workspaceId, userId)
-            .then(() => clearTaskSyncError(set))
+            .then(() => markTaskSyncSuccess(set))
             .catch((error) => reportTaskSyncError(set, error, 'move task to trash'))
         }
       },
@@ -426,7 +434,7 @@ const useTaskStore = create(
         if (workspaceId && updated) {
           const patch = buildTaskPatchFromUpdates(updated, { dependsOn: updated.dependsOn })
           void persistTaskPatch(updated, patch, workspaceId, userId)
-            .then(() => clearTaskSyncError(set))
+            .then(() => markTaskSyncSuccess(set))
             .catch((error) => reportTaskSyncError(set, error, 'update task dependency'))
         }
       },
@@ -444,7 +452,7 @@ const useTaskStore = create(
         if (workspaceId && updated) {
           const patch = buildTaskPatchFromUpdates(updated, { dependsOn: updated.dependsOn })
           void persistTaskPatch(updated, patch, workspaceId, userId)
-            .then(() => clearTaskSyncError(set))
+            .then(() => markTaskSyncSuccess(set))
             .catch((error) => reportTaskSyncError(set, error, 'remove task dependency'))
         }
       },
@@ -469,7 +477,7 @@ const useTaskStore = create(
                 persistTaskPatch(task, buildTaskPatchFromUpdates(task, updates), workspaceId, userId)
               )
             )
-              .then(() => clearTaskSyncError(set))
+              .then(() => markTaskSyncSuccess(set))
               .catch((error) => reportTaskSyncError(set, error, 'bulk update tasks'))
           }
         }
@@ -504,7 +512,7 @@ const useTaskStore = create(
               persistTaskPatch(task, buildTaskPatchFromUpdates(task, { deletedAt: task.deletedAt }), workspaceId, userId)
             )
           )
-            .then(() => clearTaskSyncError(set))
+            .then(() => markTaskSyncSuccess(set))
             .catch((error) => reportTaskSyncError(set, error, 'bulk move tasks to trash'))
         }
       },
@@ -526,7 +534,7 @@ const useTaskStore = create(
         if (workspaceId && restoredTask) {
           const patch = buildTaskPatchFromUpdates(restoredTask, { deletedAt: restoredTask.deletedAt })
           void persistTaskPatch(restoredTask, patch, workspaceId, userId)
-            .then(() => clearTaskSyncError(set))
+            .then(() => markTaskSyncSuccess(set))
             .catch((error) => reportTaskSyncError(set, error, 'restore task'))
         }
       },
@@ -540,7 +548,7 @@ const useTaskStore = create(
         if (workspaceId) {
           void supabase.from('tasks').delete().eq('id', id).then(({ error }) => {
             if (error) reportTaskSyncError(set, error, 'delete task permanently')
-            else clearTaskSyncError(set)
+            else markTaskSyncSuccess(set)
           })
         }
       },
@@ -557,7 +565,7 @@ const useTaskStore = create(
         if (workspaceId) {
           void supabase.from('tasks').delete().in('id', ids).then(({ error }) => {
             if (error) reportTaskSyncError(set, error, 'empty trash')
-            else clearTaskSyncError(set)
+            else markTaskSyncSuccess(set)
           })
         }
       },
@@ -737,7 +745,7 @@ const useTaskStore = create(
             state.tasks = sanitized.tasks
             state.trashTasks = sanitized.trashTasks
           })
-          clearTaskSyncError(set)
+          markTaskSyncSuccess(set)
         } catch (error) {
           reportTaskSyncError(set, error, 'load tasks from Supabase')
         } finally {

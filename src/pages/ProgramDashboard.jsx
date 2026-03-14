@@ -1,5 +1,5 @@
 import { memo, useEffect, useMemo, useState } from 'react'
-import { CheckCircle2, Clock, AlertTriangle, TrendingUp, CalendarClock, ArrowRight } from 'lucide-react'
+import { CheckCircle2, Clock, AlertTriangle, TrendingUp, CalendarClock, ArrowRight, Flag, FolderClock } from 'lucide-react'
 import Header from '../components/layout/Header'
 import { ProgramStatusBadge, ProgramHealthBadge } from '../components/common/ProgramStatusBadge'
 import GlassCard from '../components/common/GlassCard'
@@ -22,6 +22,32 @@ const Stat = memo(function Stat({ label, value, color, icon: Icon }) {
         {Icon && <Icon size={11} style={{ color }} />}
         <span className="text-lg font-bold" style={{ color: color || 'var(--text-primary)' }}>{value}</span>
       </div>
+    </div>
+  )
+})
+
+const ReviewFocusCard = memo(function ReviewFocusCard({ label, value, detail, tone = 'neutral', icon: Icon }) {
+  const palette = tone === 'danger'
+    ? { background: 'rgba(239,68,68,0.12)', border: 'rgba(239,68,68,0.24)', color: '#ef4444' }
+    : tone === 'warning'
+      ? { background: 'rgba(245,158,11,0.12)', border: 'rgba(245,158,11,0.24)', color: '#f59e0b' }
+      : tone === 'accent'
+        ? { background: 'rgba(var(--accent-rgb),0.12)', border: 'rgba(var(--accent-rgb),0.2)', color: 'var(--accent)' }
+        : { background: 'rgba(255,255,255,0.03)', border: 'rgba(255,255,255,0.08)', color: 'var(--text-primary)' }
+
+  return (
+    <div
+      className="rounded-2xl px-4 py-4"
+      style={{ background: palette.background, border: `1px solid ${palette.border}` }}
+    >
+      <div className="flex items-center gap-2">
+        <Icon size={14} style={{ color: palette.color }} />
+        <span className="text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>
+          {label}
+        </span>
+      </div>
+      <div className="mt-3 text-2xl font-bold leading-none" style={{ color: palette.color }}>{value}</div>
+      <p className="mt-2 text-[11px] leading-5" style={{ color: 'var(--text-secondary)' }}>{detail}</p>
     </div>
   )
 })
@@ -281,6 +307,10 @@ const ProgramDashboard = memo(function ProgramDashboard() {
     [scopedPrograms, scopedProjects, scopedTasks, scopedMilestones, projectById, allStats]
   )
 
+  const nextMilestone = milestoneTimelineItems[0] ?? null
+  const flaggedPrograms = scopedProgramCards.filter(({ stats }) => ['at-risk', 'off-track'].includes(stats.health)).length
+  const launchCount = milestoneTimelineItems.length
+
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       <Header />
@@ -299,17 +329,18 @@ const ProgramDashboard = memo(function ProgramDashboard() {
         ) : (
           <>
             <PageHero
-              eyebrow="Portfolio analytics"
-              title="Spot delivery pressure before it becomes drift"
-              description="Roll up progress, milestones, and planning signals so the next portfolio conversation starts with facts instead of hunting through workstreams."
+              eyebrow="Analytics"
+              title="Review delivery with the signals that change the next decision"
+              description="Start with launch timing, missing schedules, and flagged workstreams before you drop into detailed roll-ups."
+              compact
               stats={[
-                { label: 'Total tasks', value: summary.total, tone: 'accent' },
-                { label: 'Completed', value: summary.done, tone: 'success' },
+                { label: 'Programs', value: scopedPrograms.length, tone: 'accent' },
+                { label: 'Tasks', value: summary.total, tone: 'default' },
                 { label: 'Overdue', value: summary.overdue, tone: summary.overdue > 0 ? 'danger' : 'default' },
-                { label: 'Health', value: summary.offTrack > 0 ? `${summary.offTrack} off` : summary.atRisk > 0 ? `${summary.atRisk} risk` : 'On track', tone: summary.offTrack > 0 ? 'danger' : summary.atRisk > 0 ? 'accent' : 'success' },
+                { label: 'Launches', value: launchCount, tone: launchCount > 0 ? 'success' : 'default' },
               ]}
             >
-              <div className="max-w-xl">
+              <div className="max-w-2xl">
                 <div className="flex justify-between text-[11px] mb-1.5" style={{ color: 'var(--text-secondary)' }}>
                   <span>Portfolio completion</span>
                   <span style={{ color: 'var(--accent)', fontWeight: 600 }}>{summary.completion}%</span>
@@ -320,13 +351,22 @@ const ProgramDashboard = memo(function ProgramDashboard() {
                     style={{ width: `${summary.completion}%`, background: 'linear-gradient(90deg, var(--accent-dark), var(--accent))' }}
                   />
                 </div>
+                <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px]" style={{ color: 'var(--text-secondary)' }}>
+                  <span className="px-2.5 py-1 rounded-full" style={{ background: 'rgba(255,255,255,0.05)' }}>
+                    {summary.offTrack > 0 ? `${summary.offTrack} off track` : summary.atRisk > 0 ? `${summary.atRisk} at risk` : 'Portfolio stable'}
+                  </span>
+                  <span className="px-2.5 py-1 rounded-full" style={{ background: 'rgba(255,255,255,0.05)' }}>
+                    {nextMilestone ? `Next launch ${nextMilestone.name} · ${new Date(nextMilestone.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : 'No launch date pinned yet'}
+                  </span>
+                </div>
               </div>
             </PageHero>
 
             <ScopeBar
               eyebrow="Analytics scope"
-              title="Keep the review tight"
-              description="Scope the portfolio by program or project without moving to another page."
+              title="Keep this review tight"
+              description="Cut the portfolio to one program or one project before you look at signals."
+              compact
               controls={
                 <>
                   <select
@@ -383,6 +423,37 @@ const ProgramDashboard = memo(function ProgramDashboard() {
               }
             />
 
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <ReviewFocusCard
+                label="Flagged programs"
+                value={flaggedPrograms}
+                detail={flaggedPrograms > 0 ? 'Programs showing overdue work or blocked flow.' : 'No program is currently flagged.'}
+                tone={flaggedPrograms > 0 ? 'danger' : 'accent'}
+                icon={Flag}
+              />
+              <ReviewFocusCard
+                label="Schedule conflicts"
+                value={insights.cards.find((card) => card.id === 'conflicts')?.value ?? 0}
+                detail="Dates that invert task or project windows."
+                tone={(insights.cards.find((card) => card.id === 'conflicts')?.value ?? 0) > 0 ? 'danger' : 'neutral'}
+                icon={AlertTriangle}
+              />
+              <ReviewFocusCard
+                label="Unscheduled"
+                value={insights.cards.find((card) => card.id === 'unscheduled')?.value ?? 0}
+                detail="Tasks still missing a full start and due range."
+                tone={(insights.cards.find((card) => card.id === 'unscheduled')?.value ?? 0) > 0 ? 'warning' : 'neutral'}
+                icon={FolderClock}
+              />
+              <ReviewFocusCard
+                label="Next launch"
+                value={nextMilestone ? new Date(nextMilestone.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'TBD'}
+                detail={nextMilestone ? nextMilestone.name : 'No upcoming milestone in scope.'}
+                tone={nextMilestone ? 'accent' : 'neutral'}
+                icon={CalendarClock}
+              />
+            </div>
+
             <GlassCard padding="p-5">
               <div className="flex items-center gap-2 mb-4">
                 <div className="w-8 h-8 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(var(--accent-rgb),0.1)', border: '1px solid rgba(var(--accent-rgb),0.18)' }}>
@@ -397,12 +468,6 @@ const ProgramDashboard = memo(function ProgramDashboard() {
               </div>
               <MilestoneTimeline milestones={milestoneTimelineItems} />
             </GlassCard>
-
-            <div className="grid gap-4 md:grid-cols-2">
-              {scopedProgramCards.map(({ program, stats }) => (
-                <ProgramCard key={program.id} program={program} stats={stats} />
-              ))}
-            </div>
 
             <TimelinePlanningPanel
               showSavedViews={false}
@@ -426,6 +491,12 @@ const ProgramDashboard = memo(function ProgramDashboard() {
                 setPage('timeline')
               }}
             />
+
+            <div className="grid gap-4 md:grid-cols-2">
+              {scopedProgramCards.map(({ program, stats }) => (
+                <ProgramCard key={program.id} program={program} stats={stats} />
+              ))}
+            </div>
           </>
         )}
       </div>

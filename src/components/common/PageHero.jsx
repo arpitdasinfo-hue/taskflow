@@ -24,18 +24,18 @@ const STAT_TONE = {
   },
 }
 
-const HeroStat = memo(function HeroStat({ label, value, tone = 'default' }) {
+const HeroStat = memo(function HeroStat({ label, value, tone = 'default', compact = false }) {
   const palette = STAT_TONE[tone] ?? STAT_TONE.default
 
   return (
     <div
-      className="rounded-2xl px-4 py-3 min-w-[124px]"
+      className={`rounded-2xl ${compact ? 'px-3 py-2.5 min-w-[112px]' : 'px-4 py-3 min-w-[124px]'}`}
       style={{ background: palette.background, border: `1px solid ${palette.border}` }}
     >
       <div className="text-[10px] font-semibold uppercase tracking-[0.24em]" style={{ color: 'var(--text-secondary)' }}>
         {label}
       </div>
-      <div className="mt-2 text-2xl font-bold leading-none" style={{ color: palette.color }}>
+      <div className={`${compact ? 'mt-1.5 text-xl' : 'mt-2 text-2xl'} font-bold leading-none`} style={{ color: palette.color }}>
         {value}
       </div>
     </div>
@@ -49,24 +49,25 @@ const PageHero = memo(function PageHero({
   actions = null,
   stats = [],
   children = null,
+  compact = false,
   className = '',
 }) {
   return (
-    <GlassCard padding="p-6" rounded="rounded-[30px]" className={className}>
-      <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+    <GlassCard padding={compact ? 'p-4 md:p-5' : 'p-6'} rounded="rounded-[30px]" className={className}>
+      <div className={`flex flex-col ${compact ? 'gap-4' : 'gap-5'} xl:flex-row xl:items-start xl:justify-between`}>
         <div className="min-w-0 flex-1">
           {eyebrow && (
             <div className="text-[11px] font-semibold uppercase tracking-[0.24em]" style={{ color: 'var(--text-secondary)' }}>
               {eyebrow}
             </div>
           )}
-          <div className="mt-2 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div className={`mt-2 flex flex-col ${compact ? 'gap-2.5' : 'gap-3'} lg:flex-row lg:items-start lg:justify-between`}>
             <div className="min-w-0">
-              <h1 className="text-2xl md:text-[2rem] font-bold leading-tight" style={{ color: 'var(--text-primary)' }}>
+              <h1 className={`${compact ? 'text-[1.8rem] md:text-[2.2rem]' : 'text-2xl md:text-[2rem]'} font-bold leading-tight`} style={{ color: 'var(--text-primary)' }}>
                 {title}
               </h1>
               {description && (
-                <p className="mt-3 max-w-3xl text-sm md:text-base leading-7" style={{ color: 'var(--text-secondary)' }}>
+                <p className={`${compact ? 'mt-2 max-w-2xl text-sm leading-6' : 'mt-3 max-w-3xl text-sm md:text-base leading-7'}`} style={{ color: 'var(--text-secondary)' }}>
                   {description}
                 </p>
               )}
@@ -77,13 +78,13 @@ const PageHero = memo(function PageHero({
               </div>
             )}
           </div>
-          {children && <div className="mt-4">{children}</div>}
+          {children && <div className={compact ? 'mt-3' : 'mt-4'}>{children}</div>}
         </div>
 
         {stats.length > 0 && (
-          <div className="grid grid-cols-2 gap-2 md:grid-cols-4 xl:max-w-[520px]">
+          <div className={`grid grid-cols-2 gap-2 ${compact ? 'md:grid-cols-4 xl:max-w-[500px]' : 'md:grid-cols-4 xl:max-w-[520px]'}`}>
             {stats.map((stat) => (
-              <HeroStat key={stat.label} {...stat} />
+              <HeroStat key={stat.label} compact={compact} {...stat} />
             ))}
           </div>
         )}
