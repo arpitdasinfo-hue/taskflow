@@ -1,4 +1,4 @@
-import { memo, useState } from 'react'
+import { memo, useEffect, useState } from 'react'
 import {
   LayoutDashboard, ListTodo, CalendarClock, Settings2, FolderKanban,
   Zap, ChevronLeft, ChevronRight, Folder, ChevronDown, BarChart3, GanttChart, LogOut, Trash2,
@@ -30,15 +30,23 @@ const PROGRAM_STATUS_COLORS = {
 
 // ── Program group with nested projects ───────────────────────────────────────
 const ProgramGroup = memo(function ProgramGroup({ program, projects, collapsed }) {
-  const [open, setOpen]      = useState(true)
+  const activeProgramId      = useSettingsStore((s) => s.activeProgramId)
   const activeProjectId      = useSettingsStore((s) => s.activeProjectId)
   const setActiveProject     = useSettingsStore((s) => s.setActiveProject)
   const setActiveProgram     = useSettingsStore((s) => s.setActiveProgram)
   const setPage              = useSettingsStore((s) => s.setPage)
+  const [open, setOpen]      = useState(() => activeProgramId === program.id || projects.some((project) => project.id === activeProjectId))
   const tasks                = useTaskStore((s) => s.tasks)
   const allProjects          = useProjectStore((s) => s.projects)
   const taskCount = (pid) => tasks.filter((t) => t.projectId === pid && t.status !== 'done').length
   const statusColor = PROGRAM_STATUS_COLORS[program.status] || '#94a3b8'
+  const topLevel = projects.filter((p) => !p.parentId)
+
+  useEffect(() => {
+    if (activeProgramId === program.id || projects.some((project) => project.id === activeProjectId)) {
+      setOpen(true)
+    }
+  }, [activeProgramId, activeProjectId, program.id, projects])
 
   const handleProgramClick = () => {
     if (collapsed) return
@@ -72,9 +80,6 @@ const ProgramGroup = memo(function ProgramGroup({ program, projects, collapsed }
     )
   }
 
-  // Top-level projects only
-  const topLevel = projects.filter((p) => !p.parentId)
-
   return (
     <div className="mb-1">
       {/* Program row */}
@@ -89,6 +94,10 @@ const ProgramGroup = memo(function ProgramGroup({ program, projects, collapsed }
           {program.name}
         </span>
         <InfoTooltip text={program.description} />
+        <span className="text-[10px] px-1 py-0.5 rounded-full"
+          style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--text-secondary)' }}>
+          {topLevel.length}
+        </span>
         {/* Status dot */}
         <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" title={program.status || 'planning'}
           style={{ background: statusColor }} />

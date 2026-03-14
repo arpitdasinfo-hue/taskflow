@@ -1,4 +1,4 @@
-import { memo, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
   Plus, Folder, FolderOpen, CheckCircle2, Clock, AlertTriangle,
@@ -18,10 +18,9 @@ import useSettingsStore from '../store/useSettingsStore'
 import { sortTasksByStartDate } from '../lib/taskSort'
 import { taskMatchesProgram } from '../lib/taskScope'
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
 const PRIORITY_COLOR = { critical: '#ef4444', high: '#f97316', medium: '#f59e0b', low: '#94a3b8' }
-const STATUS_LABEL   = { todo: 'To Do', 'in-progress': 'Active', review: 'Review', done: 'Done', blocked: 'Blocked' }
-const STATUS_COLOR   = { todo: '#94a3b8', 'in-progress': '#22d3ee', review: '#f59e0b', done: '#10b981', blocked: '#ef4444' }
+const STATUS_LABEL = { todo: 'To Do', 'in-progress': 'Active', review: 'Review', done: 'Done', blocked: 'Blocked' }
+const STATUS_COLOR = { todo: '#94a3b8', 'in-progress': '#22d3ee', review: '#f59e0b', done: '#10b981', blocked: '#ef4444' }
 const DND_MIME = 'application/x-taskflow-dnd'
 let activeDragPayload = null
 
@@ -53,34 +52,118 @@ const createsProjectCycle = (projects, movingProjectId, nextParentId) => {
   return false
 }
 
-// ── Inline editable text ──────────────────────────────────────────────────────
+const formatShortDate = (value) => {
+  if (!value) return null
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return null
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+
+const collectProjectTreeIds = (projects, projectId) => {
+  const ids = [projectId]
+  for (let index = 0; index < ids.length; index += 1) {
+    const currentId = ids[index]
+    projects.forEach((project) => {
+      if (project.parentId === currentId && !ids.includes(project.id)) ids.push(project.id)
+    })
+  }
+  return ids
+}
+
+const buildScheduleWindow = (...collections) => {
+  const starts = []
+  const dues = []
+
+  collections.flat().forEach((item) => {
+    if (!item) return
+    if (item.startDate) {
+      const start = new Date(item.startDate)
+      if (!Number.isNaN(start.getTime())) starts.push(start)
+    }
+    if (item.dueDate) {
+      const due = new Date(item.dueDate)
+      if (!Number.isNaN(due.getTime())) dues.push(due)
+    }
+  })
+
+  starts.sort((a, b) => a - b)
+  dues.sort((a, b) => a - b)
+
+  return {
+    startDate: starts[0] ? starts[0].toISOString() : null,
+    dueDate: dues[dues.length - 1] ? dues[dues.length - 1].toISOString() : null,
+  }
+}
+
+const formatWindowLabel = (startDate, dueDate) => {
+  const startLabel = formatShortDate(startDate)
+  const dueLabel = formatShortDate(dueDate)
+  if (startLabel && dueLabel) return `${startLabel} - ${dueLabel}`
+  if (startLabel) return `Starts ${startLabel}`
+  if (dueLabel) return `Due ${dueLabel}`
+  return 'No schedule set'
+}
+
+const sortMilestones = (milestones) => (
+  [...milestones].sort((left, right) => {
+    const leftTs = left.dueDate ? new Date(left.dueDate).getTime() : Number.MAX_SAFE_INTEGER
+    const rightTs = right.dueDate ? new Date(right.dueDate).getTime() : Number.MAX_SAFE_INTEGER
+    return leftTs - rightTs
+  })
+)
+
+const getHealthMeta = ({ total, done, blocked, overdue, unscheduled }) => {
+  if (total === 0) return { label: 'Planning', color: '#94a3b8', background: 'rgba(148,163,184,0.14)', detail: 'No active work yet' }
+  if (done === total) return { label: 'Complete', color: '#10b981', background: 'rgba(16,185,129,0.14)', detail: 'All tasks closed' }
+  if (overdue > 0) return { label: 'At risk', color: '#ef4444', background: 'rgba(239,68,68,0.16)', detail: `${overdue} overdue` }
+  if (blocked > 0) return { label: 'Needs attention', color: '#f97316', background: 'rgba(249,115,22,0.16)', detail: `${blocked} blocked` }
+  if (unscheduled > 0) return { label: 'Needs dates', color: '#f59e0b', background: 'rgba(245,158,11,0.16)', detail: `${unscheduled} unscheduled` }
+  return { label: 'On track', color: '#22d3ee', background: 'rgba(34,211,238,0.16)', detail: 'Healthy delivery rhythm' }
+}
+
 const Editable = memo(function Editable({ value, onSave, className, style, maxLength = 60 }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(value)
-  const commit = () => { if (draft.trim()) onSave(draft.trim()); setEditing(false) }
+  const commit = () => {
+    if (draft.trim()) onSave(draft.trim())
+    setEditing(false)
+  }
+
   if (editing) {
     return (
       <input
-        autoFocus value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        onClick={(e) => e.stopPropagation()}
+        autoFocus
+        value={draft}
+        onChange={(event) => setDraft(event.target.value)}
+        onClick={(event) => event.stopPropagation()}
         onBlur={commit}
-        onKeyDown={(e) => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') setEditing(false) }}
-        className={className + ' bg-transparent border-b'}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') commit()
+          if (event.key === 'Escape') setEditing(false)
+        }}
+        className={`${className} bg-transparent border-b`}
         style={{ ...style, borderColor: 'var(--accent)', outline: 'none' }}
         maxLength={maxLength}
       />
     )
   }
+
   return (
-    <span className={className + ' cursor-text hover:opacity-75'} style={style}
-      onClick={(e) => { e.stopPropagation(); setDraft(value); setEditing(true) }} title="Click to rename">
+    <span
+      className={`${className} cursor-text hover:opacity-80`}
+      style={style}
+      onClick={(event) => {
+        event.stopPropagation()
+        setDraft(value)
+        setEditing(true)
+      }}
+      title="Click to rename"
+    >
       {value}
     </span>
   )
 })
 
-// ── Color swatch picker ───────────────────────────────────────────────────────
 const ColorDot = memo(function ColorDot({ color, onChange }) {
   const [open, setOpen] = useState(false)
   const [menuPos, setMenuPos] = useState({ top: 0, left: 0 })
@@ -101,19 +184,10 @@ const ColorDot = memo(function ColorDot({ color, onChange }) {
       let left = rect.left
       let top = rect.bottom + gap
 
-      if (left + menuWidth > window.innerWidth - viewportPadding) {
-        left = window.innerWidth - menuWidth - viewportPadding
-      }
-      if (left < viewportPadding) {
-        left = viewportPadding
-      }
-
-      if (top + menuHeight > window.innerHeight - viewportPadding) {
-        top = rect.top - menuHeight - gap
-      }
-      if (top < viewportPadding) {
-        top = viewportPadding
-      }
+      if (left + menuWidth > window.innerWidth - viewportPadding) left = window.innerWidth - menuWidth - viewportPadding
+      if (left < viewportPadding) left = viewportPadding
+      if (top + menuHeight > window.innerHeight - viewportPadding) top = rect.top - menuHeight - gap
+      if (top < viewportPadding) top = viewportPadding
 
       setMenuPos({ top, left })
     }
@@ -121,7 +195,6 @@ const ColorDot = memo(function ColorDot({ color, onChange }) {
     updatePosition()
     window.addEventListener('resize', updatePosition)
     window.addEventListener('scroll', updatePosition, true)
-
     return () => {
       window.removeEventListener('resize', updatePosition)
       window.removeEventListener('scroll', updatePosition, true)
@@ -129,21 +202,24 @@ const ColorDot = memo(function ColorDot({ color, onChange }) {
   }, [open])
 
   useEffect(() => {
-    if (!open) return
-    const onMouseDown = (event) => {
+    if (!open) return undefined
+    const handleMouseDown = (event) => {
       const target = event.target
       if (buttonRef.current?.contains(target) || menuRef.current?.contains(target)) return
       setOpen(false)
     }
-    document.addEventListener('mousedown', onMouseDown)
-    return () => document.removeEventListener('mousedown', onMouseDown)
+    document.addEventListener('mousedown', handleMouseDown)
+    return () => document.removeEventListener('mousedown', handleMouseDown)
   }, [open])
 
   return (
-    <div className="relative flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+    <div className="relative flex-shrink-0" onClick={(event) => event.stopPropagation()}>
       <button
         ref={buttonRef}
-        onClick={(e) => { e.stopPropagation(); setOpen((o) => !o) }}
+        onClick={(event) => {
+          event.stopPropagation()
+          setOpen((current) => !current)
+        }}
         className="w-5 h-5 rounded-full p-[2px] hover:scale-105 transition-transform"
         style={{
           background: 'rgba(255,255,255,0.04)',
@@ -180,12 +256,135 @@ const ColorDot = memo(function ColorDot({ color, onChange }) {
   )
 })
 
-// ── Task row (list view) ──────────────────────────────────────────────────────
+const ActionMenu = memo(function ActionMenu({ label, icon: Icon = MoreHorizontal, items, iconOnly = false, accent = false }) {
+  const [open, setOpen] = useState(false)
+
+  return (
+    <div className="relative" onClick={(event) => event.stopPropagation()}>
+      <button
+        type="button"
+        onClick={(event) => {
+          event.stopPropagation()
+          setOpen((current) => !current)
+        }}
+        className={`inline-flex items-center gap-1.5 rounded-xl transition-colors ${iconOnly ? 'p-2' : 'px-3 py-2 text-xs font-semibold'}`}
+        style={accent
+          ? { background: 'rgba(var(--accent-rgb),0.14)', color: 'var(--accent)', border: '1px solid rgba(var(--accent-rgb),0.18)' }
+          : { background: 'rgba(255,255,255,0.04)', color: 'var(--text-secondary)', border: '1px solid rgba(255,255,255,0.08)' }}
+      >
+        <Icon size={13} />
+        {!iconOnly && label}
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div
+            className="absolute top-full right-0 mt-1 z-50 rounded-2xl overflow-hidden"
+            style={{ background: '#ffffff', border: '1px solid rgba(15,23,42,0.12)', boxShadow: '0 16px 48px rgba(15,23,42,0.18)', minWidth: '180px' }}
+          >
+            {items.map((item) => (
+              <button
+                key={item.label}
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation()
+                  setOpen(false)
+                  item.onClick()
+                }}
+                className="w-full text-left px-3 py-2.5 text-xs transition-colors hover:bg-slate-100"
+                style={item.tone === 'danger' ? { color: '#dc2626' } : { color: '#334155' }}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  )
+})
+
+const MetricTile = memo(function MetricTile({ icon: Icon, label, value, detail, tone = 'default' }) {
+  const palette = tone === 'danger'
+    ? { background: 'rgba(239,68,68,0.09)', border: 'rgba(239,68,68,0.18)', color: '#fca5a5' }
+    : tone === 'accent'
+      ? { background: 'rgba(var(--accent-rgb),0.12)', border: 'rgba(var(--accent-rgb),0.16)', color: 'var(--accent)' }
+      : { background: 'rgba(255,255,255,0.03)', border: 'rgba(255,255,255,0.06)', color: 'var(--text-secondary)' }
+
+  return (
+    <div
+      className="rounded-2xl px-3.5 py-3"
+      style={{ background: palette.background, border: `1px solid ${palette.border}` }}
+    >
+      <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>
+        <Icon size={11} style={{ color: palette.color }} />
+        {label}
+      </div>
+      <div className="mt-2 text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{value}</div>
+      {detail && (
+        <p className="mt-1 text-[11px] leading-5" style={{ color: 'var(--text-secondary)' }}>
+          {detail}
+        </p>
+      )}
+    </div>
+  )
+})
+
+const MilestonePreviewStrip = memo(function MilestonePreviewStrip({ label, milestones, accentColor, onToggle, expanded }) {
+  const visibleMilestones = sortMilestones(milestones).slice(0, 3)
+
+  return (
+    <div
+      className="rounded-2xl px-3.5 py-3"
+      style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}
+    >
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>{label}</p>
+          <p className="text-[11px] mt-1" style={{ color: 'var(--text-secondary)' }}>
+            {milestones.length > 0
+              ? `${milestones.length} milestone${milestones.length === 1 ? '' : 's'} in this workstream`
+              : 'No milestones pinned yet'}
+          </p>
+        </div>
+        {onToggle && (
+          <button
+            type="button"
+            onClick={onToggle}
+            className="text-[11px] px-2.5 py-1.5 rounded-full transition-colors"
+            style={{ background: `${accentColor}18`, color: accentColor }}
+          >
+            {expanded ? 'Hide details' : milestones.length > 0 ? 'Manage' : 'Add milestone'}
+          </button>
+        )}
+      </div>
+      {visibleMilestones.length > 0 && (
+        <div className="flex flex-wrap gap-2 mt-3">
+          {visibleMilestones.map((milestone) => (
+            <div
+              key={milestone.id}
+              className="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-full text-[11px]"
+              style={{ background: `${accentColor}14`, color: 'var(--text-primary)', border: `1px solid ${accentColor}24` }}
+            >
+              <span style={{ color: accentColor }}>◆</span>
+              <span className="font-medium">{milestone.name}</span>
+              {milestone.dueDate && (
+                <span style={{ color: 'var(--text-secondary)' }}>{formatShortDate(milestone.dueDate)}</span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+})
+
 const TaskRow = memo(function TaskRow({ task, onDragStart, onDragOver, onDrop }) {
-  const selectTask = useSettingsStore((s) => s.selectTask)
-  const updateTask = useTaskStore((s) => s.updateTask)
+  const selectTask = useSettingsStore((state) => state.selectTask)
+  const updateTask = useTaskStore((state) => state.updateTask)
   const now = new Date()
   const isOverdue = task.dueDate && new Date(task.dueDate) < now && task.status !== 'done'
+
   const updateDateField = (field, nextValue) => {
     updateTask(task.id, { [field]: nextValue ? new Date(nextValue).toISOString() : null })
   }
@@ -205,26 +404,23 @@ const TaskRow = memo(function TaskRow({ task, onDragStart, onDragOver, onDrop })
         onClick={() => selectTask(task.id)}
         className="flex-1 min-w-0 bg-transparent border-0 p-0 text-left"
       >
-        <span className="block text-sm truncate" style={{ color: task.status === 'done' ? 'var(--text-secondary)' : 'var(--text-primary)', textDecoration: task.status === 'done' ? 'line-through' : 'none' }}>
+        <span
+          className="block text-sm truncate"
+          style={{
+            color: task.status === 'done' ? 'var(--text-secondary)' : 'var(--text-primary)',
+            textDecoration: task.status === 'done' ? 'line-through' : 'none',
+          }}
+        >
           {task.title}
         </span>
       </button>
       <div className="hidden md:flex items-center gap-2 flex-shrink-0">
-        <InlineDateChip
-          label="Start"
-          value={task.startDate}
-          onChange={(nextValue) => updateDateField('startDate', nextValue)}
-        />
-        <InlineDateChip
-          label="Due"
-          value={task.dueDate}
-          tone={isOverdue ? 'danger' : 'default'}
-          onChange={(nextValue) => updateDateField('dueDate', nextValue)}
-        />
+        <InlineDateChip label="Start" value={task.startDate} onChange={(nextValue) => updateDateField('startDate', nextValue)} />
+        <InlineDateChip label="Due" value={task.dueDate} tone={isOverdue ? 'danger' : 'default'} onChange={(nextValue) => updateDateField('dueDate', nextValue)} />
       </div>
       {task.subtasks?.length > 0 && (
         <span className="text-[10px] flex-shrink-0" style={{ color: 'var(--text-secondary)' }}>
-          {task.subtasks.filter((s) => s.completed).length}/{task.subtasks.length}
+          {task.subtasks.filter((subtask) => subtask.completed).length}/{task.subtasks.length}
         </span>
       )}
       <InlineStatusChip value={task.status} onChange={(nextStatus) => updateTask(task.id, { status: nextStatus })} labels={STATUS_LABEL} colors={STATUS_COLOR} />
@@ -232,70 +428,91 @@ const TaskRow = memo(function TaskRow({ task, onDragStart, onDragOver, onDrop })
   )
 })
 
-// ── Kanban mini-card ──────────────────────────────────────────────────────────
 const KanbanCard = memo(function KanbanCard({ task }) {
-  const selectTask = useSettingsStore((s) => s.selectTask)
+  const selectTask = useSettingsStore((state) => state.selectTask)
   return (
-    <button onClick={() => selectTask(task.id)}
+    <button
+      type="button"
+      onClick={() => selectTask(task.id)}
       className="w-full text-left p-2.5 rounded-xl transition-colors hover:bg-white/5"
-      style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+      style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}
+    >
       <div className="flex items-start gap-1.5 mb-1.5">
         <span className="w-1.5 h-1.5 rounded-full flex-shrink-0 mt-1" style={{ background: PRIORITY_COLOR[task.priority] }} />
         <span className="text-xs leading-snug" style={{ color: 'var(--text-primary)' }}>{task.title}</span>
       </div>
       {task.subtasks?.length > 0 && (
         <div className="text-[10px]" style={{ color: 'var(--text-secondary)' }}>
-          {task.subtasks.filter((s) => s.completed).length}/{task.subtasks.length} subtasks
+          {task.subtasks.filter((subtask) => subtask.completed).length}/{task.subtasks.length} subtasks
         </div>
       )}
     </button>
   )
 })
 
-// ── Project panel ─────────────────────────────────────────────────────────────
 const KANBAN_COLS = [
-  { id: 'todo',        label: 'To Do',      color: '#94a3b8' },
+  { id: 'todo', label: 'To Do', color: '#94a3b8' },
   { id: 'in-progress', label: 'In Progress', color: '#22d3ee' },
-  { id: 'review',      label: 'Review',      color: '#f59e0b' },
-  { id: 'done',        label: 'Done',        color: '#10b981' },
-  { id: 'blocked',     label: 'Blocked',     color: '#ef4444' },
+  { id: 'review', label: 'Review', color: '#f59e0b' },
+  { id: 'done', label: 'Done', color: '#10b981' },
+  { id: 'blocked', label: 'Blocked', color: '#ef4444' },
 ]
 
-const ProjectPanel = memo(function ProjectPanel({ project, depth = 0 }) {
-  const tasks            = useTaskStore((s) => s.tasks)
-  const moveTask         = useTaskStore((s) => s.moveTask)
-  const updateProject    = useProjectStore((s) => s.updateProject)
-  const moveProject      = useProjectStore((s) => s.moveProject)
-  const deleteProject    = useProjectStore((s) => s.deleteProject)
-  const addProject       = useProjectStore((s) => s.addProject)
-  const programs         = useProjectStore((s) => s.programs)
-  const setActiveProject = useSettingsStore((s) => s.setActiveProject)
-  const allProjects      = useProjectStore((s) => s.projects)
+const ProjectPanel = memo(function ProjectPanel({ project, depth = 0, mode = 'portfolio' }) {
+  const tasks = useTaskStore((state) => state.tasks)
+  const moveTask = useTaskStore((state) => state.moveTask)
+  const updateProject = useProjectStore((state) => state.updateProject)
+  const moveProject = useProjectStore((state) => state.moveProject)
+  const deleteProject = useProjectStore((state) => state.deleteProject)
+  const addProject = useProjectStore((state) => state.addProject)
+  const programs = useProjectStore((state) => state.programs)
+  const milestones = useProjectStore((state) => state.milestones ?? [])
+  const allProjects = useProjectStore((state) => state.projects)
+  const activeProjectId = useSettingsStore((state) => state.activeProjectId)
+  const setActiveProject = useSettingsStore((state) => state.setActiveProject)
 
-  const [view, setView]               = useState('list')
-  const [expanded, setExpanded]       = useState(false)
-  const [confirmDel, setConfirmDel]   = useState(false)
-  const [addingSub, setAddingSub]     = useState(false)
-  const [subName, setSubName]         = useState('')
-  const [subColor, setSubColor]       = useState(project.color)
+  const [view, setView] = useState('list')
+  const [expanded, setExpanded] = useState(() => mode === 'execution' && activeProjectId === project.id)
+  const [showWork, setShowWork] = useState(mode === 'execution')
+  const [addingSub, setAddingSub] = useState(false)
+  const [subName, setSubName] = useState('')
+  const [subColor, setSubColor] = useState(project.color)
   const [showMilestones, setShowMilestones] = useState(false)
-  const [showMenu, setShowMenu]       = useState(false)
   const [showMovePicker, setShowMovePicker] = useState(false)
-  const [showShare, setShowShare]     = useState(false)
+  const [showShare, setShowShare] = useState(false)
+  const [deleteArmed, setDeleteArmed] = useState(false)
 
-  const projectTasks = sortTasksByStartDate(tasks.filter((t) => t.projectId === project.id))
-  const total      = projectTasks.length
-  const done       = projectTasks.filter((t) => t.status === 'done').length
-  const inProgress = projectTasks.filter((t) => t.status === 'in-progress').length
-  const blocked    = projectTasks.filter((t) => t.status === 'blocked').length
-  const now        = new Date()
-  const overdue    = projectTasks.filter((t) => t.dueDate && new Date(t.dueDate) < now && t.status !== 'done').length
+  const childProjects = useMemo(() => allProjects.filter((candidate) => candidate.parentId === project.id), [allProjects, project.id])
+  const projectTreeIds = useMemo(() => collectProjectTreeIds(allProjects, project.id), [allProjects, project.id])
+  const directTasks = useMemo(() => sortTasksByStartDate(tasks.filter((task) => task.projectId === project.id)), [tasks, project.id])
+  const allProjectTasks = useMemo(() => sortTasksByStartDate(tasks.filter((task) => task.projectId && projectTreeIds.includes(task.projectId))), [tasks, projectTreeIds])
+  const projectMilestones = useMemo(() => sortMilestones(milestones.filter((milestone) => milestone.projectId === project.id)), [milestones, project.id])
+
+  const total = allProjectTasks.length
+  const done = allProjectTasks.filter((task) => task.status === 'done').length
+  const inProgress = allProjectTasks.filter((task) => task.status === 'in-progress' || task.status === 'review').length
+  const blocked = allProjectTasks.filter((task) => task.status === 'blocked').length
+  const now = new Date()
+  const overdue = allProjectTasks.filter((task) => task.dueDate && new Date(task.dueDate) < now && task.status !== 'done').length
+  const unscheduled = allProjectTasks.filter((task) => !task.startDate && !task.dueDate).length
   const completion = total ? Math.round((done / total) * 100) : 0
+  const health = getHealthMeta({ total, done, blocked, overdue, unscheduled })
+  const scheduleWindow = buildScheduleWindow(project, childProjects, allProjectTasks, projectMilestones)
+  const windowLabel = formatWindowLabel(scheduleWindow.startDate, scheduleWindow.dueDate)
 
-  const submitSub = () => {
+  useEffect(() => {
+    if (activeProjectId === project.id) setExpanded(true)
+  }, [activeProjectId, project.id])
+
+  useEffect(() => {
+    if (mode === 'execution') setShowWork(true)
+  }, [mode])
+
+  const submitSubProject = () => {
     if (!subName.trim()) return
     addProject({ name: subName.trim(), color: subColor, programId: project.programId, parentId: project.id })
-    setSubName(''); setAddingSub(false)
+    setSubName('')
+    setAddingSub(false)
   }
 
   const openTaskComposer = () => {
@@ -309,8 +526,10 @@ const ProjectPanel = memo(function ProjectPanel({ project, depth = 0 }) {
     }
   }
 
-  // Also get sub-projects from allProjects that reference this project
-  const childProjects = allProjects.filter((p) => p.parentId === project.id)
+  const toggleExpanded = () => {
+    setExpanded((current) => !current)
+    setActiveProject(project.id)
+  }
 
   const handleProjectDragStart = (event) => {
     event.stopPropagation()
@@ -322,22 +541,29 @@ const ProjectPanel = memo(function ProjectPanel({ project, depth = 0 }) {
     })
   }
 
+  const handleProjectDragOver = (event) => {
+    const payload = readDragPayload(event)
+    if (!payload) return
+    if (payload.type === 'project' || payload.type === 'task') {
+      event.preventDefault()
+      event.dataTransfer.dropEffect = 'move'
+    }
+  }
+
   const handleProjectDrop = (event) => {
     const payload = readDragPayload(event)
     if (!payload) return
 
-    if (payload.type === 'project') {
+    if (payload.type === 'project' && payload.id !== project.id) {
       event.preventDefault()
       event.stopPropagation()
-      if (payload.id !== project.id) {
-        const nextParentId = project.parentId ?? null
-        if (createsProjectCycle(allProjects, payload.id, nextParentId)) return
-        moveProject(payload.id, {
-          programId: project.programId ?? null,
-          parentId: nextParentId,
-          beforeProjectId: project.id,
-        })
-      }
+      const nextParentId = project.parentId ?? null
+      if (createsProjectCycle(allProjects, payload.id, nextParentId)) return
+      moveProject(payload.id, {
+        programId: project.programId ?? null,
+        parentId: nextParentId,
+        beforeProjectId: project.id,
+      })
       return
     }
 
@@ -345,19 +571,6 @@ const ProjectPanel = memo(function ProjectPanel({ project, depth = 0 }) {
       event.preventDefault()
       event.stopPropagation()
       moveTask(payload.id, { projectId: project.id })
-    }
-  }
-
-  const handleProjectDragOver = (event) => {
-    const payload = readDragPayload(event)
-    if (!payload) return
-    if (payload.type === 'project') {
-      event.preventDefault()
-      event.dataTransfer.dropEffect = 'move'
-    }
-    if (payload.type === 'task') {
-      event.preventDefault()
-      event.dataTransfer.dropEffect = 'move'
     }
   }
 
@@ -388,268 +601,267 @@ const ProjectPanel = memo(function ProjectPanel({ project, depth = 0 }) {
 
   return (
     <div
-      className="rounded-2xl overflow-hidden"
+      className="rounded-[26px] overflow-hidden"
       data-project-id={project.id}
       onDragOver={handleProjectDragOver}
       onDrop={handleProjectDrop}
       style={{
-        border: `1px solid ${project.color}${depth > 0 ? '20' : '25'}`,
-        background: depth > 0 ? 'rgba(255,255,255,0.015)' : 'rgba(255,255,255,0.02)',
-        marginLeft: depth > 0 ? '0' : '0',
+        border: `1px solid ${project.color}${depth > 0 ? '22' : '28'}`,
+        background: depth > 0 ? 'rgba(255,255,255,0.014)' : 'rgba(255,255,255,0.02)',
+        boxShadow: expanded ? `0 18px 42px ${project.color}10` : 'none',
       }}
     >
-      {/* Project header */}
       <div
-        onClick={() => setExpanded((e) => !e)}
-        className="relative group flex items-center gap-2.5 px-4 py-3 cursor-pointer"
-        style={{ background: `${project.color}08`, borderBottom: expanded ? `1px solid ${project.color}18` : 'none' }}
+        onClick={toggleExpanded}
+        className="group cursor-pointer px-4 py-3.5"
+        style={{ background: `${project.color}${expanded ? '0f' : '09'}`, borderBottom: expanded ? `1px solid ${project.color}18` : 'none' }}
       >
-        <span className="flex-shrink-0 transition-transform" style={{ color: 'var(--text-secondary)' }}>
-          {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-        </span>
-
-        <button
-          draggable
-          onDragStart={handleProjectDragStart}
-          onClick={(e) => e.stopPropagation()}
-          className="p-0.5 rounded hover:bg-white/8 cursor-grab active:cursor-grabbing"
-          style={{ color: 'var(--text-secondary)' }}
-          title="Drag to reorder or move project"
-        >
-          <GripVertical size={12} />
-        </button>
-
-        <ColorDot color={project.color} onChange={(c) => updateProject(project.id, { color: c })} />
-
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            {depth > 0 && <GitBranch size={10} style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />}
-            <Editable value={project.name} onSave={(n) => updateProject(project.id, { name: n })}
-              className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }} />
-            <InfoTooltip text={project.description} />
-            <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium"
-              style={{ background: `${project.color}18`, color: project.color }}>
-              {total} task{total !== 1 ? 's' : ''}
-            </span>
-            {project.dueDate && (
-              <span className="text-[10px] flex items-center gap-0.5" style={{ color: 'var(--text-secondary)' }}>
-                <Calendar size={9} />
-                {new Date(project.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-              </span>
-            )}
-          </div>
-        </div>
-
-        {/* Date editor */}
-        <input
-          type="date"
-          value={project.dueDate ? new Date(project.dueDate).toISOString().split('T')[0] : ''}
-          onChange={(e) => updateProject(project.id, { dueDate: e.target.value ? new Date(e.target.value).toISOString() : null })}
-          className="hidden"
-          id={`due-${project.id}`}
-        />
-
-        {/* Stats */}
-        <div className="hidden sm:flex items-center gap-3 text-[10px]" style={{ color: 'var(--text-secondary)' }}>
-          {inProgress > 0 && <span style={{ color: '#22d3ee' }}>{inProgress} active</span>}
-          {blocked > 0    && <span style={{ color: '#ef4444' }}>{blocked} blocked</span>}
-          {overdue > 0    && <span style={{ color: '#ef4444' }}>{overdue} overdue</span>}
-          <span style={{ color: project.color }}>{completion}%</span>
-        </div>
-
-        {/* View toggles */}
-        {expanded && total > 0 && (
-          <div className="flex items-center gap-0.5 rounded-lg p-0.5" style={{ background: 'rgba(255,255,255,0.06)' }}>
-            {[['list', LayoutList], ['board', Kanban]].map(([v, Icon]) => (
-              <button key={v} onClick={(e) => { e.stopPropagation(); setView(v) }}
-                className="p-1 rounded-md transition-colors"
-                style={view === v ? { background: 'var(--accent)', color: '#fff' } : { color: 'var(--text-secondary)' }}>
-                <Icon size={12} />
-              </button>
-            ))}
-          </div>
-        )}
-
-        <button
-          onClick={(e) => { e.stopPropagation(); setShowShare(true) }}
-          className="p-1 rounded-lg hover:bg-white/8 transition-colors"
-          style={{ color: 'var(--text-secondary)' }}
-          title="Share project"
-        >
-          <Share2 size={13} />
-        </button>
-
-        <div className="relative">
+        <div className="flex items-start gap-3">
+          <button type="button" onClick={(event) => { event.stopPropagation(); toggleExpanded() }} style={{ color: 'var(--text-secondary)' }}>
+            {expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
+          </button>
           <button
-            onClick={(e) => { e.stopPropagation(); setShowMenu((v) => !v) }}
-            className="p-1 rounded-lg hover:bg-white/8 transition-colors opacity-80 group-hover:opacity-100"
+            type="button"
+            draggable
+            onDragStart={handleProjectDragStart}
+            onClick={(event) => event.stopPropagation()}
+            className="p-0.5 rounded hover:bg-white/8 cursor-grab active:cursor-grabbing"
             style={{ color: 'var(--text-secondary)' }}
-            title="Project actions"
+            title="Drag to reorder or move project"
           >
-            <MoreHorizontal size={13} />
+            <GripVertical size={12} />
           </button>
-          {showMenu && (
-            <>
-              <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
-              <div
-                className="absolute top-full right-0 mt-1 z-50 rounded-xl overflow-hidden"
-                style={{ background: '#ffffff', border: '1px solid rgba(15,23,42,0.12)', boxShadow: '0 16px 48px rgba(15,23,42,0.18)', minWidth: '160px' }}
-              >
-                <button
-                  onClick={(e) => { e.stopPropagation(); setShowMovePicker((v) => !v); setShowMenu(false) }}
-                  className="w-full text-left px-3 py-2 text-xs hover:bg-slate-100 transition-colors"
-                  style={{ color: '#334155' }}
-                >
-                  Move to program…
-                </button>
-              </div>
-            </>
-          )}
-        </div>
+          <ColorDot color={project.color} onChange={(nextColor) => updateProject(project.id, { color: nextColor })} />
 
-        {/* Delete */}
-        {confirmDel ? (
-          <div className="flex items-center gap-1">
-            <button onClick={(e) => { e.stopPropagation(); deleteProject(project.id) }} className="p-1 rounded-lg" style={{ background: 'rgba(239,68,68,0.15)', color: '#ef4444' }}>
-              <Check size={12} />
-            </button>
-            <button onClick={(e) => { e.stopPropagation(); setConfirmDel(false) }} className="p-1 rounded-lg" style={{ color: 'var(--text-secondary)' }}>
-              <X size={12} />
-            </button>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              {depth > 0 && <GitBranch size={10} style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />}
+              <Editable value={project.name} onSave={(name) => updateProject(project.id, { name })} className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }} />
+              {depth > 0 && (
+                <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--text-secondary)' }}>
+                  Sub-project
+                </span>
+              )}
+              <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: health.background, color: health.color }}>
+                {health.label}
+              </span>
+              <InfoTooltip text={project.description} />
+            </div>
+            <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]" style={{ color: 'var(--text-secondary)' }}>
+              <span>{windowLabel}</span>
+              <span>{total} task{total === 1 ? '' : 's'}</span>
+              {childProjects.length > 0 && <span>{childProjects.length} sub-project{childProjects.length === 1 ? '' : 's'}</span>}
+              {projectMilestones.length > 0 && <span>{projectMilestones.length} milestone{projectMilestones.length === 1 ? '' : 's'}</span>}
+            </div>
           </div>
-        ) : (
-          <button onClick={(e) => { e.stopPropagation(); setConfirmDel(true) }} className="p-1 rounded-lg hover:bg-red-500/10 transition-colors flex-shrink-0"
-            style={{ color: 'var(--text-secondary)' }}>
-            <Trash2 size={13} />
-          </button>
-        )}
+
+          <div className="hidden xl:flex items-center gap-3 min-w-[220px]" onClick={(event) => event.stopPropagation()}>
+            <div className="flex-1 min-w-[120px]">
+              <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.07)' }}>
+                <div className="h-full rounded-full transition-all duration-700" style={{ width: `${completion}%`, background: `linear-gradient(90deg, ${project.color}88, ${project.color})` }} />
+              </div>
+              <div className="flex justify-between mt-1 text-[10px]" style={{ color: 'var(--text-secondary)' }}>
+                <span>{done}/{total || 0} done</span>
+                <span style={{ color: project.color }}>{completion}%</span>
+              </div>
+            </div>
+            <span className="text-[10px] px-2 py-1 rounded-full" style={{ background: `${project.color}18`, color: project.color }}>
+              {inProgress} active
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2" onClick={(event) => event.stopPropagation()}>
+            <ActionMenu
+              iconOnly
+              items={[
+                { label: showMovePicker ? 'Hide move picker' : 'Move to program…', onClick: () => setShowMovePicker((current) => !current) },
+                { label: showShare ? 'Hide share link' : 'Share project', onClick: () => setShowShare(true) },
+                { label: deleteArmed ? 'Cancel delete' : 'Delete project', onClick: () => setDeleteArmed((current) => !current), tone: 'danger' },
+              ]}
+            />
+          </div>
+        </div>
       </div>
 
       {showMovePicker && (
         <div className="px-4 pb-2">
           <select
             value={project.programId ?? ''}
-            onChange={(e) => {
-              moveProject(project.id, { programId: e.target.value || null, parentId: project.parentId ?? null })
+            onChange={(event) => {
+              moveProject(project.id, { programId: event.target.value || null, parentId: project.parentId ?? null })
               setShowMovePicker(false)
             }}
-            className="w-full text-xs px-2.5 py-1.5 rounded-lg"
+            className="w-full text-xs px-2.5 py-2 rounded-xl"
             style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-primary)' }}
           >
             <option value="">Unassigned</option>
-            {programs.map((program) => (
-              <option key={program.id} value={program.id}>{program.name}</option>
+            {programs.map((programOption) => (
+              <option key={programOption.id} value={programOption.id}>{programOption.name}</option>
             ))}
           </select>
         </div>
       )}
 
-      {/* Progress bar */}
-      {expanded && total > 0 && (
-        <div className="px-4 pt-2.5 pb-1" style={{ background: `${project.color}04` }}>
-          <div className="h-1 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
-            <div className="h-full rounded-full transition-all duration-700"
-              style={{ width: `${completion}%`, background: `linear-gradient(90deg, ${project.color}80, ${project.color})` }} />
+      {deleteArmed && (
+        <div className="px-4 pb-3">
+          <div className="flex items-center justify-between gap-3 rounded-2xl px-3 py-2.5" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.16)' }}>
+            <span className="text-[11px]" style={{ color: '#fca5a5' }}>Delete this project and its nested work?</span>
+            <div className="flex items-center gap-2">
+              <button type="button" onClick={() => setDeleteArmed(false)} className="text-[11px] px-2 py-1 rounded-lg" style={{ color: 'var(--text-secondary)', background: 'rgba(255,255,255,0.08)' }}>Cancel</button>
+              <button type="button" onClick={() => deleteProject(project.id)} className="text-[11px] px-2 py-1 rounded-lg" style={{ color: '#fff', background: '#dc2626' }}>Delete</button>
+            </div>
           </div>
         </div>
       )}
 
-      {/* Task content */}
       {expanded && (
-        <div className="px-3 py-2" style={{ background: `${project.color}04` }}>
-          {total === 0 ? (
-            <p className="text-xs text-center py-3" style={{ color: 'var(--text-secondary)' }}>
-              No tasks yet —{' '}
-              <button onClick={openTaskComposer} className="underline" style={{ color: 'var(--accent)' }}>
-                add one
-              </button>
-            </p>
-          ) : view === 'list' ? (
-            <div className="space-y-1">
-              {projectTasks.map((t) => (
-                <TaskRow
-                  key={t.id}
-                  task={t}
-                  onDragStart={handleTaskDragStart}
-                  onDragOver={handleTaskDragOver}
-                  onDrop={handleTaskDrop}
-                />
-              ))}
-            </div>
-          ) : (
-            <div className="flex gap-2 overflow-x-auto pb-2 snap-x">
-              {KANBAN_COLS.map((col) => {
-                const colTasks = projectTasks.filter((t) => t.status === col.id)
-                return (
-                  <div key={col.id} className="flex-shrink-0 w-[200px] snap-start">
-                    <div className="flex items-center gap-1.5 mb-1.5 px-1">
-                      <span className="w-1.5 h-1.5 rounded-full" style={{ background: col.color }} />
-                      <span className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: col.color }}>{col.label}</span>
-                      <span className="text-[10px] ml-auto" style={{ color: 'var(--text-secondary)' }}>{colTasks.length}</span>
-                    </div>
-                    <div className="space-y-1.5 min-h-[40px]">
-                      {colTasks.map((t) => <KanbanCard key={t.id} task={t} />)}
-                    </div>
-                  </div>
-                )
-              })}
+        <div className="px-4 pb-4 pt-3 space-y-3" style={{ background: `${project.color}05` }}>
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <MetricTile icon={CheckCircle2} label="Progress" value={`${completion}% complete`} detail={`${done} of ${total || 0} tasks closed`} tone="accent" />
+            <MetricTile icon={Clock} label="Execution" value={`${inProgress} active`} detail={unscheduled > 0 ? `${unscheduled} tasks still need dates` : 'Tasks are sequenced'} />
+            <MetricTile icon={Calendar} label="Schedule" value={windowLabel} detail={project.dueDate ? `Project due ${formatShortDate(project.dueDate)}` : 'No project-level due date'} />
+            <MetricTile icon={AlertTriangle} label="Health" value={health.label} detail={health.detail} tone={overdue > 0 || blocked > 0 ? 'danger' : 'default'} />
+          </div>
+
+          <MilestonePreviewStrip
+            label="Milestones"
+            milestones={projectMilestones}
+            accentColor={project.color}
+            expanded={showMilestones}
+            onToggle={() => setShowMilestones((current) => !current)}
+          />
+
+          {showMilestones && (
+            <div className="rounded-2xl px-3 py-3" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+              <MilestonePanel projectId={project.id} projectColor={project.color} />
             </div>
           )}
 
-          {/* Sub-projects */}
           {childProjects.length > 0 && (
-            <div className="mt-3 space-y-2 pl-3 border-l-2" style={{ borderColor: `${project.color}30` }}>
-              <p className="text-[10px] font-semibold uppercase tracking-wide mb-1.5" style={{ color: 'var(--text-secondary)' }}>
-                Sub-projects ({childProjects.length})
-              </p>
-              {childProjects.map((sub) => <ProjectPanel key={sub.id} project={sub} depth={depth + 1} />)}
+            <div className="rounded-2xl px-3.5 py-3" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
+              <div className="flex items-center justify-between gap-3 mb-3">
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>Sub-projects</p>
+                  <p className="text-[11px] mt-1" style={{ color: 'var(--text-secondary)' }}>Keep the hierarchy clean. Open a sub-project only when you want its work.</p>
+                </div>
+                <span className="text-[10px] px-2 py-1 rounded-full" style={{ background: `${project.color}18`, color: project.color }}>{childProjects.length}</span>
+              </div>
+              <div className="space-y-2">
+                {childProjects.map((childProject) => (
+                  <ProjectPanel key={childProject.id} project={childProject} depth={depth + 1} mode={mode} />
+                ))}
+              </div>
             </div>
           )}
 
-          {/* Add sub-project */}
           {depth === 0 && (
-            <div className="mt-2">
+            <div className="rounded-2xl px-3.5 py-3" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
               {addingSub ? (
-                <div className="p-2.5 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                  <input autoFocus value={subName} onChange={(e) => setSubName(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === 'Enter') submitSub(); if (e.key === 'Escape') setAddingSub(false) }}
-                    placeholder="Sub-project name…" maxLength={60}
-                    className="w-full text-xs px-2 py-1.5 rounded-lg mb-2 bg-transparent border"
-                    style={{ borderColor: 'rgba(var(--accent-rgb),0.3)', color: 'var(--text-primary)' }} />
-                  <div className="mb-2">
-                    <ColorPalettePicker
-                      colors={PROJECT_COLORS}
-                      value={subColor}
-                      compact
-                      onChange={(next) => next && setSubColor(next)}
-                    />
+                <div className="space-y-2.5">
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>Add sub-project</p>
+                    <p className="text-[11px] mt-1" style={{ color: 'var(--text-secondary)' }}>Split this project into clearer working lanes without opening another program.</p>
                   </div>
-                  <div className="flex gap-1.5">
-                    <button onClick={submitSub} className="flex-1 btn-accent py-1 text-[11px]">Add</button>
-                    <button onClick={() => setAddingSub(false)} className="btn-ghost py-1 text-[11px] px-2">Cancel</button>
+                  <input
+                    autoFocus
+                    value={subName}
+                    onChange={(event) => setSubName(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') submitSubProject()
+                      if (event.key === 'Escape') setAddingSub(false)
+                    }}
+                    placeholder="Sub-project name…"
+                    maxLength={60}
+                    className="w-full text-xs px-2.5 py-2 rounded-xl bg-transparent border"
+                    style={{ borderColor: 'rgba(var(--accent-rgb),0.3)', color: 'var(--text-primary)' }}
+                  />
+                  <ColorPalettePicker colors={PROJECT_COLORS} value={subColor} compact onChange={(next) => next && setSubColor(next)} />
+                  <div className="flex gap-2">
+                    <button type="button" onClick={submitSubProject} className="flex-1 btn-accent py-1.5 text-xs">Create sub-project</button>
+                    <button type="button" onClick={() => setAddingSub(false)} className="btn-ghost py-1.5 text-xs px-3">Cancel</button>
                   </div>
                 </div>
               ) : (
-                <button onClick={() => setAddingSub(true)}
-                  className="flex items-center gap-1 text-[11px] px-2 py-1 rounded-lg hover:bg-white/5 transition-colors"
-                  style={{ color: 'var(--text-secondary)' }}>
-                  <Plus size={10} /> Add sub-project
+                <button
+                  type="button"
+                  onClick={() => setAddingSub(true)}
+                  className="flex items-center gap-2 text-[11px] px-2.5 py-2 rounded-xl transition-colors hover:bg-white/5"
+                  style={{ color: 'var(--text-secondary)' }}
+                >
+                  <Plus size={12} /> Add sub-project
                 </button>
               )}
             </div>
           )}
 
-          {/* Milestones toggle */}
-          <div className="mt-2 border-t" style={{ borderColor: 'rgba(255,255,255,0.05)' }}>
-            <button onClick={() => setShowMilestones((v) => !v)}
-              className="w-full flex items-center gap-1.5 text-[10px] py-2 transition-colors hover:opacity-80"
-              style={{ color: 'var(--text-secondary)' }}>
-              <ChevronRight size={10} style={{ transform: showMilestones ? 'rotate(90deg)' : 'none', transition: 'transform 0.2s' }} />
-              Milestones
-            </button>
-            {showMilestones && (
-              <div className="pb-2">
-                <MilestonePanel projectId={project.id} projectColor={project.color} />
+          <div className="rounded-2xl px-3.5 py-3" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-3">
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>Work items</p>
+                <p className="text-[11px] mt-1" style={{ color: 'var(--text-secondary)' }}>
+                  {mode === 'portfolio'
+                    ? 'Tasks stay tucked away until you open work.'
+                    : 'Execution mode keeps task movement visible inside the selected hierarchy.'}
+                </p>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                {directTasks.length > 0 && showWork && (
+                  <div className="flex items-center gap-0.5 rounded-xl p-0.5" style={{ background: 'rgba(255,255,255,0.06)' }}>
+                    {[['list', LayoutList], ['board', Kanban]].map(([nextView, Icon]) => (
+                      <button
+                        key={nextView}
+                        type="button"
+                        onClick={() => setView(nextView)}
+                        className="p-1.5 rounded-lg transition-colors"
+                        style={view === nextView ? { background: 'var(--accent)', color: '#fff' } : { color: 'var(--text-secondary)' }}
+                      >
+                        <Icon size={12} />
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <button type="button" onClick={() => setShowWork((current) => !current)} className="text-[11px] px-2.5 py-2 rounded-xl" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)' }}>
+                  {showWork ? 'Hide tasks' : 'Show tasks'}
+                </button>
+                <button type="button" onClick={openTaskComposer} className="text-[11px] px-2.5 py-2 rounded-xl" style={{ background: `${project.color}18`, color: project.color }}>
+                  Add task
+                </button>
+              </div>
+            </div>
+
+            {showWork ? (
+              directTasks.length === 0 ? (
+                <div className="rounded-2xl px-3 py-4 text-center" style={{ background: 'rgba(255,255,255,0.02)', border: '1px dashed rgba(255,255,255,0.08)', color: 'var(--text-secondary)' }}>
+                  No direct tasks yet. Add work here or keep it inside sub-projects.
+                </div>
+              ) : view === 'list' ? (
+                <div className="space-y-1">
+                  {directTasks.map((task) => (
+                    <TaskRow key={task.id} task={task} onDragStart={handleTaskDragStart} onDragOver={handleTaskDragOver} onDrop={handleTaskDrop} />
+                  ))}
+                </div>
+              ) : (
+                <div className="flex gap-2 overflow-x-auto pb-2 snap-x">
+                  {KANBAN_COLS.map((column) => {
+                    const columnTasks = directTasks.filter((task) => task.status === column.id)
+                    return (
+                      <div key={column.id} className="flex-shrink-0 w-[220px] snap-start">
+                        <div className="flex items-center gap-1.5 mb-1.5 px-1">
+                          <span className="w-1.5 h-1.5 rounded-full" style={{ background: column.color }} />
+                          <span className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: column.color }}>{column.label}</span>
+                          <span className="text-[10px] ml-auto" style={{ color: 'var(--text-secondary)' }}>{columnTasks.length}</span>
+                        </div>
+                        <div className="space-y-1.5 min-h-[40px]">
+                          {columnTasks.map((task) => <KanbanCard key={task.id} task={task} />)}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )
+            ) : (
+              <div className="rounded-2xl px-3 py-4 text-center" style={{ background: 'rgba(255,255,255,0.02)', border: '1px dashed rgba(255,255,255,0.08)', color: 'var(--text-secondary)' }}>
+                {directTasks.length > 0 ? `${directTasks.length} direct task${directTasks.length === 1 ? '' : 's'} tucked under this project.` : 'No direct tasks here yet.'}
               </div>
             )}
           </div>
@@ -657,54 +869,65 @@ const ProjectPanel = memo(function ProjectPanel({ project, depth = 0 }) {
       )}
 
       {showShare && (
-        <ShareModal
-          resourceType="project"
-          resourceId={project.id}
-          resourceName={project.name}
-          onClose={() => setShowShare(false)}
-        />
+        <ShareModal resourceType="project" resourceId={project.id} resourceName={project.name} onClose={() => setShowShare(false)} />
       )}
     </div>
   )
 })
 
-// ── Program section ───────────────────────────────────────────────────────────
-const ProgramSection = memo(function ProgramSection({ program, projects }) {
-  const updateProgram = useProjectStore((s) => s.updateProgram)
-  const moveProgram   = useProjectStore((s) => s.moveProgram)
-  const deleteProgram = useProjectStore((s) => s.deleteProgram)
-  const addProject    = useProjectStore((s) => s.addProject)
-  const moveProject   = useProjectStore((s) => s.moveProject)
-  const tasks         = useTaskStore((s) => s.tasks)
-  const moveTask      = useTaskStore((s) => s.moveTask)
-  const activeProgramId = useSettingsStore((s) => s.activeProgramId)
-  const activeProjectId = useSettingsStore((s) => s.activeProjectId)
+const ProgramSection = memo(function ProgramSection({ program, projects, mode = 'portfolio' }) {
+  const updateProgram = useProjectStore((state) => state.updateProgram)
+  const moveProgram = useProjectStore((state) => state.moveProgram)
+  const deleteProgram = useProjectStore((state) => state.deleteProgram)
+  const addProject = useProjectStore((state) => state.addProject)
+  const moveProject = useProjectStore((state) => state.moveProject)
+  const milestones = useProjectStore((state) => state.milestones ?? [])
+  const tasks = useTaskStore((state) => state.tasks)
+  const moveTask = useTaskStore((state) => state.moveTask)
+  const activeProgramId = useSettingsStore((state) => state.activeProgramId)
+  const activeProjectId = useSettingsStore((state) => state.activeProjectId)
 
-  const [collapsed, setCollapsed]     = useState(false)
+  const [collapsed, setCollapsed] = useState(false)
   const [addingProject, setAddingProject] = useState(false)
   const [newProjName, setNewProjName] = useState('')
   const [newProjColor, setNewProjColor] = useState(PROJECT_COLORS[0])
   const [showStatusPicker, setShowStatusPicker] = useState(false)
-  const [deleteArmed, setDeleteArmed] = useState(false)
   const [showShare, setShowShare] = useState(false)
+  const [deleteArmed, setDeleteArmed] = useState(false)
+  const [showProgramTasks, setShowProgramTasks] = useState(mode === 'execution')
 
-  // Only top-level projects (no parentId)
-  const topLevelProjects = projects.filter((p) => !p.parentId)
-  const containsActiveProject = !!activeProjectId && projects.some((p) => p.id === activeProjectId)
+  const topLevelProjects = projects.filter((project) => !project.parentId)
+  const containsActiveProject = !!activeProjectId && projects.some((project) => project.id === activeProjectId)
+  const projectMilestones = useMemo(() => sortMilestones(milestones.filter((milestone) => projects.some((project) => project.id === milestone.projectId))), [milestones, projects])
 
-  const programDirectTasks = sortTasksByStartDate(
-    tasks.filter((task) => !task.projectId && taskMatchesProgram(task, program.id, projects))
-  )
-  const allTasks = tasks.filter((task) =>
-    taskMatchesProgram(task, program.id, projects)
-  )
+  const programDirectTasks = useMemo(() => sortTasksByStartDate(tasks.filter((task) => !task.projectId && taskMatchesProgram(task, program.id, projects))), [tasks, program.id, projects])
+  const allTasks = useMemo(() => tasks.filter((task) => taskMatchesProgram(task, program.id, projects)), [tasks, program.id, projects])
+
   const totalTasks = allTasks.length
-  const doneTasks  = allTasks.filter((t) => t.status === 'done').length
+  const doneTasks = allTasks.filter((task) => task.status === 'done').length
+  const inProgress = allTasks.filter((task) => task.status === 'in-progress' || task.status === 'review').length
+  const blocked = allTasks.filter((task) => task.status === 'blocked').length
+  const now = new Date()
+  const overdue = allTasks.filter((task) => task.dueDate && new Date(task.dueDate) < now && task.status !== 'done').length
+  const unscheduled = allTasks.filter((task) => !task.startDate && !task.dueDate).length
+  const completion = totalTasks ? Math.round((doneTasks / totalTasks) * 100) : 0
+  const health = getHealthMeta({ total: totalTasks, done: doneTasks, blocked, overdue, unscheduled })
+  const scheduleWindow = buildScheduleWindow(program, projects, allTasks, projectMilestones)
+  const windowLabel = formatWindowLabel(scheduleWindow.startDate, scheduleWindow.dueDate)
+
+  useEffect(() => {
+    if (activeProgramId === program.id || containsActiveProject) setCollapsed(false)
+  }, [activeProgramId, containsActiveProject, program.id])
+
+  useEffect(() => {
+    if (mode === 'execution') setShowProgramTasks(true)
+  }, [mode])
 
   const submitProject = () => {
     if (!newProjName.trim()) return
     addProject({ name: newProjName.trim(), color: newProjColor, programId: program.id })
-    setNewProjName(''); setAddingProject(false)
+    setNewProjName('')
+    setAddingProject(false)
   }
 
   const openProgramTaskComposer = () => {
@@ -716,18 +939,6 @@ const ProgramSection = memo(function ProgramSection({ program, projects }) {
       )
     }
   }
-
-  useEffect(() => {
-    if (!deleteArmed) return
-    const timeoutId = setTimeout(() => setDeleteArmed(false), 3000)
-    return () => clearTimeout(timeoutId)
-  }, [deleteArmed])
-
-  useEffect(() => {
-    if (activeProgramId === program.id || containsActiveProject) {
-      setCollapsed(false)
-    }
-  }, [activeProgramId, containsActiveProject, program.id])
 
   const handleProgramDragStart = (event) => {
     event.stopPropagation()
@@ -741,11 +952,7 @@ const ProgramSection = memo(function ProgramSection({ program, projects }) {
       event.preventDefault()
       event.dataTransfer.dropEffect = 'move'
     }
-    if (payload.type === 'project') {
-      event.preventDefault()
-      event.dataTransfer.dropEffect = 'move'
-    }
-    if (payload.type === 'task') {
+    if (payload.type === 'project' || payload.type === 'task') {
       event.preventDefault()
       event.dataTransfer.dropEffect = 'move'
     }
@@ -777,266 +984,265 @@ const ProgramSection = memo(function ProgramSection({ program, projects }) {
   }
 
   return (
-    <div className="mb-6" data-program-id={program.id} onDragOver={handleProgramDragOver} onDrop={handleProgramDrop}>
-      {/* Program header */}
-      <div className="flex items-center gap-2.5 mb-3 px-1">
-        <button onClick={() => setCollapsed((c) => !c)} style={{ color: 'var(--text-secondary)' }}>
-          {collapsed ? <ChevronRight size={15} /> : <ChevronDown size={15} />}
-        </button>
-        <button
-          draggable
-          onDragStart={handleProgramDragStart}
-          onClick={(event) => event.stopPropagation()}
-          className="p-0.5 rounded hover:bg-white/8 cursor-grab active:cursor-grabbing"
-          style={{ color: 'var(--text-secondary)' }}
-          title="Drag to reorder program"
-        >
-          <GripVertical size={13} />
-        </button>
-        <div className="w-3 h-3 rounded flex-shrink-0" style={{ background: program.color, boxShadow: `0 0 8px ${program.color}60` }} />
-        <Editable value={program.name} onSave={(n) => updateProgram(program.id, { name: n })}
-          className="text-base font-bold" style={{ color: 'var(--text-primary)' }} />
-        <InfoTooltip text={program.description} />
-
-        {/* Program status badge */}
-        <div className="relative">
-          <button onClick={() => setShowStatusPicker((v) => !v)}>
-            <ProgramStatusBadge status={program.status || 'planning'} />
+    <div className="mb-6 rounded-[30px] overflow-hidden" data-program-id={program.id} onDragOver={handleProgramDragOver} onDrop={handleProgramDrop} style={{ border: `1px solid ${program.color}24`, background: 'rgba(255,255,255,0.02)' }}>
+      <div className="px-4 md:px-5 py-4" style={{ background: `${program.color}08` }}>
+        <div className="flex items-start gap-3">
+          <button type="button" onClick={() => setCollapsed((current) => !current)} style={{ color: 'var(--text-secondary)' }}>
+            {collapsed ? <ChevronRight size={15} /> : <ChevronDown size={15} />}
           </button>
-          {showStatusPicker && (
-            <>
-              <div className="fixed inset-0 z-40" onClick={() => setShowStatusPicker(false)} />
-              <div className="absolute top-full left-0 mt-1 z-50 rounded-xl overflow-hidden"
-                style={{ background: '#ffffff', border: '1px solid rgba(15,23,42,0.12)', boxShadow: '0 16px 48px rgba(15,23,42,0.18)', minWidth: '140px' }}>
-                {STATUS_OPTIONS.map((value) => {
-                  const cfg = STATUS_CONFIG[value]
-                  return (
-                    <button key={value}
-                    onClick={() => { updateProgram(program.id, { status: value }); setShowStatusPicker(false) }}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-left hover:bg-slate-100 transition-colors"
-                    style={(program.status || 'planning') === value ? { color: cfg.color, background: `${cfg.color}12` } : { color: '#334155' }}>
-                    <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: cfg.color }} />
-                    {cfg.label}
-                  </button>
-                  )
-                })}
-              </div>
-            </>
-          )}
-        </div>
-
-        <span className="text-[10px] px-2 py-0.5 rounded-full ml-1"
-          style={{ background: `${program.color}15`, color: program.color }}>
-          {topLevelProjects.length} project{topLevelProjects.length !== 1 ? 's' : ''} · {totalTasks} tasks
-        </span>
-
-        <div className="ml-auto flex items-center gap-1.5">
           <button
-            onClick={() => setShowShare(true)}
-            className="p-1.5 rounded-lg hover:bg-white/8 transition-colors"
+            type="button"
+            draggable
+            onDragStart={handleProgramDragStart}
+            onClick={(event) => event.stopPropagation()}
+            className="p-0.5 rounded hover:bg-white/8 cursor-grab active:cursor-grabbing"
             style={{ color: 'var(--text-secondary)' }}
-            title="Share program"
+            title="Drag to reorder program"
           >
-            <Share2 size={13} />
+            <GripVertical size={13} />
           </button>
-          <button onClick={() => setAddingProject(true)}
-            className="flex items-center gap-1 text-[11px] px-2 py-1 rounded-lg transition-colors hover:bg-white/5"
-            style={{ color: 'var(--accent)' }}>
-            <Plus size={11} /> Project
-          </button>
-          <button onClick={openProgramTaskComposer}
-            className="flex items-center gap-1 text-[11px] px-2 py-1 rounded-lg transition-colors hover:bg-white/5"
-            style={{ color: 'var(--accent)' }}>
-            <Plus size={11} /> Task
-          </button>
-          {deleteArmed ? (
-            <>
-              <button
-                onClick={() => setDeleteArmed(false)}
-                className="text-[10px] px-2 py-1 rounded-lg"
-                style={{ background: 'rgba(255,255,255,0.08)', color: 'var(--text-secondary)' }}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => deleteProgram(program.id)}
-                className="text-[10px] px-2 py-1 rounded-lg"
-                style={{ background: 'rgba(239,68,68,0.2)', color: '#ef4444' }}
-              >
-                Really delete?
-              </button>
-            </>
-          ) : (
-            <button
-              onClick={() => setDeleteArmed(true)}
-              className="text-[10px] px-2 py-1 rounded-lg hover:bg-red-500/10 transition-colors"
-              style={{ color: 'var(--text-secondary)' }}
-            >
-              Delete
-            </button>
-          )}
+          <div className="w-3 h-3 rounded flex-shrink-0 mt-1" style={{ background: program.color, boxShadow: `0 0 8px ${program.color}60` }} />
+
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <Editable value={program.name} onSave={(name) => updateProgram(program.id, { name })} className="text-base font-bold" style={{ color: 'var(--text-primary)' }} />
+              <div className="relative">
+                <button type="button" onClick={() => setShowStatusPicker((current) => !current)}>
+                  <ProgramStatusBadge status={program.status || 'planning'} />
+                </button>
+                {showStatusPicker && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setShowStatusPicker(false)} />
+                    <div className="absolute top-full left-0 mt-1 z-50 rounded-xl overflow-hidden" style={{ background: '#ffffff', border: '1px solid rgba(15,23,42,0.12)', boxShadow: '0 16px 48px rgba(15,23,42,0.18)', minWidth: '140px' }}>
+                      {STATUS_OPTIONS.map((value) => {
+                        const config = STATUS_CONFIG[value]
+                        const active = (program.status || 'planning') === value
+                        return (
+                          <button
+                            key={value}
+                            type="button"
+                            onClick={() => {
+                              updateProgram(program.id, { status: value })
+                              setShowStatusPicker(false)
+                            }}
+                            className="w-full flex items-center gap-2 px-3 py-2 text-xs text-left hover:bg-slate-100 transition-colors"
+                            style={active ? { color: config.color, background: `${config.color}12` } : { color: '#334155' }}
+                          >
+                            <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: config.color }} />
+                            {config.label}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </>
+                )}
+              </div>
+              <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: health.background, color: health.color }}>{health.label}</span>
+              <InfoTooltip text={program.description} />
+            </div>
+            <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]" style={{ color: 'var(--text-secondary)' }}>
+              <span>{windowLabel}</span>
+              <span>{topLevelProjects.length} project{topLevelProjects.length === 1 ? '' : 's'}</span>
+              <span>{totalTasks} task{totalTasks === 1 ? '' : 's'}</span>
+              {projectMilestones.length > 0 && <span>{projectMilestones.length} milestone{projectMilestones.length === 1 ? '' : 's'}</span>}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2" onClick={(event) => event.stopPropagation()}>
+            <ActionMenu
+              label="Add"
+              icon={Plus}
+              accent
+              items={[
+                { label: 'Add project', onClick: () => setAddingProject(true) },
+                { label: 'Add program task', onClick: openProgramTaskComposer },
+              ]}
+            />
+            <ActionMenu
+              iconOnly
+              items={[
+                { label: 'Share program', onClick: () => setShowShare(true) },
+                { label: deleteArmed ? 'Cancel delete' : 'Delete program', onClick: () => setDeleteArmed((current) => !current), tone: 'danger' },
+              ]}
+            />
+          </div>
         </div>
       </div>
 
-      {/* Program progress */}
-      {!collapsed && totalTasks > 0 && (
-        <div className="mb-3 px-1">
-          <div className="h-1 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
-            <div className="h-full rounded-full transition-all duration-700"
-              style={{ width: `${totalTasks ? Math.round((doneTasks / totalTasks) * 100) : 0}%`, background: `linear-gradient(90deg, ${program.color}60, ${program.color})` }} />
-          </div>
-          <div className="flex justify-between text-[10px] mt-1" style={{ color: 'var(--text-secondary)' }}>
-            <span>{doneTasks} of {totalTasks} tasks done</span>
-            <span style={{ color: program.color }}>{totalTasks ? Math.round((doneTasks / totalTasks) * 100) : 0}% complete</span>
+      {deleteArmed && (
+        <div className="px-4 md:px-5 py-3">
+          <div className="flex items-center justify-between gap-3 rounded-2xl px-3 py-2.5" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.16)' }}>
+            <span className="text-[11px]" style={{ color: '#fca5a5' }}>Delete this program and unassign its projects?</span>
+            <div className="flex items-center gap-2">
+              <button type="button" onClick={() => setDeleteArmed(false)} className="text-[11px] px-2 py-1 rounded-lg" style={{ color: 'var(--text-secondary)', background: 'rgba(255,255,255,0.08)' }}>Cancel</button>
+              <button type="button" onClick={() => deleteProgram(program.id)} className="text-[11px] px-2 py-1 rounded-lg" style={{ color: '#fff', background: '#dc2626' }}>Delete</button>
+            </div>
           </div>
         </div>
       )}
 
-      {/* New project inline form */}
-      {!collapsed && addingProject && (
-        <div className="mb-3 p-3 rounded-xl" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(var(--accent-rgb),0.2)' }}>
-          <input autoFocus value={newProjName} onChange={(e) => setNewProjName(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') submitProject(); if (e.key === 'Escape') setAddingProject(false) }}
-            placeholder="Project name…" maxLength={60}
-            className="w-full text-sm px-3 py-2 rounded-xl mb-2"
-            style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(var(--accent-rgb),0.25)', color: 'var(--text-primary)' }} />
-          <div className="mb-2">
-            <ColorPalettePicker
-              colors={PROJECT_COLORS}
-              value={newProjColor}
-              onChange={(next) => next && setNewProjColor(next)}
-            />
-          </div>
-          <div className="flex gap-2">
-            <button onClick={submitProject} className="flex-1 btn-accent py-1.5 text-xs">Create</button>
-            <button onClick={() => setAddingProject(false)} className="btn-ghost py-1.5 text-xs px-3">Cancel</button>
-          </div>
-        </div>
-      )}
-
-      {/* Projects */}
       {!collapsed && (
-        <div className="space-y-2 pl-6">
-          {programDirectTasks.length > 0 && (
-            <div
-              className="mb-3 rounded-2xl p-2.5"
-              style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}
-            >
-              <div className="flex items-center justify-between px-1 pb-2">
-                <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
-                  Program Tasks
-                </p>
-                <span className="text-[10px] px-1.5 py-0.5 rounded-full"
-                  style={{ background: `${program.color}16`, color: program.color }}>
-                  {programDirectTasks.length}
-                </span>
-              </div>
-              <div className="space-y-2">
-                {programDirectTasks.map((task) => (
-                  <TaskRow
-                    key={task.id}
-                    task={task}
-                    onDragStart={(event, item) => {
-                      event.stopPropagation()
-                      writeDragPayload(event, {
-                        type: 'task',
-                        id: item.id,
-                        projectId: item.projectId ?? null,
-                        programId: item.programId ?? null,
-                      })
-                    }}
-                    onDragOver={(event, item) => {
-                      const payload = readDragPayload(event)
-                      if (!payload || payload.type !== 'task' || payload.id === item.id) return
-                      event.preventDefault()
-                      event.dataTransfer.dropEffect = 'move'
-                    }}
-                    onDrop={(event, item) => {
-                      const payload = readDragPayload(event)
-                      if (!payload || payload.type !== 'task' || payload.id === item.id) return
-                      event.preventDefault()
-                      event.stopPropagation()
-                      moveTask(payload.id, { projectId: null, programId: program.id, beforeTaskId: item.id })
-                    }}
-                  />
-                ))}
+        <div className="px-4 md:px-5 pb-5 pt-4 space-y-4" style={{ borderTop: `1px solid ${program.color}12` }}>
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <MetricTile icon={Folder} label="Projects" value={`${topLevelProjects.length} active lanes`} detail={topLevelProjects.length > 0 ? `${projects.length - topLevelProjects.length > 0 ? `${projects.length - topLevelProjects.length} nested beneath them` : 'No nested sub-projects yet'}` : 'Create the first project to start structuring work'} tone="accent" />
+            <MetricTile icon={CheckCircle2} label="Progress" value={`${completion}% complete`} detail={`${doneTasks} of ${totalTasks || 0} tasks closed`} />
+            <MetricTile icon={Clock} label="Execution" value={`${inProgress} active`} detail={programDirectTasks.length > 0 ? `${programDirectTasks.length} direct program task${programDirectTasks.length === 1 ? '' : 's'}` : 'No direct program tasks'} />
+            <MetricTile icon={AlertTriangle} label="Health" value={health.label} detail={health.detail} tone={overdue > 0 || blocked > 0 ? 'danger' : 'default'} />
+          </div>
+
+          <MilestonePreviewStrip label="Program milestones" milestones={projectMilestones} accentColor={program.color} />
+
+          {addingProject && (
+            <div className="rounded-2xl p-3" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(var(--accent-rgb),0.18)' }}>
+              <div className="flex flex-col gap-2.5">
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>New project</p>
+                  <p className="text-[11px] mt-1" style={{ color: 'var(--text-secondary)' }}>Add the next working lane inside this program.</p>
+                </div>
+                <input
+                  autoFocus
+                  value={newProjName}
+                  onChange={(event) => setNewProjName(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') submitProject()
+                    if (event.key === 'Escape') setAddingProject(false)
+                  }}
+                  placeholder="Project name…"
+                  maxLength={60}
+                  className="w-full text-sm px-3 py-2 rounded-xl"
+                  style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(var(--accent-rgb),0.25)', color: 'var(--text-primary)' }}
+                />
+                <ColorPalettePicker colors={PROJECT_COLORS} value={newProjColor} onChange={(next) => next && setNewProjColor(next)} />
+                <div className="flex gap-2">
+                  <button type="button" onClick={submitProject} className="flex-1 btn-accent py-1.5 text-xs">Create project</button>
+                  <button type="button" onClick={() => setAddingProject(false)} className="btn-ghost py-1.5 text-xs px-3">Cancel</button>
+                </div>
               </div>
             </div>
           )}
 
-          {topLevelProjects.length === 0 && programDirectTasks.length === 0 && !addingProject ? (
-            <p className="text-xs py-2" style={{ color: 'var(--text-secondary)' }}>
-              No projects yet.{' '}
-              <button onClick={() => setAddingProject(true)} className="underline" style={{ color: 'var(--accent)' }}>Add one</button>
-            </p>
-          ) : (
-            topLevelProjects.map((p) => <ProjectPanel key={p.id} project={p} />)
+          {(programDirectTasks.length > 0 || mode === 'execution') && (
+            <div className="rounded-2xl px-3.5 py-3" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-3">
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>Program tasks</p>
+                  <p className="text-[11px] mt-1" style={{ color: 'var(--text-secondary)' }}>Use these only for cross-cutting work that should not sit inside a project.</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button type="button" onClick={() => setShowProgramTasks((current) => !current)} className="text-[11px] px-2.5 py-2 rounded-xl" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)' }}>
+                    {showProgramTasks ? 'Hide tasks' : 'Show tasks'}
+                  </button>
+                  <button type="button" onClick={openProgramTaskComposer} className="text-[11px] px-2.5 py-2 rounded-xl" style={{ background: `${program.color}18`, color: program.color }}>
+                    Add task
+                  </button>
+                </div>
+              </div>
+
+              {showProgramTasks ? (
+                programDirectTasks.length === 0 ? (
+                  <div className="rounded-2xl px-3 py-4 text-center" style={{ background: 'rgba(255,255,255,0.02)', border: '1px dashed rgba(255,255,255,0.08)', color: 'var(--text-secondary)' }}>
+                    No direct program tasks yet.
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    {programDirectTasks.map((task) => (
+                      <TaskRow
+                        key={task.id}
+                        task={task}
+                        onDragStart={(event, item) => {
+                          event.stopPropagation()
+                          writeDragPayload(event, { type: 'task', id: item.id, projectId: item.projectId ?? null, programId: item.programId ?? null })
+                        }}
+                        onDragOver={(event, item) => {
+                          const payload = readDragPayload(event)
+                          if (!payload || payload.type !== 'task' || payload.id === item.id) return
+                          event.preventDefault()
+                          event.dataTransfer.dropEffect = 'move'
+                        }}
+                        onDrop={(event, item) => {
+                          const payload = readDragPayload(event)
+                          if (!payload || payload.type !== 'task' || payload.id === item.id) return
+                          event.preventDefault()
+                          event.stopPropagation()
+                          moveTask(payload.id, { projectId: null, programId: program.id, beforeTaskId: item.id })
+                        }}
+                      />
+                    ))}
+                  </div>
+                )
+              ) : (
+                <div className="rounded-2xl px-3 py-4 text-center" style={{ background: 'rgba(255,255,255,0.02)', border: '1px dashed rgba(255,255,255,0.08)', color: 'var(--text-secondary)' }}>
+                  {programDirectTasks.length > 0 ? `${programDirectTasks.length} task${programDirectTasks.length === 1 ? '' : 's'} tucked under the program.` : 'Program tasks are hidden.'}
+                </div>
+              )}
+            </div>
           )}
+
+          <div className="space-y-3">
+            {topLevelProjects.length === 0 && programDirectTasks.length === 0 && !addingProject ? (
+              <div className="rounded-2xl px-4 py-5 text-center" style={{ background: 'rgba(255,255,255,0.02)', border: '1px dashed rgba(255,255,255,0.08)', color: 'var(--text-secondary)' }}>
+                No projects yet. Add the first working lane for this program.
+              </div>
+            ) : (
+              topLevelProjects.map((projectItem) => (
+                <ProjectPanel key={projectItem.id} project={projectItem} mode={mode} />
+              ))
+            )}
+          </div>
         </div>
       )}
 
-      {showShare && (
-        <ShareModal
-          resourceType="program"
-          resourceId={program.id}
-          resourceName={program.name}
-          onClose={() => setShowShare(false)}
-        />
-      )}
+      {showShare && <ShareModal resourceType="program" resourceId={program.id} resourceName={program.name} onClose={() => setShowShare(false)} />}
     </div>
   )
 })
 
-// ── Unassigned projects section ───────────────────────────────────────────────
-const UnassignedSection = memo(function UnassignedSection({ projects }) {
-  const moveProject = useProjectStore((s) => s.moveProject)
+const UnassignedSection = memo(function UnassignedSection({ projects, mode }) {
+  const moveProject = useProjectStore((state) => state.moveProject)
   const [collapsed, setCollapsed] = useState(false)
-  // Only top-level
-  const topLevel = projects.filter((p) => !p.parentId)
-  if (topLevel.length === 0) return null
-
-  const handleUnassignedDragOver = (event) => {
-    const payload = readDragPayload(event)
-    if (!payload || payload.type !== 'project') return
-    event.preventDefault()
-    event.dataTransfer.dropEffect = 'move'
-  }
-
-  const handleUnassignedDrop = (event) => {
-    const payload = readDragPayload(event)
-    if (!payload || payload.type !== 'project') return
-    event.preventDefault()
-    event.stopPropagation()
-    moveProject(payload.id, { programId: null, parentId: null })
-  }
+  const topLevelProjects = projects.filter((project) => !project.parentId)
+  if (topLevelProjects.length === 0) return null
 
   return (
-    <div className="mb-6" onDragOver={handleUnassignedDragOver} onDrop={handleUnassignedDrop}>
-      <div className="flex items-center gap-2.5 mb-3 px-1">
-        <button onClick={() => setCollapsed((c) => !c)} style={{ color: 'var(--text-secondary)' }}>
+    <div className="mb-6 rounded-[28px] overflow-hidden" onDragOver={(event) => {
+      const payload = readDragPayload(event)
+      if (!payload || payload.type !== 'project') return
+      event.preventDefault()
+      event.dataTransfer.dropEffect = 'move'
+    }} onDrop={(event) => {
+      const payload = readDragPayload(event)
+      if (!payload || payload.type !== 'project') return
+      event.preventDefault()
+      event.stopPropagation()
+      moveProject(payload.id, { programId: null, parentId: null })
+    }} style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)' }}>
+      <div className="flex items-center gap-2.5 px-4 py-4" style={{ background: 'rgba(255,255,255,0.03)' }}>
+        <button type="button" onClick={() => setCollapsed((current) => !current)} style={{ color: 'var(--text-secondary)' }}>
           {collapsed ? <ChevronRight size={15} /> : <ChevronDown size={15} />}
         </button>
         <Folder size={14} style={{ color: 'var(--text-secondary)' }} />
-        <span className="text-base font-bold" style={{ color: 'var(--text-secondary)' }}>Unassigned</span>
+        <div className="flex-1 min-w-0">
+          <h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Unassigned projects</h2>
+          <p className="text-[11px] mt-1" style={{ color: 'var(--text-secondary)' }}>Projects not currently attached to a program.</p>
+        </div>
         <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--text-secondary)' }}>
-          {topLevel.length} project{topLevel.length !== 1 ? 's' : ''}
+          {topLevelProjects.length}
         </span>
       </div>
       {!collapsed && (
-        <div className="space-y-2 pl-6">
-          {topLevel.map((p) => <ProjectPanel key={p.id} project={p} />)}
+        <div className="px-4 py-4 space-y-3">
+          {topLevelProjects.map((project) => <ProjectPanel key={project.id} project={project} mode={mode} />)}
         </div>
       )}
     </div>
   )
 })
 
-// ── New program form ──────────────────────────────────────────────────────────
 const NewProgramForm = memo(function NewProgramForm({ onDone }) {
-  const [name, setName]   = useState('')
+  const [name, setName] = useState('')
   const [color, setColor] = useState(PROJECT_COLORS[0])
-  const [desc, setDesc]   = useState('')
-  const addProgram = useProjectStore((s) => s.addProgram)
+  const [desc, setDesc] = useState('')
+  const addProgram = useProjectStore((state) => state.addProgram)
 
   const submit = () => {
     if (!name.trim()) return
@@ -1050,57 +1256,59 @@ const NewProgramForm = memo(function NewProgramForm({ onDone }) {
         <div className="w-3 h-3 rounded flex-shrink-0" style={{ background: color }} />
         <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>New Program</span>
       </div>
-      <input autoFocus value={name} onChange={(e) => setName(e.target.value)}
-        onKeyDown={(e) => { if (e.key === 'Enter') submit(); if (e.key === 'Escape') onDone() }}
-        placeholder="Program name (e.g. Credit Cards, GTM)…" maxLength={60}
+      <input
+        autoFocus
+        value={name}
+        onChange={(event) => setName(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') submit()
+          if (event.key === 'Escape') onDone()
+        }}
+        placeholder="Program name (e.g. Credit Cards, GTM)…"
+        maxLength={60}
         className="w-full text-sm px-3 py-2 rounded-xl"
-        style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(var(--accent-rgb),0.25)', color: 'var(--text-primary)' }} />
-      <input value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="Description (optional)" maxLength={120}
-        className="w-full text-sm px-3 py-2 rounded-xl"
-        style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', color: 'var(--text-primary)' }} />
-      <ColorPalettePicker
-        colors={PROJECT_COLORS}
-        value={color}
-        onChange={(next) => next && setColor(next)}
+        style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(var(--accent-rgb),0.25)', color: 'var(--text-primary)' }}
       />
+      <input
+        value={desc}
+        onChange={(event) => setDesc(event.target.value)}
+        placeholder="Description (optional)"
+        maxLength={120}
+        className="w-full text-sm px-3 py-2 rounded-xl"
+        style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', color: 'var(--text-primary)' }}
+      />
+      <ColorPalettePicker colors={PROJECT_COLORS} value={color} onChange={(next) => next && setColor(next)} />
       <div className="flex gap-2">
-        <button onClick={submit} className="flex-1 btn-accent py-2 text-xs">Create program</button>
-        <button onClick={onDone} className="btn-ghost py-2 text-xs px-3">Cancel</button>
+        <button type="button" onClick={submit} className="flex-1 btn-accent py-2 text-xs">Create program</button>
+        <button type="button" onClick={onDone} className="btn-ghost py-2 text-xs px-3">Cancel</button>
       </div>
     </GlassCard>
   )
 })
 
-// ── Projects page ─────────────────────────────────────────────────────────────
 const Projects = memo(function Projects() {
-  const programs = useProjectStore((s) => s.programs)
-  const projects = useProjectStore((s) => s.projects)
-  const tasks    = useTaskStore((s) => s.tasks)
-  const activeProjectId = useSettingsStore((s) => s.activeProjectId)
-  const activeProgramId = useSettingsStore((s) => s.activeProgramId)
+  const programs = useProjectStore((state) => state.programs)
+  const projects = useProjectStore((state) => state.projects)
+  const tasks = useTaskStore((state) => state.tasks)
+  const activeProjectId = useSettingsStore((state) => state.activeProjectId)
+  const activeProgramId = useSettingsStore((state) => state.activeProgramId)
+  const setActiveProgram = useSettingsStore((state) => state.setActiveProgram)
+  const setActiveProject = useSettingsStore((state) => state.setActiveProject)
+  const projectsViewMode = useSettingsStore((state) => state.projectsViewMode)
+  const setProjectsViewMode = useSettingsStore((state) => state.setProjectsViewMode)
   const [addingProgram, setAddingProgram] = useState(false)
 
-  const activeProject = projects.find((p) => p.id === activeProjectId) ?? null
+  const activeProject = projects.find((project) => project.id === activeProjectId) ?? null
   const focusedProgramId = activeProgramId ?? activeProject?.programId ?? null
-  const focusedProgram = focusedProgramId
-    ? programs.find((p) => p.id === focusedProgramId) ?? null
-    : null
+  const focusedProgram = focusedProgramId ? programs.find((program) => program.id === focusedProgramId) ?? null : null
 
   const visiblePrograms = focusedProgram ? [focusedProgram] : programs
-  const visibleProjects = focusedProgram
-    ? projects.filter((p) => p.programId === focusedProgram.id)
-    : projects
-
-  const unassignedProjects = focusedProgram
-    ? []
-    : projects.filter((p) => !p.programId || !programs.find((prog) => prog.id === p.programId))
-
-  const visibleTasks = focusedProgram
-    ? tasks.filter((task) => taskMatchesProgram(task, focusedProgram.id, projects))
-    : tasks
+  const visibleProjects = focusedProgram ? projects.filter((project) => project.programId === focusedProgram.id) : projects
+  const unassignedProjects = focusedProgram ? [] : projects.filter((project) => !project.programId || !programs.find((program) => program.id === project.programId))
+  const visibleTasks = focusedProgram ? tasks.filter((task) => taskMatchesProgram(task, focusedProgram.id, projects)) : tasks
   const totalTasks = visibleTasks.length
-  const doneTasks  = visibleTasks.filter((t) => t.status === 'done').length
-  const projectCount = focusedProgram ? visibleProjects.filter((p) => !p.parentId).length : projects.length
+  const doneTasks = visibleTasks.filter((task) => task.status === 'done').length
+  const topLevelProjectCount = focusedProgram ? visibleProjects.filter((project) => !project.parentId).length : projects.filter((project) => !project.parentId).length
   const headerTitle = focusedProgram ? focusedProgram.name : 'Programs'
 
   useEffect(() => {
@@ -1110,7 +1318,7 @@ const Projects = memo(function Projects() {
         ? `[data-program-id="${activeProgramId}"]`
         : null
 
-    if (!selector) return
+    if (!selector) return undefined
 
     const scrollToTarget = () => {
       const target = document.querySelector(selector)
@@ -1119,30 +1327,68 @@ const Projects = memo(function Projects() {
       return true
     }
 
-    if (scrollToTarget()) return
+    if (scrollToTarget()) return undefined
     const timeoutId = setTimeout(scrollToTarget, 80)
     return () => clearTimeout(timeoutId)
   }, [activeProjectId, activeProgramId, programs.length, projects.length])
 
+  const clearFocus = () => {
+    setActiveProject(null)
+    setActiveProgram(null)
+  }
+
+  const modeDescription = projectsViewMode === 'execution'
+    ? 'Execution mode keeps working rows and task movement visible inside the hierarchy.'
+    : 'Portfolio mode keeps structure first: programs, projects, milestones, then work on demand.'
+
   return (
     <div className="flex-1 overflow-y-auto px-4 md:px-6 pb-24 md:pb-8">
-      {/* Page header */}
-      <div className="flex items-center justify-between py-4 mb-4">
+      <div className="flex flex-col gap-4 py-4 mb-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <h1 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>{headerTitle}</h1>
-          <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>
-            {focusedProgram ? `${projectCount} projects` : `${programs.length} programs · ${projectCount} projects`} · {doneTasks}/{totalTasks} tasks done
+          <div className="flex items-center gap-2 flex-wrap">
+            <h1 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>{headerTitle}</h1>
+            {focusedProgram && (
+              <span className="text-[10px] px-2 py-1 rounded-full" style={{ background: 'rgba(var(--accent-rgb),0.14)', color: 'var(--accent)' }}>
+                Focused program
+              </span>
+            )}
+          </div>
+          <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
+            {focusedProgram ? `${topLevelProjectCount} projects` : `${programs.length} programs · ${topLevelProjectCount} top-level projects`} · {doneTasks}/{totalTasks} tasks done
           </p>
+          <p className="text-[11px] mt-1.5" style={{ color: 'var(--text-secondary)' }}>{modeDescription}</p>
         </div>
-        <button onClick={() => setAddingProgram(true)} className="btn-accent flex items-center gap-1.5 px-3 py-2 text-xs">
-          <Plus size={13} /> New program
-        </button>
+
+        <div className="flex flex-wrap items-center gap-2">
+          {focusedProgram && (
+            <button type="button" onClick={clearFocus} className="btn-ghost px-3 py-2 text-xs">
+              All programs
+            </button>
+          )}
+          <div className="flex items-center gap-1 rounded-2xl p-1" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+            {[
+              ['portfolio', 'Portfolio'],
+              ['execution', 'Execution'],
+            ].map(([mode, label]) => (
+              <button
+                key={mode}
+                type="button"
+                onClick={() => setProjectsViewMode(mode)}
+                className="px-3 py-2 rounded-xl text-xs font-semibold transition-colors"
+                style={projectsViewMode === mode ? { background: 'var(--accent)', color: '#fff' } : { color: 'var(--text-secondary)' }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <button type="button" onClick={() => setAddingProgram(true)} className="btn-accent flex items-center gap-1.5 px-3 py-2 text-xs">
+            <Plus size={13} /> New program
+          </button>
+        </div>
       </div>
 
-      {/* New program form */}
       {addingProgram && <NewProgramForm onDone={() => setAddingProgram(false)} />}
 
-      {/* Programs */}
       {programs.length === 0 && unassignedProjects.length === 0 && !addingProgram ? (
         <div className="flex flex-col items-center justify-center py-20 gap-3">
           <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(var(--accent-rgb),0.1)' }}>
@@ -1150,22 +1396,18 @@ const Projects = memo(function Projects() {
           </div>
           <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>No programs yet</p>
           <p className="text-xs text-center max-w-xs" style={{ color: 'var(--text-secondary)' }}>
-            Create a program (e.g. "Credit Cards") then add projects inside it (e.g. "App", "Backend")
+            Create a program first, then split the work into projects and only open tasks where you actually need to operate.
           </p>
-          <button onClick={() => setAddingProgram(true)} className="btn-accent px-4 py-2 text-xs mt-1">
+          <button type="button" onClick={() => setAddingProgram(true)} className="btn-accent px-4 py-2 text-xs mt-1">
             Create first program
           </button>
         </div>
       ) : (
         <>
           {visiblePrograms.map((program) => (
-            <ProgramSection
-              key={program.id}
-              program={program}
-              projects={visibleProjects.filter((p) => p.programId === program.id)}
-            />
+            <ProgramSection key={program.id} program={program} projects={visibleProjects.filter((project) => project.programId === program.id)} mode={projectsViewMode} />
           ))}
-          {!focusedProgram && <UnassignedSection projects={unassignedProjects} />}
+          {!focusedProgram && <UnassignedSection projects={unassignedProjects} mode={projectsViewMode} />}
         </>
       )}
     </div>

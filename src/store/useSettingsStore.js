@@ -113,6 +113,7 @@ const useSettingsStore = create(
       filters: { status: [], priority: [], tags: [] },
       activeProjectId: null,
       activeProgramId: null,
+      projectsViewMode: 'portfolio',
       selectedTaskIds: [],
       sortBy: 'createdAt',
       sidebarCollapsed: false,
@@ -294,6 +295,10 @@ const useSettingsStore = create(
         s.activeProjectId = null
       }),
 
+      setProjectsViewMode: (mode) => set((s) => {
+        s.projectsViewMode = mode === 'execution' ? 'execution' : 'portfolio'
+      }),
+
       // ── Bulk selection ─────────────────────────────────────────────────
       toggleTaskSelection: (id) =>
         set((s) => {
@@ -314,7 +319,7 @@ const useSettingsStore = create(
     {
       name: 'taskflow-settings',
       storage: createJSONStorage(() => localStorage),
-      version: 7,
+      version: 8,
       partialize: (state) => {
         const { selectedTaskId: _s1, selectedTaskIds: _s2, ...rest } = state
         return rest
@@ -376,6 +381,12 @@ const useSettingsStore = create(
               customRangeStart: s?.ganttConfig?.customRangeStart ?? null,
               customRangeEnd: s?.ganttConfig?.customRangeEnd ?? null,
             },
+          }
+        }
+        if (version < 8) {
+          s = {
+            ...s,
+            projectsViewMode: s?.projectsViewMode === 'execution' ? 'execution' : 'portfolio',
           }
         }
         return s
