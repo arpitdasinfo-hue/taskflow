@@ -1,13 +1,15 @@
 import { memo, useCallback, useEffect, useMemo, useState } from 'react'
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
+import { CheckSquare, ChevronRight, ListTodo } from 'lucide-react'
 import TaskCard from '../components/tasks/TaskCard'
 import FilterBar from '../components/tasks/FilterBar'
 import BulkActionBar from '../components/tasks/BulkActionBar'
 import CommitTaskMenu from '../components/planning/CommitTaskMenu'
 import EmptyState from '../components/common/EmptyState'
+import PageHero from '../components/common/PageHero'
+import ScopeBar from '../components/common/ScopeBar'
 import { InlineDateChip, InlineStatusChip } from '../components/common/InlineFieldChips'
 import Header from '../components/layout/Header'
-import { ListTodo, ChevronRight, CheckSquare } from 'lucide-react'
 import useSettingsStore from '../store/useSettingsStore'
 import useTaskStore from '../store/useTaskStore'
 import useProjectStore from '../store/useProjectStore'
@@ -16,28 +18,72 @@ import { sortTasksByStartDate } from '../lib/taskSort'
 import { getTaskProgram, getTaskProgramId } from '../lib/taskScope'
 
 const PRIORITY_COLOR = { critical: '#ef4444', high: '#f97316', medium: '#f59e0b', low: '#64748b' }
-const STATUS_COLOR   = { todo: '#94a3b8', 'in-progress': '#22d3ee', review: '#f59e0b', done: '#10b981', blocked: '#ef4444' }
-const STATUS_LABEL   = { todo: 'To Do', 'in-progress': 'Active', review: 'Review', done: 'Done', blocked: 'Blocked' }
+const PRIORITY_LABEL = { critical: 'Critical', high: 'High', medium: 'Medium', low: 'Low' }
+const STATUS_COLOR = { todo: '#94a3b8', 'in-progress': '#22d3ee', review: '#f59e0b', done: '#10b981', blocked: '#ef4444' }
+const STATUS_LABEL = { todo: 'To Do', 'in-progress': 'Active', review: 'Review', done: 'Done', blocked: 'Blocked' }
 
 const STATUS_COLUMNS = [
-  { id: 'todo',        label: 'To Do',       color: '#94a3b8' },
+  { id: 'todo', label: 'To Do', color: '#94a3b8' },
   { id: 'in-progress', label: 'In Progress', color: 'var(--accent)' },
-  { id: 'review',      label: 'In Review',   color: '#f59e0b' },
-  { id: 'done',        label: 'Done',        color: '#10b981' },
-  { id: 'blocked',     label: 'Blocked',     color: '#ef4444' },
+  { id: 'review', label: 'In Review', color: '#f59e0b' },
+  { id: 'done', label: 'Done', color: '#10b981' },
+  { id: 'blocked', label: 'Blocked', color: '#ef4444' },
 ]
 
-// ── Board Column ─────────────────────────────────────────────────────────────
+const SELECT_STYLE = {
+  background: 'rgba(255,255,255,0.05)',
+  border: '1px solid rgba(255,255,255,0.1)',
+  color: 'var(--text-primary)',
+}
+
+const PriorityPill = memo(function PriorityPill({ value }) {
+  return (
+    <span
+      className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-medium whitespace-nowrap"
+      style={{ background: `${PRIORITY_COLOR[value]}16`, color: PRIORITY_COLOR[value] }}
+    >
+      <span className="w-1.5 h-1.5 rounded-full" style={{ background: PRIORITY_COLOR[value] }} />
+      {PRIORITY_LABEL[value]}
+    </span>
+  )
+})
+
+const TaskContextChip = memo(function TaskContextChip({ task, projectById, programById }) {
+  const project = task.projectId ? projectById.get(task.projectId) : null
+  const program = task.programId
+    ? programById.get(task.programId)
+    : (project?.programId ? programById.get(project.programId) : null)
+  const color = project?.color ?? program?.color ?? '#94a3b8'
+  const label = project
+    ? project.parentId && projectById.get(project.parentId)
+      ? `${projectById.get(project.parentId)?.name} / ${project.name}`
+      : project.name
+    : program
+      ? `${program.name} · Program`
+      : 'Standalone'
+
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-medium max-w-[220px] truncate"
+      style={{ background: `${color}16`, color }}
+      title={label}
+    >
+      <span className="w-1.5 h-1.5 rounded-full" style={{ background: color }} />
+      <span className="truncate">{label}</span>
+    </span>
+  )
+})
+
 const BoardColumn = memo(function BoardColumn({ column, tasks, provided, snapshot, selectMode }) {
-  const selectedTaskIds     = useSettingsStore((s) => s.selectedTaskIds)
-  const toggleTaskSelection = useSettingsStore((s) => s.toggleTaskSelection)
+  const selectedTaskIds = useSettingsStore((state) => state.selectedTaskIds)
+  const toggleTaskSelection = useSettingsStore((state) => state.toggleTaskSelection)
 
   return (
     <div
       className="flex flex-col rounded-2xl min-w-[260px] max-w-[300px] w-[280px]"
       style={{
         background: snapshot.isDraggingOver ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.02)',
-        border: `1px solid ${snapshot.isDraggingOver ? column.color + '40' : 'rgba(255,255,255,0.07)'}`,
+        border: `1px solid ${snapshot.isDraggingOver ? `${column.color}40` : 'rgba(255,255,255,0.07)'}`,
         transition: 'all 0.2s ease',
       }}
     >
@@ -46,13 +92,14 @@ const BoardColumn = memo(function BoardColumn({ column, tasks, provided, snapsho
           <span className="w-2 h-2 rounded-full" style={{ background: column.color }} />
           <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{column.label}</span>
         </div>
-        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full"
-          style={{ background: `${column.color}18`, color: column.color }}>
+        <span
+          className="text-[10px] font-bold px-1.5 py-0.5 rounded-full"
+          style={{ background: `${column.color}18`, color: column.color }}
+        >
           {tasks.length}
         </span>
       </div>
-      <div ref={provided.innerRef} {...provided.droppableProps}
-        className="flex-1 px-2 pb-2 space-y-2 min-h-[80px]">
+      <div ref={provided.innerRef} {...provided.droppableProps} className="flex-1 px-2 pb-2 space-y-2 min-h-[80px]">
         {tasks.map((task, index) => (
           <Draggable key={task.id} draggableId={task.id} index={index}>
             {(dragProvided, dragSnapshot) => (
@@ -65,12 +112,11 @@ const BoardColumn = memo(function BoardColumn({ column, tasks, provided, snapsho
               >
                 {selectMode && (
                   <button
-                    onPointerDown={(e) => { e.stopPropagation(); toggleTaskSelection(task.id) }}
+                    onPointerDown={(event) => { event.stopPropagation(); toggleTaskSelection(task.id) }}
                     className="absolute top-2 left-2 z-10 w-4 h-4 rounded border flex items-center justify-center"
                     style={selectedTaskIds.includes(task.id)
                       ? { background: 'var(--accent)', borderColor: 'var(--accent)' }
-                      : { background: 'rgba(0,0,0,0.4)', borderColor: 'rgba(255,255,255,0.3)' }
-                    }
+                      : { background: 'rgba(0,0,0,0.4)', borderColor: 'rgba(255,255,255,0.3)' }}
                   >
                     {selectedTaskIds.includes(task.id) && <span className="text-white text-[8px] font-bold">✓</span>}
                   </button>
@@ -86,22 +132,21 @@ const BoardColumn = memo(function BoardColumn({ column, tasks, provided, snapsho
   )
 })
 
-// ── List View ─────────────────────────────────────────────────────────────────
 const TaskRow = memo(function TaskRow({ task, selectMode }) {
-  const selectTask          = useSettingsStore((s) => s.selectTask)
-  const selectedTaskIds     = useSettingsStore((s) => s.selectedTaskIds)
-  const toggleTaskSelection = useSettingsStore((s) => s.toggleTaskSelection)
-  const updateTask          = useTaskStore((s) => s.updateTask)
-  const projects            = useProjectStore((s) => s.projects)
-  const programs            = useProjectStore((s) => s.programs)
-  const project    = projects.find((p) => p.id === task.projectId)
-  const program    = getTaskProgram(task, programs, projects)
-  const now        = new Date()
-  const isOverdue  = task.dueDate && new Date(task.dueDate) < now && task.status !== 'done'
-  const isDone     = task.status === 'done'
+  const selectTask = useSettingsStore((state) => state.selectTask)
+  const selectedTaskIds = useSettingsStore((state) => state.selectedTaskIds)
+  const toggleTaskSelection = useSettingsStore((state) => state.toggleTaskSelection)
+  const updateTask = useTaskStore((state) => state.updateTask)
+  const projects = useProjectStore((state) => state.projects)
+  const programs = useProjectStore((state) => state.programs)
+  const project = projects.find((entry) => entry.id === task.projectId)
+  const program = getTaskProgram(task, programs, projects)
+  const now = new Date()
+  const isOverdue = task.dueDate && new Date(task.dueDate) < now && task.status !== 'done'
+  const isDone = task.status === 'done'
   const isSelected = selectedTaskIds.includes(task.id)
-  const completedSubs = task.subtasks?.filter((s) => s.completed).length ?? 0
-  const totalSubs     = task.subtasks?.length ?? 0
+  const completedSubs = task.subtasks?.filter((entry) => entry.completed).length ?? 0
+  const totalSubs = task.subtasks?.length ?? 0
 
   const handleClick = () => {
     if (selectMode) toggleTaskSelection(task.id)
@@ -125,52 +170,46 @@ const TaskRow = memo(function TaskRow({ task, selectMode }) {
       }}
     >
       {selectMode ? (
-        <span className="w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 transition-colors"
+        <span
+          className="w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 transition-colors"
           style={isSelected
             ? { background: 'var(--accent)', borderColor: 'var(--accent)' }
-            : { borderColor: 'rgba(255,255,255,0.3)' }
-          }>
+            : { borderColor: 'rgba(255,255,255,0.3)' }}
+        >
           {isSelected && <span className="text-white text-[8px] font-bold">✓</span>}
         </span>
       ) : (
-        <span className="w-2 h-2 rounded-full flex-shrink-0 mt-0.5"
-          style={{ background: PRIORITY_COLOR[task.priority] }} />
+        <span className="w-2 h-2 rounded-full flex-shrink-0 mt-0.5" style={{ background: PRIORITY_COLOR[task.priority] }} />
       )}
 
-      <button onClick={handleClick} className="flex-1 min-w-0 text-left bg-transparent border-0 p-0">
+      <button type="button" onClick={handleClick} className="flex-1 min-w-0 text-left bg-transparent border-0 p-0">
         <div className="flex-1 min-w-0">
-          <p className="text-sm truncate"
-            style={{ color: isDone ? 'var(--text-secondary)' : 'var(--text-primary)', textDecoration: isDone ? 'line-through' : 'none' }}>
+          <p
+            className="text-sm truncate"
+            style={{ color: isDone ? 'var(--text-secondary)' : 'var(--text-primary)', textDecoration: isDone ? 'line-through' : 'none' }}
+          >
             {task.title}
           </p>
           {task.description && (
-            <p className="text-[11px] truncate" style={{ color: 'var(--text-secondary)' }}>{task.description}</p>
+            <p className="text-[11px] truncate" style={{ color: 'var(--text-secondary)' }}>
+              {task.description}
+            </p>
           )}
         </div>
       </button>
 
       {(project || program) && (
-        <span className="hidden xl:inline text-[10px] px-1.5 py-0.5 rounded-full flex-shrink-0 max-w-[180px] truncate"
-          style={{
-            background: `${(project?.color ?? program?.color) || '#94a3b8'}18`,
-            color: (project?.color ?? program?.color) || '#94a3b8',
-          }}>
+        <span
+          className="hidden xl:inline text-[10px] px-1.5 py-0.5 rounded-full flex-shrink-0 max-w-[180px] truncate"
+          style={{ background: `${(project?.color ?? program?.color) || '#94a3b8'}18`, color: (project?.color ?? program?.color) || '#94a3b8' }}
+        >
           {project?.name ?? `${program?.name} · Program`}
         </span>
       )}
 
       <div className="hidden md:flex items-center gap-2 flex-shrink-0">
-        <InlineDateChip
-          label="Start"
-          value={task.startDate}
-          onChange={(nextValue) => updateDateField('startDate', nextValue)}
-        />
-        <InlineDateChip
-          label="Due"
-          value={task.dueDate}
-          tone={isOverdue ? 'danger' : 'default'}
-          onChange={(nextValue) => updateDateField('dueDate', nextValue)}
-        />
+        <InlineDateChip label="Start" value={task.startDate} onChange={(nextValue) => updateDateField('startDate', nextValue)} />
+        <InlineDateChip label="Due" value={task.dueDate} tone={isOverdue ? 'danger' : 'default'} onChange={(nextValue) => updateDateField('dueDate', nextValue)} />
       </div>
 
       {totalSubs > 0 && (
@@ -184,62 +223,209 @@ const TaskRow = memo(function TaskRow({ task, selectMode }) {
       {!selectMode && <CommitTaskMenu taskId={task.id} compact />}
 
       {!selectMode && (
-        <ChevronRight size={12} style={{ color: 'var(--text-secondary)', flexShrink: 0 }}
-          className="opacity-0 group-hover:opacity-100 transition-opacity" />
+        <ChevronRight
+          size={12}
+          style={{ color: 'var(--text-secondary)', flexShrink: 0 }}
+          className="opacity-0 group-hover:opacity-100 transition-opacity"
+        />
       )}
     </div>
   )
 })
 
 const ListView = memo(function ListView({ tasks, selectMode }) {
-  const selectAllTasks     = useSettingsStore((s) => s.selectAllTasks)
-  const clearTaskSelection = useSettingsStore((s) => s.clearTaskSelection)
-  const selectedTaskIds    = useSettingsStore((s) => s.selectedTaskIds)
-  const allSelected = tasks.length > 0 && tasks.every((t) => selectedTaskIds.includes(t.id))
+  const selectAllTasks = useSettingsStore((state) => state.selectAllTasks)
+  const clearTaskSelection = useSettingsStore((state) => state.clearTaskSelection)
+  const selectedTaskIds = useSettingsStore((state) => state.selectedTaskIds)
+  const allSelected = tasks.length > 0 && tasks.every((task) => selectedTaskIds.includes(task.id))
 
-  if (tasks.length === 0)
+  if (tasks.length === 0) {
     return <EmptyState icon={ListTodo} title="No tasks found" description="Try adjusting your filters or create a new task." />
+  }
 
   return (
-    <div className="rounded-2xl overflow-hidden mb-6"
-      style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)' }}>
+    <div
+      className="rounded-2xl overflow-hidden mb-6"
+      style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)' }}
+    >
       {selectMode && (
-        <div className="flex items-center px-3 py-2"
-          style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', background: 'rgba(var(--accent-rgb),0.04)' }}>
-          <button onClick={() => allSelected ? clearTaskSelection() : selectAllTasks(tasks.map((t) => t.id))}
-            className="text-xs" style={{ color: 'var(--accent)' }}>
+        <div
+          className="flex items-center px-3 py-2"
+          style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', background: 'rgba(var(--accent-rgb),0.04)' }}
+        >
+          <button
+            onClick={() => (allSelected ? clearTaskSelection() : selectAllTasks(tasks.map((task) => task.id)))}
+            className="text-xs"
+            style={{ color: 'var(--accent)' }}
+          >
             {allSelected ? 'Deselect all' : `Select all (${tasks.length})`}
           </button>
         </div>
       )}
-      {tasks.map((task) => <TaskRow key={task.id} task={task} selectMode={selectMode} />)}
+      {tasks.map((task) => (
+        <TaskRow key={task.id} task={task} selectMode={selectMode} />
+      ))}
     </div>
   )
 })
 
-// ── Board View ─────────────────────────────────────────────────────────────────
-const BoardView = memo(function BoardView({ selectMode, tasksByStatus }) {
-  const updateTask    = useTaskStore((s) => s.updateTask)
+const TableRow = memo(function TableRow({ task, selectMode, projectById, programById }) {
+  const selectTask = useSettingsStore((state) => state.selectTask)
+  const selectedTaskIds = useSettingsStore((state) => state.selectedTaskIds)
+  const toggleTaskSelection = useSettingsStore((state) => state.toggleTaskSelection)
+  const updateTask = useTaskStore((state) => state.updateTask)
+  const isSelected = selectedTaskIds.includes(task.id)
+  const isOverdue = task.dueDate && new Date(task.dueDate) < new Date() && task.status !== 'done'
 
-  const onDragEnd = useCallback(
-    (result) => {
-      if (!result.destination) return
-      const newStatus = result.destination.droppableId
-      if (result.source.droppableId !== newStatus) {
-        updateTask(result.draggableId, { status: newStatus })
-      }
-    },
-    [updateTask]
+  return (
+    <tr
+      className="transition-colors hover:bg-white/5"
+      style={{ background: isSelected ? 'rgba(var(--accent-rgb),0.06)' : 'transparent' }}
+    >
+      <td className="px-3 py-3 border-b align-top" style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
+        <div className="flex items-start gap-2.5 min-w-0">
+          {selectMode ? (
+            <button
+              type="button"
+              onClick={() => toggleTaskSelection(task.id)}
+              className="mt-0.5 w-4 h-4 rounded border flex items-center justify-center flex-shrink-0"
+              style={isSelected
+                ? { background: 'var(--accent)', borderColor: 'var(--accent)' }
+                : { borderColor: 'rgba(255,255,255,0.3)' }}
+            >
+              {isSelected && <span className="text-white text-[8px] font-bold">✓</span>}
+            </button>
+          ) : (
+            <span className="mt-1 w-2 h-2 rounded-full flex-shrink-0" style={{ background: PRIORITY_COLOR[task.priority] }} />
+          )}
+          <button type="button" onClick={() => selectTask(task.id)} className="min-w-0 text-left bg-transparent border-0 p-0">
+            <div className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>{task.title}</div>
+            {task.description && (
+              <div className="text-[11px] truncate mt-1" style={{ color: 'var(--text-secondary)' }}>{task.description}</div>
+            )}
+          </button>
+        </div>
+      </td>
+      <td className="px-3 py-3 border-b whitespace-nowrap" style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
+        <TaskContextChip task={task} projectById={projectById} programById={programById} />
+      </td>
+      <td className="px-3 py-3 border-b whitespace-nowrap text-xs" style={{ borderColor: 'rgba(255,255,255,0.04)', color: 'var(--text-secondary)' }}>
+        {task.projectId ? (projectById.get(task.projectId)?.name ?? '—') : 'Program task'}
+      </td>
+      <td className="px-3 py-3 border-b whitespace-nowrap" style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
+        <InlineDateChip
+          label="Start"
+          value={task.startDate}
+          onChange={(nextValue) => updateTask(task.id, { startDate: nextValue ? new Date(nextValue).toISOString() : null })}
+        />
+      </td>
+      <td className="px-3 py-3 border-b whitespace-nowrap" style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
+        <InlineDateChip
+          label="Due"
+          value={task.dueDate}
+          tone={isOverdue ? 'danger' : 'default'}
+          onChange={(nextValue) => updateTask(task.id, { dueDate: nextValue ? new Date(nextValue).toISOString() : null })}
+        />
+      </td>
+      <td className="px-3 py-3 border-b whitespace-nowrap" style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
+        <InlineStatusChip
+          value={task.status}
+          onChange={(nextStatus) => updateTask(task.id, { status: nextStatus })}
+          labels={STATUS_LABEL}
+          colors={STATUS_COLOR}
+        />
+      </td>
+      <td className="px-3 py-3 border-b whitespace-nowrap" style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
+        <PriorityPill value={task.priority} />
+      </td>
+      <td className="px-3 py-3 border-b whitespace-nowrap text-right" style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
+        {!selectMode && <CommitTaskMenu taskId={task.id} compact />}
+      </td>
+    </tr>
   )
+})
+
+const TableView = memo(function TableView({ tasks, selectMode, projectById, programById }) {
+  const selectAllTasks = useSettingsStore((state) => state.selectAllTasks)
+  const clearTaskSelection = useSettingsStore((state) => state.clearTaskSelection)
+  const selectedTaskIds = useSettingsStore((state) => state.selectedTaskIds)
+  const allSelected = tasks.length > 0 && tasks.every((task) => selectedTaskIds.includes(task.id))
+
+  if (tasks.length === 0) {
+    return <EmptyState icon={ListTodo} title="No tasks found" description="Try adjusting your filters or create a new task." />
+  }
+
+  return (
+    <div
+      className="rounded-[24px] overflow-hidden mb-6"
+      style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)' }}
+    >
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[980px] border-collapse">
+          <thead>
+            <tr style={{ background: 'rgba(255,255,255,0.035)' }}>
+              <th className="px-3 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>
+                {selectMode ? (
+                  <button
+                    type="button"
+                    onClick={() => (allSelected ? clearTaskSelection() : selectAllTasks(tasks.map((task) => task.id)))}
+                    className="inline-flex items-center gap-2"
+                    style={{ color: 'var(--accent)' }}
+                  >
+                    <CheckSquare size={12} />
+                    Task
+                  </button>
+                ) : (
+                  <span className="inline-flex items-center gap-2">
+                    <CheckSquare size={12} />
+                    Task
+                  </span>
+                )}
+              </th>
+              <th className="px-3 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>Program</th>
+              <th className="px-3 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>Project</th>
+              <th className="px-3 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>Start</th>
+              <th className="px-3 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>Due</th>
+              <th className="px-3 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>Status</th>
+              <th className="px-3 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>Priority</th>
+              <th className="px-3 py-3 text-right text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>Plan</th>
+            </tr>
+          </thead>
+          <tbody>
+            {tasks.map((task) => (
+              <TableRow
+                key={task.id}
+                task={task}
+                selectMode={selectMode}
+                projectById={projectById}
+                programById={programById}
+              />
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+})
+
+const BoardView = memo(function BoardView({ selectMode, tasksByStatus }) {
+  const updateTask = useTaskStore((state) => state.updateTask)
+
+  const onDragEnd = useCallback((result) => {
+    if (!result.destination) return
+    const nextStatus = result.destination.droppableId
+    if (result.source.droppableId !== nextStatus) {
+      updateTask(result.draggableId, { status: nextStatus })
+    }
+  }, [updateTask])
 
   return (
     <DragDropContext onDragEnd={onDragEnd}>
       <div className="flex gap-3 overflow-x-auto pb-6 px-0.5 snap-x snap-mandatory">
-        {STATUS_COLUMNS.map((col) => (
-          <Droppable key={col.id} droppableId={col.id}>
+        {STATUS_COLUMNS.map((column) => (
+          <Droppable key={column.id} droppableId={column.id}>
             {(provided, snapshot) => (
-              <BoardColumn column={col} tasks={tasksByStatus[col.id] ?? []}
-                provided={provided} snapshot={snapshot} selectMode={selectMode} />
+              <BoardColumn column={column} tasks={tasksByStatus[column.id] ?? []} provided={provided} snapshot={snapshot} selectMode={selectMode} />
             )}
           </Droppable>
         ))}
@@ -248,20 +434,19 @@ const BoardView = memo(function BoardView({ selectMode, tasksByStatus }) {
   )
 })
 
-// ── Tasks Page ─────────────────────────────────────────────────────────────────
 const Tasks = memo(function Tasks() {
   const [showFilter, setShowFilter] = useState(false)
   const [selectMode, setSelectMode] = useState(false)
   const [filterProgramId, setFilterProgramId] = useState('')
   const [filterProjectId, setFilterProjectId] = useState('')
-  const view               = useSettingsStore((s) => s.view)
-  const selectedTaskIds    = useSettingsStore((s) => s.selectedTaskIds)
-  const clearTaskSelection = useSettingsStore((s) => s.clearTaskSelection)
-  const tasks              = useFilteredTasks()
-  const programs           = useProjectStore((s) => s.programs)
-  const projects           = useProjectStore((s) => s.projects)
-  const projectById        = useMemo(() => new Map(projects.map((project) => [project.id, project])), [projects])
-  const programById        = useMemo(() => new Map(programs.map((program) => [program.id, program])), [programs])
+  const view = useSettingsStore((state) => state.view)
+  const selectedTaskIds = useSettingsStore((state) => state.selectedTaskIds)
+  const clearTaskSelection = useSettingsStore((state) => state.clearTaskSelection)
+  const tasks = useFilteredTasks()
+  const programs = useProjectStore((state) => state.programs)
+  const projects = useProjectStore((state) => state.projects)
+  const projectById = useMemo(() => new Map(projects.map((project) => [project.id, project])), [projects])
+  const programById = useMemo(() => new Map(programs.map((program) => [program.id, program])), [programs])
 
   const visibleProjects = useMemo(() => {
     if (!filterProgramId) return projects
@@ -290,96 +475,128 @@ const Tasks = memo(function Tasks() {
   }, [tasks, projectById, filterProgramId, filterProjectId])
 
   const tasksByStatus = useMemo(() => {
-    const grouped = {
-      todo: [],
-      'in-progress': [],
-      review: [],
-      done: [],
-      blocked: [],
-    }
+    const grouped = { todo: [], 'in-progress': [], review: [], done: [], blocked: [] }
     filteredTasks.forEach((task) => {
       if (grouped[task.status]) grouped[task.status].push(task)
     })
     return grouped
   }, [filteredTasks])
 
+  const inProgressCount = useMemo(
+    () => filteredTasks.filter((task) => task.status === 'in-progress' || task.status === 'review').length,
+    [filteredTasks]
+  )
+  const overdueCount = useMemo(
+    () => filteredTasks.filter((task) => task.dueDate && new Date(task.dueDate) < new Date() && task.status !== 'done').length,
+    [filteredTasks]
+  )
+
   const toggleSelectMode = () => {
-    setSelectMode((v) => { if (v) clearTaskSelection(); return !v })
+    setSelectMode((current) => {
+      if (current) clearTaskSelection()
+      return !current
+    })
   }
+
+  const activeFilterCount = Number(Boolean(filterProgramId)) + Number(Boolean(filterProjectId))
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
-      <Header showViewToggle showFilter onFilter={() => setShowFilter((v) => !v)} />
+      <Header showViewToggle showFilter onFilter={() => setShowFilter((value) => !value)} />
 
-      {showFilter && (
-        <div className="px-4 md:px-6 mb-2">
-          <FilterBar onClose={() => setShowFilter(false)} />
-        </div>
-      )}
+      <div className="px-4 md:px-6 pb-3 space-y-3">
+        <PageHero
+          eyebrow="Execution workspace"
+          title="Operate on active work"
+          description="Update dates, change status, and move across scope without leaving the task surface."
+          stats={[
+            { label: 'Visible tasks', value: filteredTasks.length, tone: 'accent' },
+            { label: 'In progress', value: inProgressCount, tone: 'default' },
+            { label: 'Overdue', value: overdueCount, tone: overdueCount > 0 ? 'danger' : 'default' },
+            { label: 'Selected', value: selectMode ? selectedTaskIds.length : 'Off', tone: selectMode ? 'success' : 'default' },
+          ]}
+          actions={
+            <button
+              onClick={toggleSelectMode}
+              className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-xl transition-colors"
+              style={selectMode
+                ? { background: 'rgba(var(--accent-rgb),0.15)', color: 'var(--accent)', border: '1px solid rgba(var(--accent-rgb),0.2)' }
+                : { color: 'var(--text-secondary)', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
+            >
+              <CheckSquare size={13} />
+              {selectMode ? `Selecting (${selectedTaskIds.length})` : 'Select tasks'}
+            </button>
+          }
+        />
 
-      <div className="px-4 md:px-6 mb-3 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-            {filteredTasks.length} {filteredTasks.length === 1 ? 'task' : 'tasks'}
-          </span>
-          <button onClick={toggleSelectMode}
-            className="flex items-center gap-1.5 text-xs px-2 py-1 rounded-lg transition-colors"
-            style={selectMode
-              ? { background: 'rgba(var(--accent-rgb),0.15)', color: 'var(--accent)' }
-              : { color: 'var(--text-secondary)', background: 'rgba(255,255,255,0.04)' }
-            }>
-            <CheckSquare size={12} />
-            {selectMode ? `Selecting (${selectedTaskIds.length})` : 'Select'}
-          </button>
-        </div>
+        <ScopeBar
+          eyebrow="Task scope"
+          title="Keep the inbox narrow"
+          description="Program and project scope stay visible here while status, priority, and sort live in the filter drawer."
+          actions={
+            activeFilterCount > 0 ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setFilterProgramId('')
+                  setFilterProjectId('')
+                }}
+                className="px-3 py-2 rounded-xl text-xs"
+                style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)', border: '1px solid rgba(255,255,255,0.1)' }}
+              >
+                Clear scope
+              </button>
+            ) : null
+          }
+          controls={
+            <>
+              <select
+                value={filterProgramId}
+                onChange={(event) => {
+                  setFilterProgramId(event.target.value)
+                  setFilterProjectId('')
+                }}
+                className="text-xs px-3 py-2 rounded-xl min-w-[180px]"
+                style={SELECT_STYLE}
+              >
+                <option value="">All programs</option>
+                {programs.map((program) => (
+                  <option key={program.id} value={program.id}>{program.name}</option>
+                ))}
+              </select>
+              <select
+                value={filterProjectId}
+                onChange={(event) => {
+                  const nextProjectId = event.target.value
+                  setFilterProjectId(nextProjectId)
+                  if (!nextProjectId) return
+                  const project = projectById.get(nextProjectId)
+                  if (project?.programId && project.programId !== filterProgramId) {
+                    setFilterProgramId(project.programId)
+                  }
+                }}
+                className="text-xs px-3 py-2 rounded-xl min-w-[220px]"
+                style={SELECT_STYLE}
+              >
+                <option value="">All projects</option>
+                {visibleProjects.map((project) => {
+                  const parent = project.parentId ? projectById.get(project.parentId) : null
+                  const program = project.programId ? programById.get(project.programId) : null
+                  const label = parent ? `${parent.name} / ${project.name}` : (program ? `${program.name} / ${project.name}` : project.name)
+                  return <option key={project.id} value={project.id}>{label}</option>
+                })}
+              </select>
+            </>
+          }
+        />
 
-        <div className="flex items-center gap-2">
-          <select
-            value={filterProgramId}
-            onChange={(event) => {
-              setFilterProgramId(event.target.value)
-              setFilterProjectId('')
-            }}
-            className="text-xs px-2.5 py-1.5 rounded-lg"
-            style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-primary)' }}
-          >
-            <option value="">All programs</option>
-            {programs.map((program) => (
-              <option key={program.id} value={program.id}>{program.name}</option>
-            ))}
-          </select>
-          <select
-            value={filterProjectId}
-            onChange={(event) => {
-              const nextProjectId = event.target.value
-              setFilterProjectId(nextProjectId)
-              if (!nextProjectId) return
-              const project = projectById.get(nextProjectId)
-              if (project?.programId && project.programId !== filterProgramId) {
-                setFilterProgramId(project.programId)
-              }
-            }}
-            className="text-xs px-2.5 py-1.5 rounded-lg"
-            style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-primary)' }}
-          >
-            <option value="">All projects</option>
-            {visibleProjects.map((project) => {
-              const parent = project.parentId ? projectById.get(project.parentId) : null
-              const program = project.programId ? programById.get(project.programId) : null
-              const label = parent ? `${parent.name} / ${project.name}` : (program ? `${program.name} / ${project.name}` : project.name)
-              return (
-                <option key={project.id} value={project.id}>{label}</option>
-              )
-            })}
-          </select>
-        </div>
+        {showFilter && <FilterBar onClose={() => setShowFilter(false)} />}
       </div>
 
-      <div className={`flex-1 overflow-y-auto px-4 md:px-6 ${view === 'board' ? 'overflow-x-auto' : ''}`}>
-        {view === 'list'
-          ? <ListView tasks={filteredTasks} selectMode={selectMode} />
-          : <BoardView selectMode={selectMode} tasksByStatus={tasksByStatus} />
-        }
+      <div className={`flex-1 overflow-y-auto px-4 md:px-6 pb-24 md:pb-8 ${view === 'board' ? 'overflow-x-auto' : ''}`}>
+        {view === 'list' && <ListView tasks={filteredTasks} selectMode={selectMode} />}
+        {view === 'table' && <TableView tasks={filteredTasks} selectMode={selectMode} projectById={projectById} programById={programById} />}
+        {view === 'board' && <BoardView selectMode={selectMode} tasksByStatus={tasksByStatus} />}
       </div>
 
       {selectedTaskIds.length > 0 && <BulkActionBar />}

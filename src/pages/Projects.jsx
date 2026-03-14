@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'
 import GlassCard from '../components/common/GlassCard'
 import InfoTooltip from '../components/common/InfoTooltip'
+import PageHero from '../components/common/PageHero'
 import { InlineDateChip, InlineStatusChip } from '../components/common/InlineFieldChips'
 import ColorPalettePicker from '../components/common/ColorPalettePicker'
 import ShareModal from '../components/ShareModal'
@@ -1197,6 +1198,136 @@ const ProgramSection = memo(function ProgramSection({ program, projects, mode = 
   )
 })
 
+const StructureExplorer = memo(function StructureExplorer({
+  programs,
+  projects,
+  tasks,
+  unassignedProjects,
+  activeProgramId,
+  activeProjectId,
+  previewProgramId,
+  onSelectProgram,
+  onSelectProject,
+  onSelectUnassigned,
+}) {
+  const topLevelProjects = useMemo(() => projects.filter((project) => !project.parentId), [projects])
+
+  return (
+    <GlassCard padding="p-4" rounded="rounded-[28px]" className="sticky top-4">
+      <div className="flex items-start justify-between gap-3 mb-4">
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>
+            Structure
+          </p>
+          <p className="mt-2 text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+            Programs and working lanes
+          </p>
+          <p className="mt-1 text-xs leading-6" style={{ color: 'var(--text-secondary)' }}>
+            Use the rail to move between structure review and execution without expanding every workstream at once.
+          </p>
+        </div>
+        <span
+          className="px-2 py-1 rounded-full text-[10px] font-semibold"
+          style={{ background: 'rgba(var(--accent-rgb),0.12)', color: 'var(--accent)' }}
+        >
+          {programs.length} programs
+        </span>
+      </div>
+
+      <div className="space-y-3">
+        {programs.map((program) => {
+          const programProjects = topLevelProjects.filter((project) => project.programId === program.id)
+          const programTasks = tasks.filter((task) => taskMatchesProgram(task, program.id, projects))
+          const isProgramActive = activeProgramId === program.id || (!activeProgramId && !activeProjectId && previewProgramId === program.id)
+          const hasActiveProject = programProjects.some((project) => project.id === activeProjectId)
+          const isExpanded = isProgramActive || hasActiveProject
+
+          return (
+            <div
+              key={program.id}
+              className="rounded-2xl px-3 py-3"
+              style={{
+                background: isExpanded ? `${program.color}10` : 'rgba(255,255,255,0.03)',
+                border: `1px solid ${isExpanded ? `${program.color}30` : 'rgba(255,255,255,0.06)'}`,
+              }}
+            >
+              <button type="button" onClick={() => onSelectProgram(program.id)} className="w-full text-left">
+                <div className="flex items-center gap-2.5">
+                  <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: program.color, boxShadow: `0 0 8px ${program.color}55` }} />
+                  <span className="flex-1 text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{program.name}</span>
+                  <span className="text-[10px] px-2 py-1 rounded-full" style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--text-secondary)' }}>
+                    {programProjects.length} projects
+                  </span>
+                </div>
+                <div className="mt-2 pl-5 text-[11px] flex items-center gap-2 flex-wrap" style={{ color: 'var(--text-secondary)' }}>
+                  <span>{programTasks.length} tasks</span>
+                  <span>{programTasks.filter((task) => task.status === 'done').length} done</span>
+                  {isProgramActive && !activeProjectId && (
+                    <span style={{ color: 'var(--accent)' }}>Open in detail</span>
+                  )}
+                </div>
+              </button>
+
+              {isExpanded && programProjects.length > 0 && (
+                <div className="mt-3 pl-5 space-y-1.5">
+                  {programProjects.map((project) => {
+                    const projectTasks = tasks.filter((task) => task.projectId === project.id)
+                    const isProjectActive = activeProjectId === project.id
+                    return (
+                      <button
+                        key={project.id}
+                        type="button"
+                        onClick={() => onSelectProject(project.id)}
+                        className="w-full flex items-center gap-2 px-2.5 py-2 rounded-xl text-left transition-colors"
+                        style={isProjectActive
+                          ? { background: `${project.color}20`, border: `1px solid ${project.color}35`, color: project.color }
+                          : { background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', color: 'var(--text-secondary)' }}
+                      >
+                        <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: project.color }} />
+                        <span className="flex-1 text-[12px] font-medium truncate" style={{ color: isProjectActive ? project.color : 'var(--text-primary)' }}>
+                          {project.name}
+                        </span>
+                        <span className="text-[10px] px-2 py-1 rounded-full" style={{ background: 'rgba(255,255,255,0.06)', color: 'inherit' }}>
+                          {projectTasks.length}
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          )
+        })}
+
+        {unassignedProjects.length > 0 && (
+          <button
+            type="button"
+            onClick={onSelectUnassigned}
+            className="w-full text-left rounded-2xl px-3 py-3 transition-colors"
+            style={{
+              background: !activeProgramId && activeProjectId && !projects.find((project) => project.id === activeProjectId)?.programId
+                ? 'rgba(var(--accent-rgb),0.12)'
+                : 'rgba(255,255,255,0.03)',
+              border: '1px solid rgba(255,255,255,0.06)',
+            }}
+          >
+            <div className="flex items-center gap-2.5">
+              <Folder size={14} style={{ color: 'var(--text-secondary)' }} />
+              <span className="flex-1 text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Unassigned projects</span>
+              <span className="text-[10px] px-2 py-1 rounded-full" style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--text-secondary)' }}>
+                {unassignedProjects.filter((project) => !project.parentId).length}
+              </span>
+            </div>
+            <div className="mt-2 text-[11px]" style={{ color: 'var(--text-secondary)' }}>
+              Projects not yet attached to a program
+            </div>
+          </button>
+        )}
+      </div>
+    </GlassCard>
+  )
+})
+
 const UnassignedSection = memo(function UnassignedSection({ projects, mode }) {
   const moveProject = useProjectStore((state) => state.moveProject)
   const [collapsed, setCollapsed] = useState(false)
@@ -1310,6 +1441,14 @@ const Projects = memo(function Projects() {
   const doneTasks = visibleTasks.filter((task) => task.status === 'done').length
   const topLevelProjectCount = focusedProgram ? visibleProjects.filter((project) => !project.parentId).length : projects.filter((project) => !project.parentId).length
   const headerTitle = focusedProgram ? focusedProgram.name : 'Programs'
+  const portfolioPreviewProgram = focusedProgram ?? programs[0] ?? null
+  const selectedUnassignedProject = activeProject && !activeProject.programId ? activeProject : null
+  const selectedDetailProgram = activeProject?.programId
+    ? programs.find((program) => program.id === activeProject.programId) ?? portfolioPreviewProgram
+    : portfolioPreviewProgram
+  const selectedProgramProjects = selectedDetailProgram
+    ? projects.filter((project) => project.programId === selectedDetailProgram.id)
+    : []
 
   useEffect(() => {
     const selector = activeProjectId
@@ -1343,48 +1482,46 @@ const Projects = memo(function Projects() {
 
   return (
     <div className="flex-1 overflow-y-auto px-4 md:px-6 pb-24 md:pb-8">
-      <div className="flex flex-col gap-4 py-4 mb-4 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <h1 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>{headerTitle}</h1>
-            {focusedProgram && (
-              <span className="text-[10px] px-2 py-1 rounded-full" style={{ background: 'rgba(var(--accent-rgb),0.14)', color: 'var(--accent)' }}>
-                Focused program
-              </span>
-            )}
-          </div>
-          <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
-            {focusedProgram ? `${topLevelProjectCount} projects` : `${programs.length} programs · ${topLevelProjectCount} top-level projects`} · {doneTasks}/{totalTasks} tasks done
-          </p>
-          <p className="text-[11px] mt-1.5" style={{ color: 'var(--text-secondary)' }}>{modeDescription}</p>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          {focusedProgram && (
-            <button type="button" onClick={clearFocus} className="btn-ghost px-3 py-2 text-xs">
-              All programs
-            </button>
-          )}
-          <div className="flex items-center gap-1 rounded-2xl p-1" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
-            {[
-              ['portfolio', 'Portfolio'],
-              ['execution', 'Execution'],
-            ].map(([mode, label]) => (
-              <button
-                key={mode}
-                type="button"
-                onClick={() => setProjectsViewMode(mode)}
-                className="px-3 py-2 rounded-xl text-xs font-semibold transition-colors"
-                style={projectsViewMode === mode ? { background: 'var(--accent)', color: '#fff' } : { color: 'var(--text-secondary)' }}
-              >
-                {label}
+      <div className="py-4 mb-4">
+        <PageHero
+          eyebrow="Structure workspace"
+          title={headerTitle}
+          description={modeDescription}
+          stats={[
+            { label: 'Programs', value: programs.length, tone: 'accent' },
+            { label: 'Projects', value: topLevelProjectCount, tone: 'default' },
+            { label: 'Tasks done', value: `${doneTasks}/${totalTasks}`, tone: 'success' },
+            { label: 'Mode', value: projectsViewMode === 'execution' ? 'Execution' : 'Portfolio', tone: 'default' },
+          ]}
+          actions={
+            <>
+              {focusedProgram && (
+                <button type="button" onClick={clearFocus} className="btn-ghost px-3 py-2 text-xs">
+                  All programs
+                </button>
+              )}
+              <div className="flex items-center gap-1 rounded-2xl p-1" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                {[
+                  ['portfolio', 'Portfolio'],
+                  ['execution', 'Execution'],
+                ].map(([mode, label]) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    onClick={() => setProjectsViewMode(mode)}
+                    className="px-3 py-2 rounded-xl text-xs font-semibold transition-colors"
+                    style={projectsViewMode === mode ? { background: 'var(--accent)', color: '#fff' } : { color: 'var(--text-secondary)' }}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <button type="button" onClick={() => setAddingProgram(true)} className="btn-accent flex items-center gap-1.5 px-3 py-2 text-xs">
+                <Plus size={13} /> New program
               </button>
-            ))}
-          </div>
-          <button type="button" onClick={() => setAddingProgram(true)} className="btn-accent flex items-center gap-1.5 px-3 py-2 text-xs">
-            <Plus size={13} /> New program
-          </button>
-        </div>
+            </>
+          }
+        />
       </div>
 
       {addingProgram && <NewProgramForm onDone={() => setAddingProgram(false)} />}
@@ -1401,6 +1538,42 @@ const Projects = memo(function Projects() {
           <button type="button" onClick={() => setAddingProgram(true)} className="btn-accent px-4 py-2 text-xs mt-1">
             Create first program
           </button>
+        </div>
+      ) : projectsViewMode === 'portfolio' ? (
+        <div className="grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
+          <StructureExplorer
+            programs={programs}
+            projects={projects}
+            tasks={tasks}
+            unassignedProjects={unassignedProjects}
+            activeProgramId={activeProgramId}
+            activeProjectId={activeProjectId}
+            previewProgramId={portfolioPreviewProgram?.id ?? null}
+            onSelectProgram={(programId) => {
+              setActiveProject(null)
+              setActiveProgram(programId === activeProgramId ? null : programId)
+            }}
+            onSelectProject={(projectId) => setActiveProject(projectId === activeProjectId ? null : projectId)}
+            onSelectUnassigned={() => {
+              setActiveProgram(null)
+              setActiveProject(selectedUnassignedProject ? null : (unassignedProjects[0]?.id ?? null))
+            }}
+          />
+
+          <div className="min-w-0 space-y-4">
+            {selectedUnassignedProject ? (
+              <UnassignedSection projects={unassignedProjects} mode={projectsViewMode} />
+            ) : selectedDetailProgram ? (
+              <ProgramSection
+                key={selectedDetailProgram.id}
+                program={selectedDetailProgram}
+                projects={selectedProgramProjects}
+                mode={projectsViewMode}
+              />
+            ) : (
+              <UnassignedSection projects={unassignedProjects} mode={projectsViewMode} />
+            )}
+          </div>
         </div>
       ) : (
         <>

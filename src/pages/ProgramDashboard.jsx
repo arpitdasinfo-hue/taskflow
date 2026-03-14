@@ -1,9 +1,11 @@
 import { memo, useEffect, useMemo, useState } from 'react'
-import { BarChart3, CheckCircle2, Clock, AlertTriangle, TrendingUp, CalendarClock, ArrowRight } from 'lucide-react'
+import { CheckCircle2, Clock, AlertTriangle, TrendingUp, CalendarClock, ArrowRight } from 'lucide-react'
 import Header from '../components/layout/Header'
 import { ProgramStatusBadge, ProgramHealthBadge } from '../components/common/ProgramStatusBadge'
 import GlassCard from '../components/common/GlassCard'
 import MilestoneTimeline from '../components/common/MilestoneTimeline'
+import PageHero from '../components/common/PageHero'
+import ScopeBar from '../components/common/ScopeBar'
 import TimelinePlanningPanel from '../components/timeline/TimelinePlanningPanel'
 import useTaskStore from '../store/useTaskStore'
 import useTimelineIntelligence from '../hooks/useTimelineIntelligence'
@@ -126,54 +128,6 @@ const ProgramCard = memo(function ProgramCard({ program, stats }) {
           style={{ color: 'var(--accent)' }}>
           View tasks <ArrowRight size={10} />
         </button>
-      </div>
-    </div>
-  )
-})
-
-// ── Overall summary ───────────────────────────────────────────────────────────
-const OverallSummary = memo(function OverallSummary({ summary }) {
-  return (
-    <div className="rounded-2xl p-5 mb-6"
-      style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(var(--accent-rgb),0.15)' }}>
-      <div className="flex items-center gap-2 mb-4">
-        <div className="w-7 h-7 rounded-xl flex items-center justify-center" style={{ background: 'var(--accent-dim)' }}>
-          <BarChart3 size={14} style={{ color: 'var(--accent)' }} />
-        </div>
-        <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Portfolio Overview</span>
-      </div>
-
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-        <div>
-          <p className="text-[10px] font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>Total Tasks</p>
-          <p className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>{summary.total}</p>
-        </div>
-        <div>
-          <p className="text-[10px] font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>Completed</p>
-          <p className="text-2xl font-bold" style={{ color: '#10b981' }}>{summary.done}</p>
-        </div>
-        <div>
-          <p className="text-[10px] font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>Overdue</p>
-          <p className="text-2xl font-bold" style={{ color: summary.overdue > 0 ? '#ef4444' : 'var(--text-secondary)' }}>{summary.overdue}</p>
-        </div>
-        <div>
-          <p className="text-[10px] font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>Portfolio Health</p>
-          <p className="text-sm font-semibold mt-1"
-            style={{ color: summary.offTrack > 0 ? '#ef4444' : summary.atRisk > 0 ? '#f59e0b' : '#10b981' }}>
-            {summary.offTrack > 0 ? `${summary.offTrack} off-track` : summary.atRisk > 0 ? `${summary.atRisk} at-risk` : 'On track'}
-          </p>
-        </div>
-      </div>
-
-      <div>
-        <div className="flex justify-between text-[10px] mb-1.5" style={{ color: 'var(--text-secondary)' }}>
-          <span>Portfolio Completion</span>
-          <span style={{ color: 'var(--accent)', fontWeight: 600 }}>{summary.completion}%</span>
-        </div>
-        <div className="h-2 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.07)' }}>
-          <div className="h-full rounded-full transition-all duration-700"
-            style={{ width: `${summary.completion}%`, background: 'linear-gradient(90deg, var(--accent-dark), var(--accent))' }} />
-        </div>
       </div>
     </div>
   )
@@ -344,55 +298,90 @@ const ProgramDashboard = memo(function ProgramDashboard() {
           </div>
         ) : (
           <>
-            <div className="flex items-start justify-between gap-4 mb-4 flex-wrap">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>
-                  Analytics Scope
-                </p>
-                <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>
-                  Filter portfolio analytics by program or project.
-                </p>
+            <PageHero
+              eyebrow="Portfolio analytics"
+              title="Spot delivery pressure before it becomes drift"
+              description="Roll up progress, milestones, and planning signals so the next portfolio conversation starts with facts instead of hunting through workstreams."
+              stats={[
+                { label: 'Total tasks', value: summary.total, tone: 'accent' },
+                { label: 'Completed', value: summary.done, tone: 'success' },
+                { label: 'Overdue', value: summary.overdue, tone: summary.overdue > 0 ? 'danger' : 'default' },
+                { label: 'Health', value: summary.offTrack > 0 ? `${summary.offTrack} off` : summary.atRisk > 0 ? `${summary.atRisk} risk` : 'On track', tone: summary.offTrack > 0 ? 'danger' : summary.atRisk > 0 ? 'accent' : 'success' },
+              ]}
+            >
+              <div className="max-w-xl">
+                <div className="flex justify-between text-[11px] mb-1.5" style={{ color: 'var(--text-secondary)' }}>
+                  <span>Portfolio completion</span>
+                  <span style={{ color: 'var(--accent)', fontWeight: 600 }}>{summary.completion}%</span>
+                </div>
+                <div className="h-2 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.08)' }}>
+                  <div
+                    className="h-full rounded-full transition-all duration-700"
+                    style={{ width: `${summary.completion}%`, background: 'linear-gradient(90deg, var(--accent-dark), var(--accent))' }}
+                  />
+                </div>
               </div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <select
-                  value={selectedProgramId}
-                  onChange={(event) => {
-                    setSelectedProgramId(event.target.value)
-                    setSelectedProjectId('')
-                  }}
-                  className="text-xs px-3 py-2 rounded-xl min-w-[160px]"
-                  style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-primary)' }}
-                >
-                  <option value="">All programs</option>
-                  {programs.map((program) => (
-                    <option key={program.id} value={program.id}>{program.name}</option>
-                  ))}
-                </select>
-                <select
-                  value={selectedProjectId}
-                  onChange={(event) => {
-                    const nextProjectId = event.target.value
-                    setSelectedProjectId(nextProjectId)
-                    if (!nextProjectId) return
-                    const project = projectById.get(nextProjectId)
-                    if (project?.programId && project.programId !== selectedProgramId) {
-                      setSelectedProgramId(project.programId)
-                    }
-                  }}
-                  className="text-xs px-3 py-2 rounded-xl min-w-[180px]"
-                  style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-primary)' }}
-                >
-                  <option value="">All projects</option>
-                  {visibleProjects.map((project) => {
-                    const parent = project.parentId ? projectById.get(project.parentId) : null
-                    const label = parent ? `${parent.name} / ${project.name}` : project.name
-                    return <option key={project.id} value={project.id}>{label}</option>
-                  })}
-                </select>
-              </div>
-            </div>
+            </PageHero>
 
-            <OverallSummary summary={summary} />
+            <ScopeBar
+              eyebrow="Analytics scope"
+              title="Keep the review tight"
+              description="Scope the portfolio by program or project without moving to another page."
+              controls={
+                <>
+                  <select
+                    value={selectedProgramId}
+                    onChange={(event) => {
+                      setSelectedProgramId(event.target.value)
+                      setSelectedProjectId('')
+                    }}
+                    className="text-xs px-3 py-2 rounded-xl min-w-[180px]"
+                    style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-primary)' }}
+                  >
+                    <option value="">All programs</option>
+                    {programs.map((program) => (
+                      <option key={program.id} value={program.id}>{program.name}</option>
+                    ))}
+                  </select>
+                  <select
+                    value={selectedProjectId}
+                    onChange={(event) => {
+                      const nextProjectId = event.target.value
+                      setSelectedProjectId(nextProjectId)
+                      if (!nextProjectId) return
+                      const project = projectById.get(nextProjectId)
+                      if (project?.programId && project.programId !== selectedProgramId) {
+                        setSelectedProgramId(project.programId)
+                      }
+                    }}
+                    className="text-xs px-3 py-2 rounded-xl min-w-[220px]"
+                    style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-primary)' }}
+                  >
+                    <option value="">All projects</option>
+                    {visibleProjects.map((project) => {
+                      const parent = project.parentId ? projectById.get(project.parentId) : null
+                      const label = parent ? `${parent.name} / ${project.name}` : project.name
+                      return <option key={project.id} value={project.id}>{label}</option>
+                    })}
+                  </select>
+                </>
+              }
+              actions={
+                (selectedProgramId || selectedProjectId) ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedProgramId('')
+                      setSelectedProjectId('')
+                    }}
+                    className="px-3 py-2 rounded-xl text-xs"
+                    style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)', border: '1px solid rgba(255,255,255,0.1)' }}
+                  >
+                    Clear scope
+                  </button>
+                ) : null
+              }
+            />
 
             <GlassCard padding="p-5">
               <div className="flex items-center gap-2 mb-4">
@@ -411,11 +400,7 @@ const ProgramDashboard = memo(function ProgramDashboard() {
 
             <div className="grid gap-4 md:grid-cols-2">
               {scopedProgramCards.map(({ program, stats }) => (
-                <ProgramCard
-                  key={program.id}
-                  program={program}
-                  stats={stats}
-                />
+                <ProgramCard key={program.id} program={program} stats={stats} />
               ))}
             </div>
 

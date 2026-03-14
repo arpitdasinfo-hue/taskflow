@@ -12,6 +12,7 @@ import {
 import GlassCard from '../components/common/GlassCard'
 import InfoTooltip from '../components/common/InfoTooltip'
 import MilestoneTimeline from '../components/common/MilestoneTimeline'
+import ScopeBar from '../components/common/ScopeBar'
 import { supabase } from '../lib/supabase'
 import {
   DEFAULT_SHARE_CONFIG,
@@ -1115,26 +1116,70 @@ export default function ShareView({ token }) {
             </GlassCard>
 
             <div className="space-y-4 min-w-0">
-              <ScopeFilterBar
-                activeSectionMeta={activeSectionMeta}
-                selectedProgramId={selectedProgramId}
-                selectedProjectId={selectedProjectId}
-                selectedSubProjectId={selectedSubProjectId}
-                programs={programs}
-                visibleTopProjects={visibleTopProjects}
-                visibleSubProjects={visibleSubProjects}
-                projectById={projectById}
-                onChangeProgram={(value) => {
-                  setSelectedProgramId(value)
-                  setSelectedProjectId('')
-                  setSelectedSubProjectId('')
-                }}
-                onChangeProject={(value) => {
-                  setSelectedProjectId(value)
-                  setSelectedSubProjectId('')
-                }}
-                onChangeSubProject={setSelectedSubProjectId}
-                onClear={clearScopeFilters}
+              <ScopeBar
+                eyebrow={`${activeSectionMeta?.label || 'Overview'} scope`}
+                title="Focus the shared view"
+                description={activeSectionMeta?.meta || 'Scope this dashboard to the program or project you want to review.'}
+                controls={
+                  <>
+                    <select
+                      value={selectedProgramId}
+                      onChange={(event) => {
+                        setSelectedProgramId(event.target.value)
+                        setSelectedProjectId('')
+                        setSelectedSubProjectId('')
+                      }}
+                      className="text-xs px-3 py-2 rounded-xl min-w-[170px]"
+                      style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-primary)' }}
+                    >
+                      <option value="">All programs</option>
+                      {programs.map((program) => (
+                        <option key={program.id} value={program.id}>{program.name}</option>
+                      ))}
+                    </select>
+                    <select
+                      value={selectedProjectId}
+                      onChange={(event) => {
+                        const nextProjectId = event.target.value
+                        setSelectedProjectId(nextProjectId)
+                        setSelectedSubProjectId('')
+                      }}
+                      className="text-xs px-3 py-2 rounded-xl min-w-[190px]"
+                      style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-primary)' }}
+                    >
+                      <option value="">All projects</option>
+                      {visibleTopProjects.map((project) => (
+                        <option key={project.id} value={project.id}>{project.name}</option>
+                      ))}
+                    </select>
+                    <select
+                      value={selectedSubProjectId}
+                      onChange={(event) => setSelectedSubProjectId(event.target.value)}
+                      className="text-xs px-3 py-2 rounded-xl min-w-[210px]"
+                      style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-primary)' }}
+                    >
+                      <option value="">All sub-projects</option>
+                      {visibleSubProjects.map((project) => {
+                        const parent = project.parentId ? projectById.get(project.parentId) : null
+                        const label = parent ? `${parent.name} / ${project.name}` : project.name
+                        return (
+                          <option key={project.id} value={project.id}>{label}</option>
+                        )
+                      })}
+                    </select>
+                  </>
+                }
+                actions={
+                  (selectedProgramId || selectedProjectId || selectedSubProjectId) ? (
+                    <button
+                      onClick={clearScopeFilters}
+                      className="px-3 py-2 rounded-xl text-xs"
+                      style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)', border: '1px solid rgba(255,255,255,0.1)' }}
+                    >
+                      Clear
+                    </button>
+                  ) : null
+                }
               />
 
               <div className="space-y-4 min-w-0">

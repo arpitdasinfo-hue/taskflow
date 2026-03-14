@@ -266,8 +266,14 @@ const useSettingsStore = create(
       closeTask: ()   => set((s) => { s.selectedTaskId = null }),
 
       // ── View ──────────────────────────────────────────────────────────
-      setView: (v) => set((s) => { s.view = v }),
-      toggleView: ()  => set((s) => { s.view = s.view === 'list' ? 'board' : 'list' }),
+      setView: (v) => set((s) => {
+        s.view = ['list', 'table', 'board'].includes(v) ? v : 'list'
+      }),
+      toggleView: ()  => set((s) => {
+        const order = ['list', 'table', 'board']
+        const currentIndex = order.indexOf(s.view)
+        s.view = order[(currentIndex + 1) % order.length]
+      }),
 
       // ── Filters ───────────────────────────────────────────────────────
       toggleFilter: (type, value) =>
@@ -319,7 +325,7 @@ const useSettingsStore = create(
     {
       name: 'taskflow-settings',
       storage: createJSONStorage(() => localStorage),
-      version: 8,
+      version: 9,
       partialize: (state) => {
         const { selectedTaskId: _s1, selectedTaskIds: _s2, ...rest } = state
         return rest
@@ -358,6 +364,12 @@ const useSettingsStore = create(
               ...(s?.ganttConfig ?? {}),
               viewMode: s?.ganttConfig?.viewMode ?? 'roadmap',
             },
+          }
+        }
+        if (version < 9) {
+          s = {
+            ...s,
+            view: ['list', 'table', 'board'].includes(s?.view) ? s.view : 'list',
           }
         }
         if (version < 6) {
