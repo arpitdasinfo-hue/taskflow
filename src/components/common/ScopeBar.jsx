@@ -1,10 +1,12 @@
 import { memo } from 'react'
 import GlassCard from './GlassCard'
+import InfoTooltip from './InfoTooltip'
 
 const ScopeBar = memo(function ScopeBar({
   eyebrow = 'Scope',
   title,
   description = null,
+  infoText = null,
   controls,
   actions = null,
   compact = false,
@@ -26,7 +28,10 @@ const ScopeBar = memo(function ScopeBar({
           </div>
           {title && (
             <div className="mt-2 text-sm md:text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
-              {title}
+              <span className="inline-flex items-center gap-2 flex-wrap">
+                <span>{title}</span>
+                <InfoTooltip text={infoText} align="right" widthClassName="w-72" />
+              </span>
             </div>
           )}
           {description && (

@@ -1,7 +1,8 @@
 import { memo, useMemo } from 'react'
-import { AlertTriangle, ArrowRight, CalendarClock, CheckCircle2, Clock3, FolderKanban, Sparkles, Target } from 'lucide-react'
+import { AlertTriangle, ArrowRight, CalendarClock, CheckCircle2, Clock3, Sparkles, Target } from 'lucide-react'
 import GlassCard from '../components/common/GlassCard'
 import PageHero from '../components/common/PageHero'
+import InfoTooltip from '../components/common/InfoTooltip'
 import MilestoneTimeline from '../components/common/MilestoneTimeline'
 import useSettingsStore from '../store/useSettingsStore'
 import useProjectStore from '../store/useProjectStore'
@@ -250,7 +251,7 @@ const Dashboard = memo(function Dashboard() {
         <PageHero
           eyebrow="Command center"
           title="What needs attention now"
-          description="Start from delivery pressure, launch timing, and planned commitments instead of hunting through pages."
+          infoText="Start from delivery pressure, launch timing, and planned commitments instead of hunting through pages."
           compact
           stats={[
             { label: 'Open work', value: openTasks.length, tone: 'accent' },
@@ -342,8 +343,10 @@ const Dashboard = memo(function Dashboard() {
               <CheckCircle2 size={15} style={{ color: 'var(--accent)' }} />
             </div>
             <div>
-              <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Planner pulse</p>
-              <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>Commitments already in motion this week.</p>
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Planner pulse</p>
+                <InfoTooltip text="Commitments already in motion this week." align="right" widthClassName="w-64" />
+              </div>
             </div>
           </div>
 

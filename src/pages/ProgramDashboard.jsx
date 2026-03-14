@@ -3,6 +3,7 @@ import { CheckCircle2, Clock, AlertTriangle, TrendingUp, CalendarClock, ArrowRig
 import Header from '../components/layout/Header'
 import { ProgramStatusBadge, ProgramHealthBadge } from '../components/common/ProgramStatusBadge'
 import GlassCard from '../components/common/GlassCard'
+import InfoTooltip from '../components/common/InfoTooltip'
 import MilestoneTimeline from '../components/common/MilestoneTimeline'
 import PageHero from '../components/common/PageHero'
 import ScopeBar from '../components/common/ScopeBar'
@@ -331,7 +332,7 @@ const ProgramDashboard = memo(function ProgramDashboard() {
             <PageHero
               eyebrow="Analytics"
               title="Review delivery with the signals that change the next decision"
-              description="Start with launch timing, missing schedules, and flagged workstreams before you drop into detailed roll-ups."
+              infoText="Start with launch timing, missing schedules, and flagged workstreams before you drop into detailed roll-ups."
               compact
               stats={[
                 { label: 'Programs', value: scopedPrograms.length, tone: 'accent' },
@@ -365,7 +366,7 @@ const ProgramDashboard = memo(function ProgramDashboard() {
             <ScopeBar
               eyebrow="Analytics scope"
               title="Keep this review tight"
-              description="Cut the portfolio to one program or one project before you look at signals."
+              infoText="Cut the portfolio to one program or one project before you look at signals."
               compact
               controls={
                 <>
@@ -460,10 +461,10 @@ const ProgramDashboard = memo(function ProgramDashboard() {
                   <CalendarClock size={15} style={{ color: 'var(--accent)' }} />
                 </div>
                 <div>
-                  <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Milestone Timeline</p>
-                  <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>
-                    Zoomed-out launch view of the next checkpoints across programs.
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Milestone Timeline</p>
+                    <InfoTooltip text="Zoomed-out launch view of the next checkpoints across programs." align="right" widthClassName="w-64" />
+                  </div>
                 </div>
               </div>
               <MilestoneTimeline milestones={milestoneTimelineItems} />

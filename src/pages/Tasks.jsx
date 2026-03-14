@@ -508,7 +508,7 @@ const Tasks = memo(function Tasks() {
         <PageHero
           eyebrow="Execution workspace"
           title="Operate on active work"
-          description="Update dates, change status, and move across scope without leaving the task surface."
+          infoText="Update dates, change status, and move across scope without leaving the task surface."
           stats={[
             { label: 'Visible tasks', value: filteredTasks.length, tone: 'accent' },
             { label: 'In progress', value: inProgressCount, tone: 'default' },
@@ -532,7 +532,7 @@ const Tasks = memo(function Tasks() {
         <ScopeBar
           eyebrow="Task scope"
           title="Keep the inbox narrow"
-          description="Program and project scope stay visible here while status, priority, and sort live in the filter drawer."
+          infoText="Program and project scope stay visible here while status, priority, and sort live in the filter drawer."
           actions={
             activeFilterCount > 0 ? (
               <button

@@ -1485,7 +1485,7 @@ const Projects = memo(function Projects() {
         <PageHero
           eyebrow="Programs"
           title={headerTitle}
-          description={focusedProgram
+          infoText={focusedProgram
             ? 'Review structure, milestones, and work only where delivery needs attention.'
             : 'Browse the portfolio, pick a program, and open work only when you want to operate inside it.'}
           stats={[

@@ -1077,9 +1077,6 @@ export default function ShareView({ token }) {
                       widthClassName="w-72"
                     />
                   </div>
-                  <p className="mt-3 text-sm max-w-2xl" style={{ color: 'var(--text-secondary)' }}>
-                    Programs, delivery health, milestones, tasks, and timeline in one place.
-                  </p>
                   <div className="mt-3 flex items-center gap-2 flex-wrap text-xs">
                     <span className="px-2.5 py-1 rounded-full" style={{ background: 'rgba(var(--accent-rgb),0.12)', color: 'var(--accent)' }}>
                       {shareScopeLabel}
@@ -1119,7 +1116,8 @@ export default function ShareView({ token }) {
               <ScopeBar
                 eyebrow={`${activeSectionMeta?.label || 'Overview'} scope`}
                 title="Focus the shared view"
-                description={activeSectionMeta?.meta || 'Scope this dashboard to the program or project you want to review.'}
+                infoText={activeSectionMeta?.meta || 'Scope this dashboard to the program or project you want to review.'}
+                compact
                 controls={
                   <>
                     <select

@@ -1,5 +1,6 @@
 import { memo } from 'react'
 import GlassCard from './GlassCard'
+import InfoTooltip from './InfoTooltip'
 
 const STAT_TONE = {
   default: {
@@ -46,6 +47,7 @@ const PageHero = memo(function PageHero({
   eyebrow = null,
   title,
   description = null,
+  infoText = null,
   actions = null,
   stats = [],
   children = null,
@@ -64,7 +66,10 @@ const PageHero = memo(function PageHero({
           <div className={`mt-2 flex flex-col ${compact ? 'gap-2.5' : 'gap-3'} lg:flex-row lg:items-start lg:justify-between`}>
             <div className="min-w-0">
               <h1 className={`${compact ? 'text-[1.8rem] md:text-[2.2rem]' : 'text-2xl md:text-[2rem]'} font-bold leading-tight`} style={{ color: 'var(--text-primary)' }}>
-                {title}
+                <span className="inline-flex items-center gap-2 flex-wrap">
+                  <span>{title}</span>
+                  <InfoTooltip text={infoText} align="right" widthClassName="w-72" />
+                </span>
               </h1>
               {description && (
                 <p className={`${compact ? 'mt-2 max-w-2xl text-sm leading-6' : 'mt-3 max-w-3xl text-sm md:text-base leading-7'}`} style={{ color: 'var(--text-secondary)' }}>
