@@ -1,21 +1,16 @@
 import { memo, useMemo, useRef, useState } from 'react'
 import { CheckSquare2, ChevronDown, ChevronRight, FolderKanban, Layers3 } from 'lucide-react'
-import { ROW_HEIGHT, STATUS_COLOR } from './timelineConfig'
+import { ROW_HEIGHT } from './timelineConfig'
 import { addDays, clamp, diffDays, startOfDay, toDisplayDate } from './timelineUtils'
+import TimelineHoverCard from './TimelineHoverCard'
 import TimelineProjectBar from './TimelineProjectBar'
 import TimelineTaskBar from './TimelineTaskBar'
+import { getBarHoverMeta, getBarVisuals } from './timelineBarVisuals'
 
 const getItemRange = (item) => {
   const start = toDisplayDate(item.startDate) || toDisplayDate(item.dueDate)
   const end = toDisplayDate(item.dueDate) || toDisplayDate(item.startDate)
   return { start, end }
-}
-
-const getItemProgress = (item) => {
-  if (typeof item.progress === 'number') return clamp(item.progress, 0, 1)
-  if (item.status === 'done') return 1
-  if (item.status === 'in-progress') return 0.5
-  return 0
 }
 
 const getRowIcon = (type) => {
@@ -70,26 +65,6 @@ const getChipStyle = (tone) => {
   if (tone === 'risk') return { background: 'rgba(56,189,248,0.14)', color: '#7dd3fc' }
   if (tone === 'calm') return { background: 'rgba(148,163,184,0.12)', color: '#cbd5e1' }
   return { background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)' }
-}
-
-const getFallbackBarStyle = (row, item, width) => {
-  const color = item.color || STATUS_COLOR[item.status] || row.color || 'var(--accent)'
-  const due = toDisplayDate(item.dueDate)
-  const isLate = !!(due && due < startOfDay(new Date()) && item.status !== 'done')
-  const isBlocked = item.status === 'blocked'
-
-  return {
-    color,
-    accentColor: isLate ? '#f87171' : color,
-    height: row.type === 'program' ? 20 : row.type === 'project' ? 16 : 14,
-    background: isBlocked
-      ? `repeating-linear-gradient(135deg, ${color}28 0 8px, rgba(255,255,255,0.04) 8px 16px)`
-      : `${color}24`,
-    border: `1px solid ${isLate ? '#f87171' : color}88`,
-    boxShadow: isLate
-      ? '0 0 0 1px rgba(248,113,113,0.3), 0 0 20px rgba(248,113,113,0.18)'
-      : width > 120 ? `0 8px 22px ${color}22` : 'none',
-  }
 }
 
 const TimelineRow = memo(function TimelineRow({
@@ -350,36 +325,70 @@ const TimelineRow = memo(function TimelineRow({
           const clampedEnd = clamp(to, 0, days - 1)
           const left = clampedStart * cellWidth + 1
           const width = Math.max(8, (clampedEnd - clampedStart + 1) * cellWidth - 2)
-          const { color, accentColor, height: barHeight, background, border, boxShadow } = getFallbackBarStyle(row, item, width)
-          const progress = getItemProgress(item)
+          const visuals = getBarVisuals({
+            type: row.type === 'program' ? 'program' : 'project',
+            item,
+            rowColor: row.color,
+            width,
+            cellWidth,
+            readOnly,
+          })
+          const hoverMeta = getBarHoverMeta({
+            type: row.type === 'program' ? 'program' : 'project',
+            item,
+            progress: visuals.progress,
+          })
 
           return (
-            <button
+            <div
               key={`${row.id}-${item.id}`}
-              onClick={() => row.taskId && onSelectTask?.(row.taskId)}
-              disabled={!row.taskId}
-              className="absolute rounded-full overflow-hidden"
+              className="absolute group"
               style={{
                 left,
                 top: '50%',
                 transform: 'translateY(-50%)',
-                width,
-                height: barHeight,
-                background,
-                border,
-                boxShadow,
-                cursor: row.taskId ? 'pointer' : 'default',
+                zIndex: 4,
               }}
-              title={item.title || row.label}
             >
-              <div className="absolute top-0 bottom-0 left-0 rounded-full" style={{ width: `${progress * 100}%`, background: `${accentColor}70` }} />
-              <div className="absolute top-[2px] bottom-[2px] left-[3px] w-[2px] rounded-full" style={{ background: accentColor }} />
-              {width > 56 && (
-                <span className="relative z-[2] px-2 text-[9px] font-medium truncate block text-left" style={{ color: '#e8edf5' }}>
-                  {item.title || row.label}
-                </span>
-              )}
-            </button>
+              <div className="hidden group-hover:block">
+                <TimelineHoverCard
+                  title={item.title || row.label}
+                  color={visuals.accentColor}
+                  compact={cellWidth <= 14}
+                  {...hoverMeta}
+                />
+              </div>
+              <button
+                onClick={() => row.taskId && onSelectTask?.(row.taskId)}
+                disabled={!row.taskId}
+                className="relative rounded-full overflow-hidden"
+                style={{
+                  width,
+                  height: visuals.height,
+                  background: visuals.background,
+                  border: `1px solid ${visuals.borderColor}`,
+                  boxShadow: visuals.boxShadow,
+                  cursor: row.taskId ? 'pointer' : 'default',
+                }}
+                title={item.title || row.label}
+              >
+                <div
+                  className="absolute inset-x-0 top-0"
+                  style={{ height: '46%', background: 'linear-gradient(180deg, rgba(255,255,255,0.16), rgba(255,255,255,0))' }}
+                />
+                <div
+                  className="absolute top-0 bottom-0 left-0 rounded-full"
+                  style={{ width: `${visuals.progress * 100}%`, background: visuals.progressFill }}
+                />
+                <div className="absolute top-[2px] bottom-[2px] left-[3px] rounded-full" style={{ width: visuals.capWidth, background: visuals.accentColor }} />
+                <div className="absolute top-[2px] bottom-[2px] right-[3px] rounded-full" style={{ width: visuals.capWidth, background: visuals.isLate ? '#fb7185' : 'rgba(255,255,255,0.28)' }} />
+                {visuals.label ? (
+                  <span className="relative z-[2] px-2 text-[10px] font-semibold truncate block text-left" style={{ color: '#eef6fb' }}>
+                    {visuals.label}
+                  </span>
+                ) : null}
+              </button>
+            </div>
           )
         })}
 
@@ -417,22 +426,40 @@ const TimelineRow = memo(function TimelineRow({
 
           const color = milestone.status === 'completed' ? '#10b981' : row.color
           return (
-            <span
+            <div
               key={`${row.id}-milestone-${milestone.id}`}
-              className="absolute"
+              className="absolute flex items-center gap-1.5"
               style={{
-                left: offset * cellWidth + cellWidth / 2 - 6,
+                left: offset * cellWidth + cellWidth / 2 - 8,
                 top: '50%',
-                transform: 'translateY(-50%) rotate(45deg)',
-                width: 12,
-                height: 12,
-                background: `${color}22`,
-                border: `1px solid ${color}`,
-                boxShadow: `0 0 14px ${color}25`,
+                transform: 'translateY(-50%)',
                 zIndex: 3,
               }}
-              title={milestone.name}
-            />
+              title={`${milestone.name} · ${milestone.dueDate ? toDisplayDate(milestone.dueDate)?.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''}`}
+            >
+              <span
+                style={{
+                  width: 16,
+                  height: 16,
+                  transform: 'rotate(45deg)',
+                  background: `${color}28`,
+                  border: `1px solid ${color}`,
+                  boxShadow: `0 0 16px ${color}28`,
+                }}
+              />
+              {cellWidth >= 18 ? (
+                <span
+                  className="rounded-full px-2 py-0.5 text-[10px] font-medium whitespace-nowrap"
+                  style={{
+                    background: 'rgba(7,14,24,0.9)',
+                    color: '#e2e8f0',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                  }}
+                >
+                  {milestone.name}
+                </span>
+              ) : null}
+            </div>
           )
         })}
       </div>
