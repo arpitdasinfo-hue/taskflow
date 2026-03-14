@@ -761,7 +761,7 @@ const ProjectPanel = memo(function ProjectPanel({ project, depth = 0, mode = 'po
                 <div className="space-y-2.5">
                   <div>
                     <p className="text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>Add sub-project</p>
-                    <p className="text-[11px] mt-1" style={{ color: 'var(--text-secondary)' }}>Split this project into clearer working lanes without opening another program.</p>
+                    <p className="text-[11px] mt-1" style={{ color: 'var(--text-secondary)' }}>Split this project into clearer sub-projects without opening another program.</p>
                   </div>
                   <input
                     autoFocus
@@ -1085,7 +1085,7 @@ const ProgramSection = memo(function ProgramSection({ program, projects, mode = 
       {!collapsed && (
         <div className="px-4 md:px-5 pb-5 pt-4 space-y-4" style={{ borderTop: `1px solid ${program.color}12` }}>
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <MetricTile icon={Folder} label="Projects" value={`${topLevelProjects.length} active lanes`} detail={topLevelProjects.length > 0 ? `${projects.length - topLevelProjects.length > 0 ? `${projects.length - topLevelProjects.length} nested beneath them` : 'No nested sub-projects yet'}` : 'Create the first project to start structuring work'} tone="accent" />
+            <MetricTile icon={Folder} label="Projects" value={`${topLevelProjects.length} active projects`} detail={topLevelProjects.length > 0 ? `${projects.length - topLevelProjects.length > 0 ? `${projects.length - topLevelProjects.length} nested beneath them` : 'No nested sub-projects yet'}` : 'Create the first project to start structuring work'} tone="accent" />
             <MetricTile icon={CheckCircle2} label="Progress" value={`${completion}% complete`} detail={`${doneTasks} of ${totalTasks || 0} tasks closed`} />
             <MetricTile icon={Clock} label="Execution" value={`${inProgress} active`} detail={programDirectTasks.length > 0 ? `${programDirectTasks.length} direct program task${programDirectTasks.length === 1 ? '' : 's'}` : 'No direct program tasks'} />
             <MetricTile icon={AlertTriangle} label="Health" value={health.label} detail={health.detail} tone={overdue > 0 || blocked > 0 ? 'danger' : 'default'} />
@@ -1098,7 +1098,7 @@ const ProgramSection = memo(function ProgramSection({ program, projects, mode = 
               <div className="flex flex-col gap-2.5">
                 <div>
                   <p className="text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>New project</p>
-                  <p className="text-[11px] mt-1" style={{ color: 'var(--text-secondary)' }}>Add the next working lane inside this program.</p>
+                  <p className="text-[11px] mt-1" style={{ color: 'var(--text-secondary)' }}>Add the next project inside this program.</p>
                 </div>
                 <input
                   autoFocus
@@ -1182,7 +1182,7 @@ const ProgramSection = memo(function ProgramSection({ program, projects, mode = 
           <div className="space-y-3">
             {topLevelProjects.length === 0 && programDirectTasks.length === 0 && !addingProject ? (
               <div className="rounded-2xl px-4 py-5 text-center" style={{ background: 'rgba(255,255,255,0.02)', border: '1px dashed rgba(255,255,255,0.08)', color: 'var(--text-secondary)' }}>
-                No projects yet. Add the first working lane for this program.
+                    No projects yet. Add the first project for this program.
               </div>
             ) : (
               topLevelProjects.map((projectItem) => (
@@ -1220,10 +1220,10 @@ const StructureExplorer = memo(function StructureExplorer({
             Structure
           </p>
           <p className="mt-2 text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-            Programs and working lanes
+            Programs & Projects
           </p>
           <p className="mt-1 text-xs leading-6" style={{ color: 'var(--text-secondary)' }}>
-            Use the rail to move between structure review and execution without expanding every workstream at once.
+            Navigate the portfolio structure without opening every workstream at once.
           </p>
         </div>
         <span
