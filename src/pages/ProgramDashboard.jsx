@@ -7,7 +7,6 @@ import InfoTooltip from '../components/common/InfoTooltip'
 import MilestoneTimeline from '../components/common/MilestoneTimeline'
 import PageHero from '../components/common/PageHero'
 import ScopeBar from '../components/common/ScopeBar'
-import TimelinePlanningPanel from '../components/timeline/TimelinePlanningPanel'
 import useTaskStore from '../store/useTaskStore'
 import useTimelineIntelligence from '../hooks/useTimelineIntelligence'
 import { useAllProgramStats } from '../hooks/useProgramStats'
@@ -50,6 +49,64 @@ const ReviewFocusCard = memo(function ReviewFocusCard({ label, value, detail, to
       <div className="mt-3 text-2xl font-bold leading-none" style={{ color: palette.color }}>{value}</div>
       <p className="mt-2 text-[11px] leading-5" style={{ color: 'var(--text-secondary)' }}>{detail}</p>
     </div>
+  )
+})
+
+const AttentionStrip = memo(function AttentionStrip({ insights, onOpenRiskView, onExpandAll }) {
+  const conflicts = insights.cards.find((card) => card.id === 'conflicts')?.value ?? 0
+  const unscheduled = insights.cards.find((card) => card.id === 'unscheduled')?.value ?? 0
+  const dependencyRisk = insights.cards.find((card) => card.id === 'dependency')?.value ?? 0
+  const blocked = insights.cards.find((card) => card.id === 'blocked')?.value ?? 0
+  const summaryItems = [
+    { label: 'Conflicts', value: conflicts, tone: conflicts > 0 ? '#ef4444' : 'var(--text-secondary)' },
+    { label: 'Unscheduled', value: unscheduled, tone: unscheduled > 0 ? '#f59e0b' : 'var(--text-secondary)' },
+    { label: 'Dependency risk', value: dependencyRisk, tone: dependencyRisk > 0 ? '#fb7185' : 'var(--text-secondary)' },
+    { label: 'Blocked / late', value: blocked, tone: blocked > 0 ? '#ef4444' : 'var(--text-secondary)' },
+  ]
+
+  return (
+    <GlassCard padding="p-4">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>
+              Attention
+            </p>
+            <InfoTooltip text="Use this strip to jump straight into schedule cleanup without repeating the same signal cards again below." widthClassName="w-64" />
+          </div>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            {summaryItems.map((item) => (
+              <span
+                key={item.label}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px]"
+                style={{ background: 'rgba(255,255,255,0.04)', color: item.tone, border: '1px solid rgba(255,255,255,0.08)' }}
+              >
+                <span className="font-semibold">{item.value}</span>
+                <span>{item.label}</span>
+              </span>
+            ))}
+          </div>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap lg:justify-end">
+          <button
+            type="button"
+            onClick={onOpenRiskView}
+            className="px-3 py-2 rounded-xl text-xs font-medium"
+            style={{ background: 'rgba(239,68,68,0.12)', color: '#fda4af', border: '1px solid rgba(239,68,68,0.18)' }}
+          >
+            Open risk view
+          </button>
+          <button
+            type="button"
+            onClick={onExpandAll}
+            className="px-3 py-2 rounded-xl text-xs font-medium"
+            style={{ background: 'rgba(255,255,255,0.04)', color: 'var(--text-primary)', border: '1px solid rgba(255,255,255,0.08)' }}
+          >
+            Expand tasks
+          </button>
+        </div>
+      </div>
+    </GlassCard>
   )
 })
 
@@ -310,7 +367,6 @@ const ProgramDashboard = memo(function ProgramDashboard() {
 
   const nextMilestone = milestoneTimelineItems[0] ?? null
   const flaggedPrograms = scopedProgramCards.filter(({ stats }) => ['at-risk', 'off-track'].includes(stats.health)).length
-  const launchCount = milestoneTimelineItems.length
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
@@ -331,42 +387,20 @@ const ProgramDashboard = memo(function ProgramDashboard() {
           <>
             <PageHero
               eyebrow="Analytics"
-              title="Review delivery with the signals that change the next decision"
-              infoText="Start with launch timing, missing schedules, and flagged workstreams before you drop into detailed roll-ups."
+              title="Review delivery and launch signals"
+              infoText="Start with launch timing, missing schedules, and flagged workstreams before dropping into program detail."
               compact
               stats={[
                 { label: 'Programs', value: scopedPrograms.length, tone: 'accent' },
                 { label: 'Tasks', value: summary.total, tone: 'default' },
                 { label: 'Overdue', value: summary.overdue, tone: summary.overdue > 0 ? 'danger' : 'default' },
-                { label: 'Launches', value: launchCount, tone: launchCount > 0 ? 'success' : 'default' },
+                { label: 'Completion', value: `${summary.completion}%`, tone: summary.completion > 0 ? 'success' : 'default' },
               ]}
-            >
-              <div className="max-w-2xl">
-                <div className="flex justify-between text-[11px] mb-1.5" style={{ color: 'var(--text-secondary)' }}>
-                  <span>Portfolio completion</span>
-                  <span style={{ color: 'var(--accent)', fontWeight: 600 }}>{summary.completion}%</span>
-                </div>
-                <div className="h-2 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.08)' }}>
-                  <div
-                    className="h-full rounded-full transition-all duration-700"
-                    style={{ width: `${summary.completion}%`, background: 'linear-gradient(90deg, var(--accent-dark), var(--accent))' }}
-                  />
-                </div>
-                <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px]" style={{ color: 'var(--text-secondary)' }}>
-                  <span className="px-2.5 py-1 rounded-full" style={{ background: 'rgba(255,255,255,0.05)' }}>
-                    {summary.offTrack > 0 ? `${summary.offTrack} off track` : summary.atRisk > 0 ? `${summary.atRisk} at risk` : 'Portfolio stable'}
-                  </span>
-                  <span className="px-2.5 py-1 rounded-full" style={{ background: 'rgba(255,255,255,0.05)' }}>
-                    {nextMilestone ? `Next launch ${nextMilestone.name} · ${new Date(nextMilestone.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : 'No launch date pinned yet'}
-                  </span>
-                </div>
-              </div>
-            </PageHero>
+            />
 
             <ScopeBar
-              eyebrow="Analytics scope"
-              title="Keep this review tight"
-              infoText="Cut the portfolio to one program or one project before you look at signals."
+              eyebrow={null}
+              title={null}
               compact
               controls={
                 <>
@@ -470,8 +504,7 @@ const ProgramDashboard = memo(function ProgramDashboard() {
               <MilestoneTimeline milestones={milestoneTimelineItems} />
             </GlassCard>
 
-            <TimelinePlanningPanel
-              showSavedViews={false}
+            <AttentionStrip
               insights={insights}
               onOpenRiskView={() => {
                 setGanttConfig({

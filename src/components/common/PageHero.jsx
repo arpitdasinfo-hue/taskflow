@@ -30,13 +30,13 @@ const HeroStat = memo(function HeroStat({ label, value, tone = 'default', compac
 
   return (
     <div
-      className={`rounded-2xl ${compact ? 'px-3 py-2.5 min-w-[112px]' : 'px-4 py-3 min-w-[124px]'}`}
+      className={`rounded-2xl ${compact ? 'px-3 py-2 min-w-[102px]' : 'px-4 py-3 min-w-[124px]'}`}
       style={{ background: palette.background, border: `1px solid ${palette.border}` }}
     >
       <div className="text-[10px] font-semibold uppercase tracking-[0.24em]" style={{ color: 'var(--text-secondary)' }}>
         {label}
       </div>
-      <div className={`${compact ? 'mt-1.5 text-xl' : 'mt-2 text-2xl'} font-bold leading-none`} style={{ color: palette.color }}>
+      <div className={`${compact ? 'mt-1 text-[1.8rem]' : 'mt-2 text-2xl'} font-bold leading-none`} style={{ color: palette.color }}>
         {value}
       </div>
     </div>
@@ -56,16 +56,16 @@ const PageHero = memo(function PageHero({
 }) {
   return (
     <GlassCard padding={compact ? 'p-4 md:p-5' : 'p-6'} rounded="rounded-[30px]" className={className}>
-      <div className={`flex flex-col ${compact ? 'gap-4' : 'gap-5'} xl:flex-row xl:items-start xl:justify-between`}>
+      <div className={`flex flex-col ${compact ? 'gap-3' : 'gap-5'} xl:flex-row xl:items-start xl:justify-between`}>
         <div className="min-w-0 flex-1">
           {eyebrow && (
             <div className="text-[11px] font-semibold uppercase tracking-[0.24em]" style={{ color: 'var(--text-secondary)' }}>
               {eyebrow}
             </div>
           )}
-          <div className={`mt-2 flex flex-col ${compact ? 'gap-2.5' : 'gap-3'} lg:flex-row lg:items-start lg:justify-between`}>
+          <div className={`mt-2 flex flex-col ${compact ? 'gap-2' : 'gap-3'} lg:flex-row lg:items-start lg:justify-between`}>
             <div className="min-w-0">
-              <h1 className={`${compact ? 'text-[1.8rem] md:text-[2.2rem]' : 'text-2xl md:text-[2rem]'} font-bold leading-tight`} style={{ color: 'var(--text-primary)' }}>
+              <h1 className={`${compact ? 'text-[1.6rem] md:text-[1.95rem]' : 'text-2xl md:text-[2rem]'} font-bold leading-tight`} style={{ color: 'var(--text-primary)' }}>
                 <span className="inline-flex items-center gap-2 flex-wrap">
                   <span>{title}</span>
                   <InfoTooltip text={infoText} align="right" widthClassName="w-72" />
