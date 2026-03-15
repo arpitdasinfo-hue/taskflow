@@ -14,6 +14,7 @@ const TimelineTaskBar = memo(function TimelineTaskBar({
   onUpdateTaskSchedule,
   readOnly = false,
 }) {
+  const anchorRef = useRef(null)
   const buttonRef = useRef(null)
   const interactionRef = useRef(null)
   const suppressClickRef = useRef(false)
@@ -52,6 +53,7 @@ const TimelineTaskBar = memo(function TimelineTaskBar({
   if (readOnly) {
     return (
       <div
+        ref={anchorRef}
         className="absolute"
         style={{ left, top: '50%', transform: 'translateY(-50%)', zIndex: isHovered ? 40 : 4 }}
         onMouseEnter={() => setIsHovered(true)}
@@ -62,6 +64,7 @@ const TimelineTaskBar = memo(function TimelineTaskBar({
             title={item.title}
             color={visuals.accentColor}
             compact
+            anchorRef={anchorRef}
             {...hoverMeta}
           />
         ) : null}
@@ -208,6 +211,7 @@ const TimelineTaskBar = memo(function TimelineTaskBar({
   return (
     <>
       <div
+        ref={anchorRef}
         className="absolute"
         style={{ left, top: '50%', transform: 'translateY(-50%)', zIndex: isInteracting || isHovered ? 40 : 4 }}
         onMouseEnter={() => setIsHovered(true)}
@@ -218,6 +222,7 @@ const TimelineTaskBar = memo(function TimelineTaskBar({
             title={item.title}
             color={visuals.accentColor}
             compact={cellWidth <= 14}
+            anchorRef={anchorRef}
             {...hoverMeta}
           />
         ) : null}

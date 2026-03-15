@@ -13,6 +13,7 @@ const TimelineProjectBar = memo(function TimelineProjectBar({
   onUpdateProjectSchedule,
   readOnly = false,
 }) {
+  const anchorRef = useRef(null)
   const buttonRef = useRef(null)
   const interactionRef = useRef(null)
   const draftRangeRef = useRef(null)
@@ -50,6 +51,7 @@ const TimelineProjectBar = memo(function TimelineProjectBar({
   if (readOnly) {
     return (
       <div
+        ref={anchorRef}
         className="absolute"
         style={{ left, top: '50%', transform: 'translateY(-50%)', zIndex: isHovered ? 40 : 4 }}
         onMouseEnter={() => setIsHovered(true)}
@@ -60,6 +62,7 @@ const TimelineProjectBar = memo(function TimelineProjectBar({
             title={item.title || 'Project schedule'}
             color={visuals.accentColor}
             compact
+            anchorRef={anchorRef}
             {...hoverMeta}
           />
         ) : null}
@@ -195,6 +198,7 @@ const TimelineProjectBar = memo(function TimelineProjectBar({
   return (
     <>
       <div
+        ref={anchorRef}
         className="absolute"
         style={{ left, top: '50%', transform: 'translateY(-50%)', zIndex: isInteracting || isHovered ? 40 : 4 }}
         onMouseEnter={() => setIsHovered(true)}
@@ -204,6 +208,7 @@ const TimelineProjectBar = memo(function TimelineProjectBar({
           <TimelineHoverCard
             title={item.title || 'Project schedule'}
             color={visuals.accentColor}
+            anchorRef={anchorRef}
             {...hoverMeta}
           />
         ) : null}

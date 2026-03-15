@@ -67,6 +67,99 @@ const getChipStyle = (tone) => {
   return { background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)' }
 }
 
+const StaticTimelineBar = memo(function StaticTimelineBar({
+  row,
+  item,
+  startDate,
+  days,
+  cellWidth,
+  readOnly,
+  onSelectTask,
+}) {
+  const anchorRef = useRef(null)
+  const [isHovered, setIsHovered] = useState(false)
+
+  const { start, end } = getItemRange(item)
+  if (!start || !end) return null
+
+  const from = diffDays(startDate, start)
+  const to = diffDays(startDate, end)
+  if (to < 0 || from >= days) return null
+
+  const clampedStart = clamp(from, 0, days - 1)
+  const clampedEnd = clamp(to, 0, days - 1)
+  const left = clampedStart * cellWidth + 1
+  const width = Math.max(8, (clampedEnd - clampedStart + 1) * cellWidth - 2)
+  const visuals = getBarVisuals({
+    type: row.type === 'program' ? 'program' : 'project',
+    item,
+    rowColor: row.color,
+    width,
+    cellWidth,
+    readOnly,
+  })
+  const hoverMeta = getBarHoverMeta({
+    type: row.type === 'program' ? 'program' : 'project',
+    item,
+    progress: visuals.progress,
+  })
+
+  return (
+    <div
+      ref={anchorRef}
+      className="absolute"
+      style={{
+        left,
+        top: '50%',
+        transform: 'translateY(-50%)',
+        zIndex: isHovered ? 40 : 4,
+      }}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
+      {isHovered ? (
+        <TimelineHoverCard
+          title={item.title || row.label}
+          color={visuals.accentColor}
+          compact={cellWidth <= 14}
+          anchorRef={anchorRef}
+          {...hoverMeta}
+        />
+      ) : null}
+      <button
+        onClick={() => row.taskId && onSelectTask?.(row.taskId)}
+        disabled={!row.taskId}
+        className="relative rounded-full overflow-hidden"
+        style={{
+          width,
+          height: visuals.height,
+          background: visuals.background,
+          border: `1px solid ${visuals.borderColor}`,
+          boxShadow: visuals.boxShadow,
+          cursor: row.taskId ? 'pointer' : 'default',
+        }}
+        title={item.title || row.label}
+      >
+        <div
+          className="absolute inset-x-0 top-0"
+          style={{ height: '46%', background: 'linear-gradient(180deg, rgba(255,255,255,0.16), rgba(255,255,255,0))' }}
+        />
+        <div
+          className="absolute top-0 bottom-0 left-0 rounded-full"
+          style={{ width: `${visuals.progress * 100}%`, background: visuals.progressFill }}
+        />
+        <div className="absolute top-[2px] bottom-[2px] left-[3px] rounded-full" style={{ width: visuals.capWidth, background: visuals.accentColor }} />
+        <div className="absolute top-[2px] bottom-[2px] right-[3px] rounded-full" style={{ width: visuals.capWidth, background: visuals.isLate ? '#fb7185' : 'rgba(255,255,255,0.28)' }} />
+        {visuals.label ? (
+          <span className="relative z-[2] px-2 text-[10px] font-semibold truncate block text-left" style={{ color: '#eef6fb' }}>
+            {visuals.label}
+          </span>
+        ) : null}
+      </button>
+    </div>
+  )
+})
+
 const TimelineRow = memo(function TimelineRow({
   row,
   startDate,
@@ -314,81 +407,17 @@ const TimelineRow = memo(function TimelineRow({
             )
           }
 
-          const { start, end } = getItemRange(item)
-          if (!start || !end) return null
-
-          const from = diffDays(startDate, start)
-          const to = diffDays(startDate, end)
-          if (to < 0 || from >= days) return null
-
-          const clampedStart = clamp(from, 0, days - 1)
-          const clampedEnd = clamp(to, 0, days - 1)
-          const left = clampedStart * cellWidth + 1
-          const width = Math.max(8, (clampedEnd - clampedStart + 1) * cellWidth - 2)
-          const visuals = getBarVisuals({
-            type: row.type === 'program' ? 'program' : 'project',
-            item,
-            rowColor: row.color,
-            width,
-            cellWidth,
-            readOnly,
-          })
-          const hoverMeta = getBarHoverMeta({
-            type: row.type === 'program' ? 'program' : 'project',
-            item,
-            progress: visuals.progress,
-          })
-
           return (
-            <div
+            <StaticTimelineBar
               key={`${row.id}-${item.id}`}
-              className="absolute group hover:z-[40]"
-              style={{
-                left,
-                top: '50%',
-                transform: 'translateY(-50%)',
-                zIndex: 4,
-              }}
-            >
-              <div className="hidden group-hover:block">
-                <TimelineHoverCard
-                  title={item.title || row.label}
-                  color={visuals.accentColor}
-                  compact={cellWidth <= 14}
-                  {...hoverMeta}
-                />
-              </div>
-              <button
-                onClick={() => row.taskId && onSelectTask?.(row.taskId)}
-                disabled={!row.taskId}
-                className="relative rounded-full overflow-hidden"
-                style={{
-                  width,
-                  height: visuals.height,
-                  background: visuals.background,
-                  border: `1px solid ${visuals.borderColor}`,
-                  boxShadow: visuals.boxShadow,
-                  cursor: row.taskId ? 'pointer' : 'default',
-                }}
-                title={item.title || row.label}
-              >
-                <div
-                  className="absolute inset-x-0 top-0"
-                  style={{ height: '46%', background: 'linear-gradient(180deg, rgba(255,255,255,0.16), rgba(255,255,255,0))' }}
-                />
-                <div
-                  className="absolute top-0 bottom-0 left-0 rounded-full"
-                  style={{ width: `${visuals.progress * 100}%`, background: visuals.progressFill }}
-                />
-                <div className="absolute top-[2px] bottom-[2px] left-[3px] rounded-full" style={{ width: visuals.capWidth, background: visuals.accentColor }} />
-                <div className="absolute top-[2px] bottom-[2px] right-[3px] rounded-full" style={{ width: visuals.capWidth, background: visuals.isLate ? '#fb7185' : 'rgba(255,255,255,0.28)' }} />
-                {visuals.label ? (
-                  <span className="relative z-[2] px-2 text-[10px] font-semibold truncate block text-left" style={{ color: '#eef6fb' }}>
-                    {visuals.label}
-                  </span>
-                ) : null}
-              </button>
-            </div>
+              row={row}
+              item={item}
+              startDate={startDate}
+              days={days}
+              cellWidth={cellWidth}
+              readOnly={readOnly}
+              onSelectTask={onSelectTask}
+            />
           )
         })}
 
