@@ -171,7 +171,6 @@ export default function App() {
   const resetPlanning = usePlanningStore((s) => s.reset)
   const [syncReady, setSyncReady] = useState(false)
   const [needRefresh, setNeedRefresh] = useState(false)
-  const [offlineReady, setOfflineReady] = useState(false)
   const updateServiceWorkerRef = useRef(() => {})
   const themeSyncTimerRef = useRef(null)
   const lastAppliedRemoteThemeRef = useRef('')
@@ -212,11 +211,44 @@ export default function App() {
     const updateServiceWorker = registerSW({
       immediate: true,
       onNeedRefresh: () => setNeedRefresh(true),
-      onOfflineReady: () => setOfflineReady(true),
+      onOfflineReady: () => {},
       onRegisterError: () => {},
     })
 
     updateServiceWorkerRef.current = updateServiceWorker
+  }, [])
+
+  useEffect(() => {
+    if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return undefined
+
+    const syncNeedRefreshState = async () => {
+      try {
+        const registration = await navigator.serviceWorker.getRegistration()
+        const waitingWorker = registration?.waiting
+        if (!waitingWorker) setNeedRefresh(false)
+      } catch {
+        // Ignore service worker inspection failures and keep the last known UI state.
+      }
+    }
+
+    const handleControllerChange = () => {
+      setNeedRefresh(false)
+    }
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') void syncNeedRefreshState()
+    }
+
+    navigator.serviceWorker.addEventListener('controllerchange', handleControllerChange)
+    window.addEventListener('focus', syncNeedRefreshState)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    void syncNeedRefreshState()
+
+    return () => {
+      navigator.serviceWorker.removeEventListener('controllerchange', handleControllerChange)
+      window.removeEventListener('focus', syncNeedRefreshState)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
   }, [])
 
   useEffect(() => () => {
@@ -444,10 +476,12 @@ export default function App() {
 
       <PWAUpdateBanner
         needRefresh={needRefresh}
-        onReload={() => updateServiceWorkerRef.current(true)}
+        onReload={() => {
+          setNeedRefresh(false)
+          updateServiceWorkerRef.current(true)
+        }}
         onDismiss={() => {
           setNeedRefresh(false)
-          setOfflineReady(false)
         }}
       />
     </div>
