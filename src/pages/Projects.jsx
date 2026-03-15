@@ -459,7 +459,7 @@ const KANBAN_COLS = [
   { id: 'blocked', label: 'Blocked', color: '#ef4444' },
 ]
 
-const ProjectPanel = memo(function ProjectPanel({ project, depth = 0, mode = 'portfolio' }) {
+const ProjectPanel = memo(function ProjectPanel({ project, depth = 0 }) {
   const tasks = useTaskStore((state) => state.tasks)
   const moveTask = useTaskStore((state) => state.moveTask)
   const updateProject = useProjectStore((state) => state.updateProject)
@@ -473,8 +473,8 @@ const ProjectPanel = memo(function ProjectPanel({ project, depth = 0, mode = 'po
   const setActiveProject = useSettingsStore((state) => state.setActiveProject)
 
   const [view, setView] = useState('list')
-  const [expanded, setExpanded] = useState(() => mode === 'execution' && activeProjectId === project.id)
-  const [showWork, setShowWork] = useState(mode === 'execution')
+  const [expanded, setExpanded] = useState(() => activeProjectId === project.id)
+  const [showWork, setShowWork] = useState(() => activeProjectId === project.id)
   const [addingSub, setAddingSub] = useState(false)
   const [subName, setSubName] = useState('')
   const [subColor, setSubColor] = useState(project.color)
@@ -502,12 +502,11 @@ const ProjectPanel = memo(function ProjectPanel({ project, depth = 0, mode = 'po
   const windowLabel = formatWindowLabel(scheduleWindow.startDate, scheduleWindow.dueDate)
 
   useEffect(() => {
-    if (activeProjectId === project.id) setExpanded(true)
+    if (activeProjectId === project.id) {
+      setExpanded(true)
+      setShowWork(true)
+    }
   }, [activeProjectId, project.id])
-
-  useEffect(() => {
-    if (mode === 'execution') setShowWork(true)
-  }, [mode])
 
   const submitSubProject = () => {
     if (!subName.trim()) return
@@ -749,7 +748,7 @@ const ProjectPanel = memo(function ProjectPanel({ project, depth = 0, mode = 'po
               </div>
               <div className="space-y-2">
                 {childProjects.map((childProject) => (
-                  <ProjectPanel key={childProject.id} project={childProject} depth={depth + 1} mode={mode} />
+                  <ProjectPanel key={childProject.id} project={childProject} depth={depth + 1} />
                 ))}
               </div>
             </div>
@@ -800,9 +799,7 @@ const ProjectPanel = memo(function ProjectPanel({ project, depth = 0, mode = 'po
               <div>
                 <p className="text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>Work items</p>
                 <p className="text-[11px] mt-1" style={{ color: 'var(--text-secondary)' }}>
-                  {mode === 'portfolio'
-                    ? 'Tasks stay tucked away until you open work.'
-                    : 'Execution mode keeps task movement visible inside the selected hierarchy.'}
+                  Open work only when you want to review or update the tasks inside this project.
                 </p>
               </div>
               <div className="flex items-center gap-2 flex-wrap">
@@ -876,7 +873,7 @@ const ProjectPanel = memo(function ProjectPanel({ project, depth = 0, mode = 'po
   )
 })
 
-const ProgramSection = memo(function ProgramSection({ program, projects, mode = 'portfolio' }) {
+const ProgramSection = memo(function ProgramSection({ program, projects }) {
   const updateProgram = useProjectStore((state) => state.updateProgram)
   const moveProgram = useProjectStore((state) => state.moveProgram)
   const deleteProgram = useProjectStore((state) => state.deleteProgram)
@@ -895,7 +892,6 @@ const ProgramSection = memo(function ProgramSection({ program, projects, mode = 
   const [showStatusPicker, setShowStatusPicker] = useState(false)
   const [showShare, setShowShare] = useState(false)
   const [deleteArmed, setDeleteArmed] = useState(false)
-  const [showProgramTasks, setShowProgramTasks] = useState(mode === 'execution')
 
   const topLevelProjects = projects.filter((project) => !project.parentId)
   const containsActiveProject = !!activeProjectId && projects.some((project) => project.id === activeProjectId)
@@ -919,10 +915,6 @@ const ProgramSection = memo(function ProgramSection({ program, projects, mode = 
   useEffect(() => {
     if (activeProgramId === program.id || containsActiveProject) setCollapsed(false)
   }, [activeProgramId, containsActiveProject, program.id])
-
-  useEffect(() => {
-    if (mode === 'execution') setShowProgramTasks(true)
-  }, [mode])
 
   const submitProject = () => {
     if (!newProjName.trim()) return
@@ -1122,62 +1114,49 @@ const ProgramSection = memo(function ProgramSection({ program, projects, mode = 
             </div>
           )}
 
-          {(programDirectTasks.length > 0 || mode === 'execution') && (
-            <div className="rounded-2xl px-3.5 py-3" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
-              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-3">
-                <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>Program tasks</p>
-                  <p className="text-[11px] mt-1" style={{ color: 'var(--text-secondary)' }}>Use these only for cross-cutting work that should not sit inside a project.</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button type="button" onClick={() => setShowProgramTasks((current) => !current)} className="text-[11px] px-2.5 py-2 rounded-xl" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)' }}>
-                    {showProgramTasks ? 'Hide tasks' : 'Show tasks'}
-                  </button>
-                  <button type="button" onClick={openProgramTaskComposer} className="text-[11px] px-2.5 py-2 rounded-xl" style={{ background: `${program.color}18`, color: program.color }}>
-                    Add task
-                  </button>
-                </div>
+          <div className="rounded-2xl px-3.5 py-3" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-3">
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>Program tasks</p>
+                <p className="text-[11px] mt-1" style={{ color: 'var(--text-secondary)' }}>Add work here when it belongs to the program itself, not to a specific project.</p>
               </div>
-
-              {showProgramTasks ? (
-                programDirectTasks.length === 0 ? (
-                  <div className="rounded-2xl px-3 py-4 text-center" style={{ background: 'rgba(255,255,255,0.02)', border: '1px dashed rgba(255,255,255,0.08)', color: 'var(--text-secondary)' }}>
-                    No direct program tasks yet.
-                  </div>
-                ) : (
-                  <div className="space-y-1">
-                    {programDirectTasks.map((task) => (
-                      <TaskRow
-                        key={task.id}
-                        task={task}
-                        onDragStart={(event, item) => {
-                          event.stopPropagation()
-                          writeDragPayload(event, { type: 'task', id: item.id, projectId: item.projectId ?? null, programId: item.programId ?? null })
-                        }}
-                        onDragOver={(event, item) => {
-                          const payload = readDragPayload(event)
-                          if (!payload || payload.type !== 'task' || payload.id === item.id) return
-                          event.preventDefault()
-                          event.dataTransfer.dropEffect = 'move'
-                        }}
-                        onDrop={(event, item) => {
-                          const payload = readDragPayload(event)
-                          if (!payload || payload.type !== 'task' || payload.id === item.id) return
-                          event.preventDefault()
-                          event.stopPropagation()
-                          moveTask(payload.id, { projectId: null, programId: program.id, beforeTaskId: item.id })
-                        }}
-                      />
-                    ))}
-                  </div>
-                )
-              ) : (
-                <div className="rounded-2xl px-3 py-4 text-center" style={{ background: 'rgba(255,255,255,0.02)', border: '1px dashed rgba(255,255,255,0.08)', color: 'var(--text-secondary)' }}>
-                  {programDirectTasks.length > 0 ? `${programDirectTasks.length} task${programDirectTasks.length === 1 ? '' : 's'} tucked under the program.` : 'Program tasks are hidden.'}
-                </div>
-              )}
+              <button type="button" onClick={openProgramTaskComposer} className="text-[11px] px-2.5 py-2 rounded-xl self-start md:self-auto" style={{ background: `${program.color}18`, color: program.color }}>
+                Add task
+              </button>
             </div>
-          )}
+
+            {programDirectTasks.length === 0 ? (
+              <div className="rounded-2xl px-3 py-4 text-center" style={{ background: 'rgba(255,255,255,0.02)', border: '1px dashed rgba(255,255,255,0.08)', color: 'var(--text-secondary)' }}>
+                No program tasks yet. Add one here for cross-cutting work.
+              </div>
+            ) : (
+              <div className="space-y-1">
+                {programDirectTasks.map((task) => (
+                  <TaskRow
+                    key={task.id}
+                    task={task}
+                    onDragStart={(event, item) => {
+                      event.stopPropagation()
+                      writeDragPayload(event, { type: 'task', id: item.id, projectId: item.projectId ?? null, programId: item.programId ?? null })
+                    }}
+                    onDragOver={(event, item) => {
+                      const payload = readDragPayload(event)
+                      if (!payload || payload.type !== 'task' || payload.id === item.id) return
+                      event.preventDefault()
+                      event.dataTransfer.dropEffect = 'move'
+                    }}
+                    onDrop={(event, item) => {
+                      const payload = readDragPayload(event)
+                      if (!payload || payload.type !== 'task' || payload.id === item.id) return
+                      event.preventDefault()
+                      event.stopPropagation()
+                      moveTask(payload.id, { projectId: null, programId: program.id, beforeTaskId: item.id })
+                    }}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
 
           <div className="space-y-3">
             {topLevelProjects.length === 0 && programDirectTasks.length === 0 && !addingProject ? (
@@ -1186,7 +1165,7 @@ const ProgramSection = memo(function ProgramSection({ program, projects, mode = 
               </div>
             ) : (
               topLevelProjects.map((projectItem) => (
-                <ProjectPanel key={projectItem.id} project={projectItem} mode={mode} />
+                <ProjectPanel key={projectItem.id} project={projectItem} />
               ))
             )}
           </div>
@@ -1331,7 +1310,7 @@ const StructureExplorer = memo(function StructureExplorer({
   )
 })
 
-const UnassignedSection = memo(function UnassignedSection({ projects, mode }) {
+const UnassignedSection = memo(function UnassignedSection({ projects }) {
   const moveProject = useProjectStore((state) => state.moveProject)
   const [collapsed, setCollapsed] = useState(false)
   const topLevelProjects = projects.filter((project) => !project.parentId)
@@ -1365,7 +1344,7 @@ const UnassignedSection = memo(function UnassignedSection({ projects, mode }) {
       </div>
       {!collapsed && (
         <div className="px-4 py-4 space-y-3">
-          {topLevelProjects.map((project) => <ProjectPanel key={project.id} project={project} mode={mode} />)}
+          {topLevelProjects.map((project) => <ProjectPanel key={project.id} project={project} />)}
         </div>
       )}
     </div>
@@ -1428,8 +1407,6 @@ const Projects = memo(function Projects() {
   const activeProgramId = useSettingsStore((state) => state.activeProgramId)
   const setActiveProgram = useSettingsStore((state) => state.setActiveProgram)
   const setActiveProject = useSettingsStore((state) => state.setActiveProject)
-  const projectsViewMode = useSettingsStore((state) => state.projectsViewMode)
-  const setProjectsViewMode = useSettingsStore((state) => state.setProjectsViewMode)
   const [addingProgram, setAddingProgram] = useState(false)
 
   const activeProject = projects.find((project) => project.id === activeProjectId) ?? null
@@ -1444,15 +1421,6 @@ const Projects = memo(function Projects() {
   const doneTasks = visibleTasks.filter((task) => task.status === 'done').length
   const topLevelProjectCount = focusedProgram ? visibleProjects.filter((project) => !project.parentId).length : projects.filter((project) => !project.parentId).length
   const headerTitle = focusedProgram ? focusedProgram.name : 'Programs'
-  const portfolioPreviewProgram = focusedProgram ?? programs[0] ?? null
-  const selectedUnassignedProject = activeProject && !activeProject.programId ? activeProject : null
-  const selectedDetailProgram = activeProject?.programId
-    ? programs.find((program) => program.id === activeProject.programId) ?? portfolioPreviewProgram
-    : portfolioPreviewProgram
-  const selectedProgramProjects = selectedDetailProgram
-    ? projects.filter((project) => project.programId === selectedDetailProgram.id)
-    : []
-
   useEffect(() => {
     const selector = activeProjectId
       ? `[data-project-id="${activeProjectId}"]`
@@ -1486,13 +1454,13 @@ const Projects = memo(function Projects() {
           eyebrow="Programs"
           title={headerTitle}
           infoText={focusedProgram
-            ? 'Review structure, milestones, and work only where delivery needs attention.'
-            : 'Browse the portfolio, pick a program, and open work only when you want to operate inside it.'}
+            ? 'Review the selected program, manage its projects, and add program-level work directly where it belongs.'
+            : 'Scan programs, open the one you want, and manage projects, milestones, and program tasks in one place.'}
           stats={[
             { label: 'Programs', value: programs.length, tone: 'accent' },
             { label: 'Projects', value: topLevelProjectCount, tone: 'default' },
+            { label: 'Tasks', value: totalTasks, tone: 'default' },
             { label: 'Tasks done', value: `${doneTasks}/${totalTasks}`, tone: 'success' },
-            { label: 'Mode', value: projectsViewMode === 'execution' ? 'Execution' : 'Portfolio', tone: 'default' },
           ]}
           compact
           actions={
@@ -1502,22 +1470,6 @@ const Projects = memo(function Projects() {
                   All programs
                 </button>
               )}
-              <div className="flex items-center gap-1 rounded-2xl p-1" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                {[
-                  ['portfolio', 'Portfolio'],
-                  ['execution', 'Execution'],
-                ].map(([mode, label]) => (
-                  <button
-                    key={mode}
-                    type="button"
-                    onClick={() => setProjectsViewMode(mode)}
-                    className="px-3 py-2 rounded-xl text-xs font-semibold transition-colors"
-                    style={projectsViewMode === mode ? { background: 'var(--accent)', color: '#fff' } : { color: 'var(--text-secondary)' }}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
               <button type="button" onClick={() => setAddingProgram(true)} className="btn-accent flex items-center gap-1.5 px-3 py-2 text-xs">
                 <Plus size={13} /> New program
               </button>
@@ -1525,14 +1477,9 @@ const Projects = memo(function Projects() {
           }
         >
           <div className="flex flex-wrap items-center gap-2 text-[11px]" style={{ color: 'var(--text-secondary)' }}>
-            <span className="px-2.5 py-1 rounded-full" style={{ background: 'rgba(255,255,255,0.05)' }}>
-              {projectsViewMode === 'execution'
-                ? 'Execution view keeps working rows and task movement visible.'
-                : 'Portfolio view keeps hierarchy first and work on demand.'}
-            </span>
             {focusedProgram && (
               <span className="px-2.5 py-1 rounded-full" style={{ background: `${focusedProgram.color}18`, color: focusedProgram.color }}>
-                {visibleProjects.filter((project) => !project.parentId).length} active project lanes
+                {visibleProjects.filter((project) => !project.parentId).length} active projects
               </span>
             )}
           </div>
@@ -1554,48 +1501,12 @@ const Projects = memo(function Projects() {
             Create first program
           </button>
         </div>
-      ) : projectsViewMode === 'portfolio' ? (
-        <div className="grid gap-4 xl:grid-cols-[292px_minmax(0,1fr)]">
-          <StructureExplorer
-            programs={programs}
-            projects={projects}
-            tasks={tasks}
-            unassignedProjects={unassignedProjects}
-            activeProgramId={activeProgramId}
-            activeProjectId={activeProjectId}
-            previewProgramId={portfolioPreviewProgram?.id ?? null}
-            onSelectProgram={(programId) => {
-              setActiveProject(null)
-              setActiveProgram(programId === activeProgramId ? null : programId)
-            }}
-            onSelectProject={(projectId) => setActiveProject(projectId === activeProjectId ? null : projectId)}
-            onSelectUnassigned={() => {
-              setActiveProgram(null)
-              setActiveProject(selectedUnassignedProject ? null : (unassignedProjects[0]?.id ?? null))
-            }}
-          />
-
-          <div className="min-w-0 space-y-4">
-            {selectedUnassignedProject ? (
-              <UnassignedSection projects={unassignedProjects} mode={projectsViewMode} />
-            ) : selectedDetailProgram ? (
-              <ProgramSection
-                key={selectedDetailProgram.id}
-                program={selectedDetailProgram}
-                projects={selectedProgramProjects}
-                mode={projectsViewMode}
-              />
-            ) : (
-              <UnassignedSection projects={unassignedProjects} mode={projectsViewMode} />
-            )}
-          </div>
-        </div>
       ) : (
         <>
           {visiblePrograms.map((program) => (
-            <ProgramSection key={program.id} program={program} projects={visibleProjects.filter((project) => project.programId === program.id)} mode={projectsViewMode} />
+            <ProgramSection key={program.id} program={program} projects={visibleProjects.filter((project) => project.programId === program.id)} />
           ))}
-          {!focusedProgram && <UnassignedSection projects={unassignedProjects} mode={projectsViewMode} />}
+          {!focusedProgram && <UnassignedSection projects={unassignedProjects} />}
         </>
       )}
     </div>
