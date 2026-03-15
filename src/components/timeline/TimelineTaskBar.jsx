@@ -53,7 +53,7 @@ const TimelineTaskBar = memo(function TimelineTaskBar({
     return (
       <div
         className="absolute"
-        style={{ left, top: '50%', transform: 'translateY(-50%)', zIndex: isHovered ? 8 : 4 }}
+        style={{ left, top: '50%', transform: 'translateY(-50%)', zIndex: isHovered ? 40 : 4 }}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >
@@ -209,7 +209,7 @@ const TimelineTaskBar = memo(function TimelineTaskBar({
     <>
       <div
         className="absolute"
-        style={{ left, top: '50%', transform: 'translateY(-50%)', zIndex: isInteracting || isHovered ? 8 : 4 }}
+        style={{ left, top: '50%', transform: 'translateY(-50%)', zIndex: isInteracting || isHovered ? 40 : 4 }}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >
@@ -283,7 +283,7 @@ const TimelineTaskBar = memo(function TimelineTaskBar({
             background: 'rgba(8,20,35,0.96)',
             color: 'var(--text-secondary)',
             border: '1px solid rgba(255,255,255,0.16)',
-            zIndex: 8,
+            zIndex: 45,
           }}
         >
           {formatDateShort(previewStart)} - {formatDateShort(previewEnd)}

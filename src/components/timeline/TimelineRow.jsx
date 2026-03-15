@@ -342,7 +342,7 @@ const TimelineRow = memo(function TimelineRow({
           return (
             <div
               key={`${row.id}-${item.id}`}
-              className="absolute group"
+              className="absolute group hover:z-[40]"
               style={{
                 left,
                 top: '50%',
