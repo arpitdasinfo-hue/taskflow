@@ -9,14 +9,20 @@ const PRIORITIES = ['critical', 'high', 'medium', 'low']
 const STATUS_LABELS   = { 'todo': 'To Do', 'in-progress': 'In Progress', 'review': 'Review', 'done': 'Done', 'blocked': 'Blocked' }
 const PRIORITY_COLORS = { critical: '#ef4444', high: '#f97316', medium: '#f59e0b', low: '#94a3b8' }
 
-const DropdownMenu = memo(function DropdownMenu({ label, options, onSelect, renderOption }) {
+const DropdownMenu = memo(function DropdownMenu({ label, options, onSelect, renderOption, disabled = false }) {
   const [open, setOpen] = useState(false)
   return (
     <div className="relative">
       <button
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => {
+          if (disabled) return
+          setOpen((o) => !o)
+        }}
+        disabled={disabled}
         className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-colors hover:bg-white/10"
-        style={{ color: 'var(--text-primary)', border: '1px solid rgba(255,255,255,0.12)' }}
+        style={disabled
+          ? { color: 'var(--text-secondary)', border: '1px solid rgba(255,255,255,0.08)', opacity: 0.45, cursor: 'not-allowed' }
+          : { color: 'var(--text-primary)', border: '1px solid rgba(255,255,255,0.12)' }}
       >
         {label}
         <ChevronDown size={11} style={{ color: 'var(--text-secondary)' }} />
@@ -45,7 +51,7 @@ const DropdownMenu = memo(function DropdownMenu({ label, options, onSelect, rend
   )
 })
 
-const BulkActionBar = memo(function BulkActionBar() {
+const BulkActionBar = memo(function BulkActionBar({ active = false, onExitSelectMode = null }) {
   const selectedTaskIds   = useSettingsStore((s) => s.selectedTaskIds)
   const clearTaskSelection = useSettingsStore((s) => s.clearTaskSelection)
   const bulkUpdateTasks   = useTaskStore((s) => s.bulkUpdateTasks)
@@ -54,12 +60,15 @@ const BulkActionBar = memo(function BulkActionBar() {
 
   const [confirmDelete, setConfirmDelete] = useState(false)
 
-  if (selectedTaskIds.length === 0) return null
+  const hasSelection = selectedTaskIds.length > 0
+
+  if (!active && !hasSelection) return null
 
   const handleBulkStatus   = (status) => { bulkUpdateTasks(selectedTaskIds, { status }); clearTaskSelection() }
   const handleBulkPriority = (priority) => { bulkUpdateTasks(selectedTaskIds, { priority }); clearTaskSelection() }
   const handleBulkProject  = (projectId) => { bulkUpdateTasks(selectedTaskIds, { projectId }); clearTaskSelection() }
   const handleDelete = () => {
+    if (!hasSelection) return
     if (confirmDelete) {
       bulkDeleteTasks(selectedTaskIds)
       clearTaskSelection()
@@ -88,6 +97,12 @@ const BulkActionBar = memo(function BulkActionBar() {
         {selectedTaskIds.length} selected
       </span>
 
+      {!hasSelection && (
+        <span className="hidden md:inline text-xs flex-shrink-0" style={{ color: 'var(--text-secondary)' }}>
+          Tap tasks to select them
+        </span>
+      )}
+
       <div className="w-px h-5" style={{ background: 'rgba(255,255,255,0.1)' }} />
 
       {/* Status */}
@@ -96,6 +111,7 @@ const BulkActionBar = memo(function BulkActionBar() {
         options={STATUSES}
         onSelect={handleBulkStatus}
         renderOption={(s) => <span>{STATUS_LABELS[s]}</span>}
+        disabled={!hasSelection}
       />
 
       {/* Priority */}
@@ -109,6 +125,7 @@ const BulkActionBar = memo(function BulkActionBar() {
             <span className="capitalize">{p}</span>
           </span>
         )}
+        disabled={!hasSelection}
       />
 
       {/* Move to project */}
@@ -123,6 +140,7 @@ const BulkActionBar = memo(function BulkActionBar() {
               {p.name}
             </span>
           )}
+          disabled={!hasSelection}
         />
       )}
 
@@ -150,8 +168,9 @@ const BulkActionBar = memo(function BulkActionBar() {
       ) : (
         <button
           onClick={handleDelete}
+          disabled={!hasSelection}
           className="p-1.5 rounded-lg hover:bg-red-500/10 transition-colors"
-          style={{ color: '#ef4444' }}
+          style={hasSelection ? { color: '#ef4444' } : { color: 'var(--text-secondary)', opacity: 0.45, cursor: 'not-allowed' }}
           title="Move selected tasks to trash"
         >
           <Trash2 size={14} />
@@ -160,10 +179,14 @@ const BulkActionBar = memo(function BulkActionBar() {
 
       {/* Clear selection */}
       <button
-        onClick={clearTaskSelection}
+        onClick={() => {
+          clearTaskSelection()
+          onExitSelectMode?.()
+          setConfirmDelete(false)
+        }}
         className="p-1.5 rounded-lg hover:bg-white/10 transition-colors"
         style={{ color: 'var(--text-secondary)' }}
-        title="Clear selection"
+        title="Exit select mode"
       >
         <X size={14} />
       </button>

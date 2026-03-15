@@ -604,7 +604,7 @@ const Tasks = memo(function Tasks() {
         {view === 'board' && <BoardView selectMode={selectMode} tasksByStatus={tasksByStatus} />}
       </div>
 
-      {selectedTaskIds.length > 0 && <BulkActionBar />}
+      <BulkActionBar active={selectMode} onExitSelectMode={() => setSelectMode(false)} />
     </div>
   )
 })
