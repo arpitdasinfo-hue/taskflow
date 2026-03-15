@@ -380,6 +380,132 @@ const MilestonePreviewStrip = memo(function MilestonePreviewStrip({ label, miles
   )
 })
 
+const ProgramMilestonesOverview = memo(function ProgramMilestonesOverview({ milestones, projects, accentColor }) {
+  const visibleMilestones = useMemo(() => sortMilestones(milestones).slice(0, 5), [milestones])
+  const projectMap = useMemo(
+    () => new Map(projects.map((project) => [project.id, project])),
+    [projects]
+  )
+
+  const totalCount = milestones.length
+  const completedCount = milestones.filter((milestone) => milestone.status === 'completed').length
+  const upcomingCount = milestones.filter((milestone) => milestone.status !== 'completed').length
+  const hiddenCount = Math.max(0, totalCount - visibleMilestones.length)
+
+  return (
+    <div
+      className="rounded-2xl px-3.5 py-3"
+      style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>
+              Milestones
+            </p>
+            <InfoTooltip text="Program milestones are rolled up from the milestones inside its projects and sub-projects." />
+          </div>
+          <p className="text-[11px] mt-1" style={{ color: 'var(--text-secondary)' }}>
+            {totalCount > 0
+              ? `${upcomingCount} upcoming, ${completedCount} completed`
+              : 'No project milestones yet'}
+          </p>
+        </div>
+        <div className="flex items-center gap-1.5 flex-wrap justify-end">
+          <span className="text-[10px] px-2 py-1 rounded-full" style={{ background: `${accentColor}18`, color: accentColor }}>
+            {totalCount} total
+          </span>
+          {upcomingCount > 0 && (
+            <span className="text-[10px] px-2 py-1 rounded-full" style={{ background: 'rgba(245,158,11,0.12)', color: '#fbbf24' }}>
+              {upcomingCount} upcoming
+            </span>
+          )}
+        </div>
+      </div>
+
+      {visibleMilestones.length > 0 ? (
+        <div className="mt-3 space-y-2">
+          {visibleMilestones.map((milestone) => {
+            const project = projectMap.get(milestone.projectId)
+            const isCompleted = milestone.status === 'completed'
+            const dueDate = milestone.dueDate ? new Date(milestone.dueDate) : null
+            const isOverdue = dueDate && dueDate < new Date() && !isCompleted
+            const projectColor = project?.color || accentColor
+
+            return (
+              <div
+                key={milestone.id}
+                className="flex items-center gap-3 rounded-xl px-3 py-2"
+                style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.05)' }}
+              >
+                <span style={{ color: projectColor }} className="text-[11px] flex-shrink-0">◆</span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span
+                      className="text-[12px] font-medium truncate"
+                      style={{
+                        color: isCompleted ? 'var(--text-secondary)' : 'var(--text-primary)',
+                        textDecoration: isCompleted ? 'line-through' : 'none',
+                      }}
+                    >
+                      {milestone.name}
+                    </span>
+                    {project && (
+                      <span
+                        className="text-[10px] px-2 py-0.5 rounded-full"
+                        style={{ background: `${projectColor}18`, color: projectColor }}
+                      >
+                        {project.name}
+                      </span>
+                    )}
+                  </div>
+                  {milestone.description ? (
+                    <p className="text-[10px] mt-0.5 truncate" style={{ color: 'var(--text-secondary)' }}>
+                      {milestone.description}
+                    </p>
+                  ) : null}
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  {milestone.dueDate ? (
+                    <span
+                      className="text-[10px] px-2 py-1 rounded-full"
+                      style={{
+                        background: isOverdue ? 'rgba(239,68,68,0.12)' : 'rgba(255,255,255,0.05)',
+                        color: isOverdue ? '#fca5a5' : 'var(--text-secondary)',
+                      }}
+                    >
+                      {formatShortDate(milestone.dueDate)}
+                    </span>
+                  ) : (
+                    <span className="text-[10px] px-2 py-1 rounded-full" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)' }}>
+                      No date
+                    </span>
+                  )}
+                  <span
+                    className="text-[10px] px-2 py-1 rounded-full"
+                    style={isCompleted
+                      ? { background: 'rgba(16,185,129,0.14)', color: '#34d399' }
+                      : isOverdue
+                        ? { background: 'rgba(239,68,68,0.14)', color: '#f87171' }
+                        : { background: 'rgba(255,255,255,0.06)', color: 'var(--text-secondary)' }}
+                  >
+                    {isCompleted ? 'Done' : isOverdue ? 'Late' : 'Upcoming'}
+                  </span>
+                </div>
+              </div>
+            )
+          })}
+          {hiddenCount > 0 && (
+            <div className="pt-1 text-[10px]" style={{ color: 'var(--text-secondary)' }}>
+              +{hiddenCount} more milestone{hiddenCount === 1 ? '' : 's'} in this program
+            </div>
+          )}
+        </div>
+      ) : null}
+    </div>
+  )
+})
+
 const TaskRow = memo(function TaskRow({ task, onDragStart, onDragOver, onDrop }) {
   const selectTask = useSettingsStore((state) => state.selectTask)
   const updateTask = useTaskStore((state) => state.updateTask)
@@ -1065,7 +1191,7 @@ const ProgramSection = memo(function ProgramSection({ program, projects }) {
             <MetricTile icon={AlertTriangle} label="Health" value={health.label} detail={health.detail} tone={overdue > 0 || blocked > 0 ? 'danger' : 'default'} />
           </div>
 
-          <MilestonePreviewStrip label="Program milestones" milestones={projectMilestones} accentColor={program.color} />
+          <ProgramMilestonesOverview milestones={projectMilestones} projects={projects} accentColor={program.color} />
 
           {programDirectTasks.length > 0 && (
             <div className="rounded-2xl px-3 py-2.5 flex items-center justify-between gap-3" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
