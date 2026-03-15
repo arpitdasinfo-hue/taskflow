@@ -1,6 +1,6 @@
 import { memo, useState, useCallback, useRef } from 'react'
 import { Plus, Trash2, Pencil, Check, X, StickyNote } from 'lucide-react'
-import { formatDistanceToNow } from 'date-fns'
+import { format } from 'date-fns'
 import useTaskStore from '../../store/useTaskStore'
 
 const NoteItem = memo(function NoteItem({ taskId, note }) {
@@ -18,6 +18,19 @@ const NoteItem = memo(function NoteItem({ taskId, note }) {
     setValue(note.content)
     setEditing(false)
   }, [note.content])
+
+  const createdTs = note.createdAt ? new Date(note.createdAt) : null
+  const updatedTs = note.updatedAt ? new Date(note.updatedAt) : createdTs
+  const isEdited = Boolean(
+    createdTs &&
+    updatedTs &&
+    !Number.isNaN(createdTs.getTime()) &&
+    !Number.isNaN(updatedTs.getTime()) &&
+    createdTs.getTime() !== updatedTs.getTime()
+  )
+  const timestamp = updatedTs && !Number.isNaN(updatedTs.getTime())
+    ? format(updatedTs, 'dd MMM, h:mm a')
+    : null
 
   return (
     <div className="group rounded-xl p-3 anim-slide-up" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
@@ -43,8 +56,16 @@ const NoteItem = memo(function NoteItem({ taskId, note }) {
             {note.content}
           </p>
           <div className="flex items-center justify-between">
-            <span className="text-[10px]" style={{ color: 'var(--text-secondary)' }}>
-              {formatDistanceToNow(new Date(note.updatedAt), { addSuffix: true })}
+            <span
+              className="text-[10px] inline-flex items-center gap-1.5"
+              style={{ color: 'var(--text-secondary)' }}
+              title={timestamp ? `${isEdited ? 'Updated' : 'Created'} ${timestamp}` : undefined}
+            >
+              <span
+                className="w-1 h-1 rounded-full"
+                style={{ background: 'rgba(255,255,255,0.38)' }}
+              />
+              {timestamp ? `${isEdited ? 'Updated' : 'Created'} ${timestamp}` : 'Saved'}
             </span>
             <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
               <button
