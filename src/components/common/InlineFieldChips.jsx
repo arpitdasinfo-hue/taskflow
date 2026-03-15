@@ -24,6 +24,7 @@ export const InlineDateChip = memo(function InlineDateChip({
   value,
   onChange,
   tone = 'default',
+  compact = false,
 }) {
   const inputRef = useRef(null)
   const palette = tone === 'danger'
@@ -57,7 +58,9 @@ export const InlineDateChip = memo(function InlineDateChip({
       <button
         type="button"
         onClick={openPicker}
-        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[10px] font-medium whitespace-nowrap"
+        className={`inline-flex items-center whitespace-nowrap font-medium rounded-full ${
+          compact ? 'gap-1 px-2 py-1 text-[10px]' : 'gap-1.5 px-2.5 py-1.5 text-[10px]'
+        }`}
         style={{
           background: palette.background,
           border: `1px solid ${palette.border}`,
@@ -65,7 +68,7 @@ export const InlineDateChip = memo(function InlineDateChip({
         }}
         title={label}
       >
-        <CalendarDays size={11} />
+        <CalendarDays size={compact ? 10 : 11} />
         {formatInlineDate(value, label)}
       </button>
     </span>
@@ -77,6 +80,7 @@ export const InlineStatusChip = memo(function InlineStatusChip({
   onChange,
   labels,
   colors,
+  compact = false,
 }) {
   const [open, setOpen] = useState(false)
   const [menuPos, setMenuPos] = useState({ top: 0, left: 0, width: 0 })
@@ -144,12 +148,14 @@ export const InlineStatusChip = memo(function InlineStatusChip({
           event.stopPropagation()
           setOpen((current) => !current)
         }}
-        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[10px] font-medium whitespace-nowrap"
+        className={`inline-flex items-center whitespace-nowrap font-medium rounded-full ${
+          compact ? 'gap-1 px-2 py-1 text-[10px]' : 'gap-1.5 px-2.5 py-1.5 text-[10px]'
+        }`}
         style={{ background: `${colors[value]}18`, color: colors[value] }}
         title="Status"
       >
         {labels[value]}
-        <ChevronDown size={11} />
+        <ChevronDown size={compact ? 10 : 11} />
       </button>
 
       {open && typeof document !== 'undefined' && createPortal(

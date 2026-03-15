@@ -63,11 +63,11 @@ const TaskContextChip = memo(function TaskContextChip({ task, projectById, progr
 
   return (
     <span
-      className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-medium max-w-[220px] truncate"
+      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium max-w-[160px] truncate"
       style={{ background: `${color}16`, color }}
       title={label}
     >
-      <span className="w-1.5 h-1.5 rounded-full" style={{ background: color }} />
+      <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: color }} />
       <span className="truncate">{label}</span>
     </span>
   )
@@ -166,7 +166,7 @@ const TaskRow = memo(function TaskRow({ task, selectMode }) {
 
   return (
     <div
-      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-colors hover:bg-white/5 group"
+      className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left transition-colors hover:bg-white/5 group"
       style={{
         borderBottom: '1px solid rgba(255,255,255,0.04)',
         background: isSelected ? 'rgba(var(--accent-rgb),0.06)' : 'transparent',
@@ -194,7 +194,7 @@ const TaskRow = memo(function TaskRow({ task, selectMode }) {
             {task.title}
           </p>
           {task.description && (
-            <p className="text-[11px] truncate" style={{ color: 'var(--text-secondary)' }}>
+            <p className="hidden 2xl:block text-[11px] truncate" style={{ color: 'var(--text-secondary)' }}>
               {task.description}
             </p>
           )}
@@ -211,8 +211,8 @@ const TaskRow = memo(function TaskRow({ task, selectMode }) {
       )}
 
       <div className="hidden md:flex items-center gap-2 flex-shrink-0">
-        <InlineDateChip label="Start" value={task.startDate} onChange={(nextValue) => updateDateField('startDate', nextValue)} />
-        <InlineDateChip label="Due" value={task.dueDate} tone={isOverdue ? 'danger' : 'default'} onChange={(nextValue) => updateDateField('dueDate', nextValue)} />
+        <InlineDateChip compact label="Start" value={task.startDate} onChange={(nextValue) => updateDateField('startDate', nextValue)} />
+        <InlineDateChip compact label="Due" value={task.dueDate} tone={isOverdue ? 'danger' : 'default'} onChange={(nextValue) => updateDateField('dueDate', nextValue)} />
       </div>
 
       {totalSubs > 0 && (
@@ -221,7 +221,7 @@ const TaskRow = memo(function TaskRow({ task, selectMode }) {
         </span>
       )}
 
-      <InlineStatusChip value={task.status} onChange={updateStatusField} labels={STATUS_LABEL} colors={STATUS_COLOR} />
+      <InlineStatusChip compact value={task.status} onChange={updateStatusField} labels={STATUS_LABEL} colors={STATUS_COLOR} />
 
       {!selectMode && <CommitTaskMenu taskId={task.id} compact />}
 
@@ -290,8 +290,8 @@ const TableRow = memo(function TableRow({ task, selectMode, projectById, program
       className="transition-colors hover:bg-white/5"
       style={{ background: isSelected ? 'rgba(var(--accent-rgb),0.06)' : 'transparent' }}
     >
-      <td className="px-3 py-3 border-b align-top" style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
-        <div className="flex items-start gap-2.5 min-w-0">
+      <td className="px-3 py-2.5 border-b align-top" style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
+        <div className="flex items-start gap-2 min-w-0">
           {selectMode ? (
             <button
               type="button"
@@ -309,44 +309,47 @@ const TableRow = memo(function TableRow({ task, selectMode, projectById, program
           <button type="button" onClick={() => selectTask(task.id)} className="min-w-0 text-left bg-transparent border-0 p-0">
             <div className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>{task.title}</div>
             {task.description && (
-              <div className="text-[11px] truncate mt-1" style={{ color: 'var(--text-secondary)' }}>{task.description}</div>
+              <div className="hidden 2xl:block text-[11px] truncate mt-0.5" style={{ color: 'var(--text-secondary)' }}>{task.description}</div>
             )}
           </button>
         </div>
       </td>
-      <td className="px-3 py-3 border-b whitespace-nowrap" style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
+      <td className="px-3 py-2.5 border-b whitespace-nowrap" style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
         <TaskContextChip task={task} projectById={projectById} programById={programById} />
       </td>
-      <td className="px-3 py-3 border-b whitespace-nowrap text-xs" style={{ borderColor: 'rgba(255,255,255,0.04)', color: 'var(--text-secondary)' }}>
+      <td className="px-3 py-2.5 border-b whitespace-nowrap text-xs" style={{ borderColor: 'rgba(255,255,255,0.04)', color: 'var(--text-secondary)' }}>
         {task.projectId ? (projectById.get(task.projectId)?.name ?? '—') : 'Program task'}
       </td>
-      <td className="px-3 py-3 border-b whitespace-nowrap" style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
+      <td className="px-3 py-2.5 border-b whitespace-nowrap" style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
         <InlineDateChip
+          compact
           label="Start"
           value={task.startDate}
           onChange={(nextValue) => updateTask(task.id, { startDate: nextValue ? new Date(nextValue).toISOString() : null })}
         />
       </td>
-      <td className="px-3 py-3 border-b whitespace-nowrap" style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
+      <td className="px-3 py-2.5 border-b whitespace-nowrap" style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
         <InlineDateChip
+          compact
           label="Due"
           value={task.dueDate}
           tone={isOverdue ? 'danger' : 'default'}
           onChange={(nextValue) => updateTask(task.id, { dueDate: nextValue ? new Date(nextValue).toISOString() : null })}
         />
       </td>
-      <td className="px-3 py-3 border-b whitespace-nowrap" style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
+      <td className="px-3 py-2.5 border-b whitespace-nowrap" style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
         <InlineStatusChip
+          compact
           value={task.status}
           onChange={(nextStatus) => updateTask(task.id, { status: nextStatus })}
           labels={STATUS_LABEL}
           colors={STATUS_COLOR}
         />
       </td>
-      <td className="px-3 py-3 border-b whitespace-nowrap" style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
+      <td className="px-3 py-2.5 border-b whitespace-nowrap" style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
         <PriorityPill value={task.priority} />
       </td>
-      <td className="px-3 py-3 border-b whitespace-nowrap text-right" style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
+      <td className="px-3 py-2.5 border-b whitespace-nowrap text-right" style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
         {!selectMode && <CommitTaskMenu taskId={task.id} compact />}
       </td>
     </tr>
