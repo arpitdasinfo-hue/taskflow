@@ -15,8 +15,12 @@ export const sortTasksByStartDate = (items = []) => [...items].sort((left, right
   const startCompare = compareNullable(toTimestamp(left.startDate), toTimestamp(right.startDate))
   if (startCompare !== 0) return startCompare
 
-  const dueCompare = compareNullable(toTimestamp(left.dueDate), toTimestamp(right.dueDate))
-  if (dueCompare !== 0) return dueCompare
+  const leftDue = toTimestamp(left.dueDate)
+  const rightDue = toTimestamp(right.dueDate)
+  if (leftDue !== null && rightDue !== null) {
+    const dueCompare = compareNullable(leftDue, rightDue)
+    if (dueCompare !== 0) return dueCompare
+  }
 
   const createdCompare = compareNullable(toTimestamp(left.createdAt), toTimestamp(right.createdAt))
   if (createdCompare !== 0) return createdCompare
