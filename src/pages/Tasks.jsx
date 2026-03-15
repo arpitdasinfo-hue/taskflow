@@ -153,6 +153,10 @@ const TaskRow = memo(function TaskRow({ task, selectMode }) {
     else selectTask(task.id)
   }
 
+  const openTask = useCallback(() => {
+    selectTask(task.id)
+  }, [selectTask, task.id])
+
   const updateDateField = useCallback((field, nextValue) => {
     updateTask(task.id, { [field]: nextValue ? new Date(nextValue).toISOString() : null })
   }, [task.id, updateTask])
@@ -223,11 +227,16 @@ const TaskRow = memo(function TaskRow({ task, selectMode }) {
       {!selectMode && <CommitTaskMenu taskId={task.id} compact />}
 
       {!selectMode && (
-        <ChevronRight
-          size={12}
-          style={{ color: 'var(--text-secondary)', flexShrink: 0 }}
-          className="opacity-0 group-hover:opacity-100 transition-opacity"
-        />
+        <button
+          type="button"
+          onClick={openTask}
+          className="flex-shrink-0 p-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white/6"
+          style={{ color: 'var(--text-secondary)' }}
+          aria-label={`Open ${task.title}`}
+          title="Open task"
+        >
+          <ChevronRight size={12} />
+        </button>
       )}
     </div>
   )
