@@ -7,7 +7,6 @@ import BulkActionBar from '../components/tasks/BulkActionBar'
 import CommitTaskMenu from '../components/planning/CommitTaskMenu'
 import EmptyState from '../components/common/EmptyState'
 import PageHero from '../components/common/PageHero'
-import ScopeBar from '../components/common/ScopeBar'
 import { InlineDateChip, InlineStatusChip } from '../components/common/InlineFieldChips'
 import Header from '../components/layout/Header'
 import useSettingsStore from '../store/useSettingsStore'
@@ -515,14 +514,12 @@ const Tasks = memo(function Tasks() {
 
       <div className="px-4 md:px-6 pb-3 space-y-3">
         <PageHero
-          eyebrow="Execution workspace"
-          title="Operate on active work"
-          infoText="Update dates, change status, and move across scope without leaving the task surface."
+          title="All Tasks"
+          compact
           stats={[
             { label: 'Visible tasks', value: filteredTasks.length, tone: 'accent' },
             { label: 'In progress', value: inProgressCount, tone: 'default' },
             { label: 'Overdue', value: overdueCount, tone: overdueCount > 0 ? 'danger' : 'default' },
-            { label: 'Selected', value: selectMode ? selectedTaskIds.length : 'Off', tone: selectMode ? 'success' : 'default' },
           ]}
           actions={
             <button
@@ -536,29 +533,12 @@ const Tasks = memo(function Tasks() {
               {selectMode ? `Selecting (${selectedTaskIds.length})` : 'Select tasks'}
             </button>
           }
-        />
-
-        <ScopeBar
-          eyebrow="Task scope"
-          title="Keep the inbox narrow"
-          infoText="Program and project scope stay visible here while status, priority, and sort live in the filter drawer."
-          actions={
-            activeFilterCount > 0 ? (
-              <button
-                type="button"
-                onClick={() => {
-                  setFilterProgramId('')
-                  setFilterProjectId('')
-                }}
-                className="px-3 py-2 rounded-xl text-xs"
-                style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)', border: '1px solid rgba(255,255,255,0.1)' }}
-              >
-                Clear scope
-              </button>
-            ) : null
-          }
-          controls={
-            <>
+        >
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="hidden md:flex items-center text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>
+              Scope
+            </div>
+            <div className="flex flex-wrap items-center gap-2 flex-1">
               <select
                 value={filterProgramId}
                 onChange={(event) => {
@@ -595,9 +575,22 @@ const Tasks = memo(function Tasks() {
                   return <option key={project.id} value={project.id}>{label}</option>
                 })}
               </select>
-            </>
-          }
-        />
+              {activeFilterCount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFilterProgramId('')
+                    setFilterProjectId('')
+                  }}
+                  className="px-3 py-2 rounded-xl text-xs"
+                  style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)', border: '1px solid rgba(255,255,255,0.1)' }}
+                >
+                  Clear scope
+                </button>
+              )}
+            </div>
+          </div>
+        </PageHero>
 
         {showFilter && <FilterBar onClose={() => setShowFilter(false)} />}
       </div>
