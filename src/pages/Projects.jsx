@@ -314,16 +314,16 @@ const MetricTile = memo(function MetricTile({ icon: Icon, label, value, detail, 
 
   return (
     <div
-      className="rounded-2xl px-3.5 py-3"
+      className="rounded-2xl px-3 py-2.5"
       style={{ background: palette.background, border: `1px solid ${palette.border}` }}
     >
       <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>
         <Icon size={11} style={{ color: palette.color }} />
         {label}
       </div>
-      <div className="mt-2 text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{value}</div>
+      <div className="mt-1.5 text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{value}</div>
       {detail && (
-        <p className="mt-1 text-[11px] leading-5" style={{ color: 'var(--text-secondary)' }}>
+        <p className="mt-1 text-[11px] leading-4.5" style={{ color: 'var(--text-secondary)' }}>
           {detail}
         </p>
       )}
@@ -613,7 +613,7 @@ const ProjectPanel = memo(function ProjectPanel({ project, depth = 0 }) {
     >
       <div
         onClick={toggleExpanded}
-        className="group cursor-pointer px-4 py-3.5"
+        className="group cursor-pointer px-4 py-3"
         style={{ background: `${project.color}${expanded ? '0f' : '09'}`, borderBottom: expanded ? `1px solid ${project.color}18` : 'none' }}
       >
         <div className="flex items-start gap-3">
@@ -715,8 +715,8 @@ const ProjectPanel = memo(function ProjectPanel({ project, depth = 0 }) {
       )}
 
       {expanded && (
-        <div className="px-4 pb-4 pt-3 space-y-3" style={{ background: `${project.color}05` }}>
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <div className="px-4 pb-3.5 pt-2.5 space-y-2.5" style={{ background: `${project.color}05` }}>
+          <div className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-4">
             <MetricTile icon={CheckCircle2} label="Progress" value={`${completion}% complete`} detail={`${done} of ${total || 0} tasks closed`} tone="accent" />
             <MetricTile icon={Clock} label="Execution" value={`${inProgress} active`} detail={unscheduled > 0 ? `${unscheduled} tasks still need dates` : 'Tasks are sequenced'} />
             <MetricTile icon={Calendar} label="Schedule" value={windowLabel} detail={project.dueDate ? `Project due ${formatShortDate(project.dueDate)}` : 'No project-level due date'} />
@@ -738,7 +738,7 @@ const ProjectPanel = memo(function ProjectPanel({ project, depth = 0 }) {
           )}
 
           {childProjects.length > 0 && (
-            <div className="rounded-2xl px-3.5 py-3" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
+            <div className="rounded-2xl px-3 py-2.5" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
               <div className="flex items-center justify-between gap-3 mb-3">
                 <div>
                   <p className="text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>Sub-projects</p>
@@ -794,7 +794,7 @@ const ProjectPanel = memo(function ProjectPanel({ project, depth = 0 }) {
             </div>
           )}
 
-          <div className="rounded-2xl px-3.5 py-3" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+          <div className="rounded-2xl px-3 py-2.5" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-3">
               <div>
                 <p className="text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>Work items</p>
@@ -881,7 +881,6 @@ const ProgramSection = memo(function ProgramSection({ program, projects }) {
   const moveProject = useProjectStore((state) => state.moveProject)
   const milestones = useProjectStore((state) => state.milestones ?? [])
   const tasks = useTaskStore((state) => state.tasks)
-  const moveTask = useTaskStore((state) => state.moveTask)
   const activeProgramId = useSettingsStore((state) => state.activeProgramId)
   const activeProjectId = useSettingsStore((state) => state.activeProjectId)
 
@@ -923,16 +922,6 @@ const ProgramSection = memo(function ProgramSection({ program, projects }) {
     setAddingProject(false)
   }
 
-  const openProgramTaskComposer = () => {
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(
-        new CustomEvent('taskflow:quick-add', {
-          detail: { type: 'task', programId: program.id },
-        })
-      )
-    }
-  }
-
   const handleProgramDragStart = (event) => {
     event.stopPropagation()
     writeDragPayload(event, { type: 'program', id: program.id })
@@ -945,7 +934,7 @@ const ProgramSection = memo(function ProgramSection({ program, projects }) {
       event.preventDefault()
       event.dataTransfer.dropEffect = 'move'
     }
-    if (payload.type === 'project' || payload.type === 'task') {
+    if (payload.type === 'project') {
       event.preventDefault()
       event.dataTransfer.dropEffect = 'move'
     }
@@ -968,17 +957,11 @@ const ProgramSection = memo(function ProgramSection({ program, projects }) {
       moveProject(payload.id, { programId: program.id, parentId: null })
       return
     }
-
-    if (payload.type === 'task') {
-      event.preventDefault()
-      event.stopPropagation()
-      moveTask(payload.id, { projectId: null, programId: program.id })
-    }
   }
 
   return (
-    <div className="mb-6 rounded-[30px] overflow-hidden" data-program-id={program.id} onDragOver={handleProgramDragOver} onDrop={handleProgramDrop} style={{ border: `1px solid ${program.color}24`, background: 'rgba(255,255,255,0.02)' }}>
-      <div className="px-4 md:px-5 py-4" style={{ background: `${program.color}08` }}>
+    <div className="mb-4 rounded-[28px] overflow-hidden" data-program-id={program.id} onDragOver={handleProgramDragOver} onDrop={handleProgramDrop} style={{ border: `1px solid ${program.color}24`, background: 'rgba(255,255,255,0.02)' }}>
+      <div className="px-4 md:px-5 py-3.5" style={{ background: `${program.color}08` }}>
         <div className="flex items-start gap-3">
           <button type="button" onClick={() => setCollapsed((current) => !current)} style={{ color: 'var(--text-secondary)' }}>
             {collapsed ? <ChevronRight size={15} /> : <ChevronDown size={15} />}
@@ -1048,7 +1031,6 @@ const ProgramSection = memo(function ProgramSection({ program, projects }) {
               accent
               items={[
                 { label: 'Add project', onClick: () => setAddingProject(true) },
-                { label: 'Add program task', onClick: openProgramTaskComposer },
               ]}
             />
             <ActionMenu
@@ -1075,15 +1057,37 @@ const ProgramSection = memo(function ProgramSection({ program, projects }) {
       )}
 
       {!collapsed && (
-        <div className="px-4 md:px-5 pb-5 pt-4 space-y-4" style={{ borderTop: `1px solid ${program.color}12` }}>
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <div className="px-4 md:px-5 pb-4 pt-3.5 space-y-3" style={{ borderTop: `1px solid ${program.color}12` }}>
+          <div className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-4">
             <MetricTile icon={Folder} label="Projects" value={`${topLevelProjects.length} active projects`} detail={topLevelProjects.length > 0 ? `${projects.length - topLevelProjects.length > 0 ? `${projects.length - topLevelProjects.length} nested beneath them` : 'No nested sub-projects yet'}` : 'Create the first project to start structuring work'} tone="accent" />
             <MetricTile icon={CheckCircle2} label="Progress" value={`${completion}% complete`} detail={`${doneTasks} of ${totalTasks || 0} tasks closed`} />
-            <MetricTile icon={Clock} label="Execution" value={`${inProgress} active`} detail={programDirectTasks.length > 0 ? `${programDirectTasks.length} direct program task${programDirectTasks.length === 1 ? '' : 's'}` : 'No direct program tasks'} />
+            <MetricTile icon={Clock} label="Execution" value={`${inProgress} active`} detail={unscheduled > 0 ? `${unscheduled} tasks still need dates` : 'Work is sequenced across projects'} />
             <MetricTile icon={AlertTriangle} label="Health" value={health.label} detail={health.detail} tone={overdue > 0 || blocked > 0 ? 'danger' : 'default'} />
           </div>
 
           <MilestonePreviewStrip label="Program milestones" milestones={projectMilestones} accentColor={program.color} />
+
+          {programDirectTasks.length > 0 && (
+            <div className="rounded-2xl px-3 py-2.5 flex items-center justify-between gap-3" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+              <div className="min-w-0">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>Program-level tasks</p>
+                <p className="text-[11px] mt-1 truncate" style={{ color: 'var(--text-secondary)' }}>
+                  {programDirectTasks.length} task{programDirectTasks.length === 1 ? '' : 's'} sit at program level. Manage them from All Tasks if needed.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  useSettingsStore.getState().setActiveProgram(program.id)
+                  useSettingsStore.getState().setPage('tasks')
+                }}
+                className="text-[11px] px-2.5 py-2 rounded-xl flex-shrink-0"
+                style={{ background: `${program.color}18`, color: program.color }}
+              >
+                Open tasks
+              </button>
+            </div>
+          )}
 
           {addingProject && (
             <div className="rounded-2xl p-3" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(var(--accent-rgb),0.18)' }}>
@@ -1113,50 +1117,6 @@ const ProgramSection = memo(function ProgramSection({ program, projects }) {
               </div>
             </div>
           )}
-
-          <div className="rounded-2xl px-3.5 py-3" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
-            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-3">
-              <div>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>Program tasks</p>
-                <p className="text-[11px] mt-1" style={{ color: 'var(--text-secondary)' }}>Add work here when it belongs to the program itself, not to a specific project.</p>
-              </div>
-              <button type="button" onClick={openProgramTaskComposer} className="text-[11px] px-2.5 py-2 rounded-xl self-start md:self-auto" style={{ background: `${program.color}18`, color: program.color }}>
-                Add task
-              </button>
-            </div>
-
-            {programDirectTasks.length === 0 ? (
-              <div className="rounded-2xl px-3 py-4 text-center" style={{ background: 'rgba(255,255,255,0.02)', border: '1px dashed rgba(255,255,255,0.08)', color: 'var(--text-secondary)' }}>
-                No program tasks yet. Add one here for cross-cutting work.
-              </div>
-            ) : (
-              <div className="space-y-1">
-                {programDirectTasks.map((task) => (
-                  <TaskRow
-                    key={task.id}
-                    task={task}
-                    onDragStart={(event, item) => {
-                      event.stopPropagation()
-                      writeDragPayload(event, { type: 'task', id: item.id, projectId: item.projectId ?? null, programId: item.programId ?? null })
-                    }}
-                    onDragOver={(event, item) => {
-                      const payload = readDragPayload(event)
-                      if (!payload || payload.type !== 'task' || payload.id === item.id) return
-                      event.preventDefault()
-                      event.dataTransfer.dropEffect = 'move'
-                    }}
-                    onDrop={(event, item) => {
-                      const payload = readDragPayload(event)
-                      if (!payload || payload.type !== 'task' || payload.id === item.id) return
-                      event.preventDefault()
-                      event.stopPropagation()
-                      moveTask(payload.id, { projectId: null, programId: program.id, beforeTaskId: item.id })
-                    }}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
 
           <div className="space-y-3">
             {topLevelProjects.length === 0 && programDirectTasks.length === 0 && !addingProject ? (
@@ -1476,13 +1436,6 @@ const Projects = memo(function Projects() {
             </>
           }
         >
-          <div className="flex flex-wrap items-center gap-2 text-[11px]" style={{ color: 'var(--text-secondary)' }}>
-            {focusedProgram && (
-              <span className="px-2.5 py-1 rounded-full" style={{ background: `${focusedProgram.color}18`, color: focusedProgram.color }}>
-                {visibleProjects.filter((project) => !project.parentId).length} active projects
-              </span>
-            )}
-          </div>
         </PageHero>
       </div>
 
