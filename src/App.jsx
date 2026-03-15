@@ -80,8 +80,8 @@ function PageRouter({ page }) {
   )
 }
 
-function PWAUpdateBanner({ needRefresh, offlineReady, onReload, onDismiss }) {
-  if (!needRefresh && !offlineReady) return null
+function PWAUpdateBanner({ needRefresh, onReload, onDismiss }) {
+  if (!needRefresh) return null
 
   return (
     <div className="fixed left-3 right-3 bottom-16 md:bottom-4 z-50">
@@ -91,18 +91,16 @@ function PWAUpdateBanner({ needRefresh, offlineReady, onReload, onDismiss }) {
       >
         <div className="flex-1 min-w-0">
           <p className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>
-            {needRefresh ? 'New version available' : 'App ready for offline use'}
+            New version available
           </p>
           <p className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>
-            {needRefresh ? 'Refresh to load the latest build.' : 'You can continue using TaskFlow without internet.'}
+            Refresh to load the latest build.
           </p>
         </div>
 
-        {needRefresh ? (
-          <button onClick={onReload} className="btn-accent px-3 py-1.5 text-xs">
-            Refresh
-          </button>
-        ) : null}
+        <button onClick={onReload} className="btn-accent px-3 py-1.5 text-xs">
+          Refresh
+        </button>
 
         <button
           onClick={onDismiss}
@@ -446,7 +444,6 @@ export default function App() {
 
       <PWAUpdateBanner
         needRefresh={needRefresh}
-        offlineReady={offlineReady}
         onReload={() => updateServiceWorkerRef.current(true)}
         onDismiss={() => {
           setNeedRefresh(false)
