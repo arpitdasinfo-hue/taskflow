@@ -25,13 +25,20 @@ const STAT_TONE = {
   },
 }
 
-const HeroStat = memo(function HeroStat({ label, value, tone = 'default', compact = false }) {
+const HeroStat = memo(function HeroStat({ label, value, tone = 'default', compact = false, onClick = null, active = false }) {
   const palette = STAT_TONE[tone] ?? STAT_TONE.default
+  const Component = onClick ? 'button' : 'div'
 
   return (
-    <div
-      className={`rounded-2xl ${compact ? 'px-3 py-2 min-w-[102px]' : 'px-4 py-3 min-w-[124px]'}`}
-      style={{ background: palette.background, border: `1px solid ${palette.border}` }}
+    <Component
+      type={onClick ? 'button' : undefined}
+      onClick={onClick ?? undefined}
+      className={`rounded-2xl ${compact ? 'px-3 py-2 min-w-[102px]' : 'px-4 py-3 min-w-[124px]'} ${onClick ? 'text-left transition-transform hover:-translate-y-0.5' : ''}`}
+      style={{
+        background: palette.background,
+        border: `1px solid ${active ? palette.color : palette.border}`,
+        boxShadow: active ? `0 0 0 1px ${palette.color}24` : 'none',
+      }}
     >
       <div className="text-[10px] font-semibold uppercase tracking-[0.24em]" style={{ color: 'var(--text-secondary)' }}>
         {label}
@@ -39,7 +46,7 @@ const HeroStat = memo(function HeroStat({ label, value, tone = 'default', compac
       <div className={`${compact ? 'mt-1 text-[1.8rem]' : 'mt-2 text-2xl'} font-bold leading-none`} style={{ color: palette.color }}>
         {value}
       </div>
-    </div>
+    </Component>
   )
 })
 

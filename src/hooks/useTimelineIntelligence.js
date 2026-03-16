@@ -266,6 +266,12 @@ const useTimelineIntelligence = ({
   return {
     cards,
     issues,
+    scheduleConflicts,
+    dependencyRisks,
+    unscheduledTasks,
+    delayedTasks,
+    blockedSoonTasks,
+    blockedOrLateTasks: [...blockedSoonTasks, ...delayedTasks],
     scopeSummary: {
       programCount: scopedPrograms.length,
       projectCount: scopedProjectIds.size,

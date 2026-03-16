@@ -26,7 +26,7 @@ const Stat = memo(function Stat({ label, value, color, icon: Icon }) {
   )
 })
 
-const ReviewFocusCard = memo(function ReviewFocusCard({ label, value, detail, tone = 'neutral', icon: Icon }) {
+const ReviewFocusCard = memo(function ReviewFocusCard({ label, value, detail, tone = 'neutral', icon: Icon, onClick, active = false }) {
   const palette = tone === 'danger'
     ? { background: 'rgba(239,68,68,0.12)', border: 'rgba(239,68,68,0.24)', color: '#ef4444' }
     : tone === 'warning'
@@ -36,9 +36,15 @@ const ReviewFocusCard = memo(function ReviewFocusCard({ label, value, detail, to
         : { background: 'rgba(255,255,255,0.03)', border: 'rgba(255,255,255,0.08)', color: 'var(--text-primary)' }
 
   return (
-    <div
-      className="rounded-2xl px-4 py-4"
-      style={{ background: palette.background, border: `1px solid ${palette.border}` }}
+    <button
+      type="button"
+      onClick={onClick}
+      className="rounded-2xl px-4 py-4 text-left transition-transform hover:-translate-y-0.5"
+      style={{
+        background: palette.background,
+        border: `1px solid ${active ? palette.color : palette.border}`,
+        boxShadow: active ? `0 0 0 1px ${palette.color}24` : 'none',
+      }}
     >
       <div className="flex items-center gap-2">
         <Icon size={14} style={{ color: palette.color }} />
@@ -48,65 +54,56 @@ const ReviewFocusCard = memo(function ReviewFocusCard({ label, value, detail, to
       </div>
       <div className="mt-3 text-2xl font-bold leading-none" style={{ color: palette.color }}>{value}</div>
       <p className="mt-2 text-[11px] leading-5" style={{ color: 'var(--text-secondary)' }}>{detail}</p>
-    </div>
+    </button>
   )
 })
 
-const AttentionStrip = memo(function AttentionStrip({ insights, onOpenRiskView, onExpandAll }) {
-  const conflicts = insights.cards.find((card) => card.id === 'conflicts')?.value ?? 0
-  const unscheduled = insights.cards.find((card) => card.id === 'unscheduled')?.value ?? 0
-  const dependencyRisk = insights.cards.find((card) => card.id === 'dependency')?.value ?? 0
-  const blocked = insights.cards.find((card) => card.id === 'blocked')?.value ?? 0
-  const summaryItems = [
-    { label: 'Conflicts', value: conflicts, tone: conflicts > 0 ? '#ef4444' : 'var(--text-secondary)' },
-    { label: 'Unscheduled', value: unscheduled, tone: unscheduled > 0 ? '#f59e0b' : 'var(--text-secondary)' },
-    { label: 'Dependency risk', value: dependencyRisk, tone: dependencyRisk > 0 ? '#fb7185' : 'var(--text-secondary)' },
-    { label: 'Blocked / late', value: blocked, tone: blocked > 0 ? '#ef4444' : 'var(--text-secondary)' },
-  ]
-
+const ReviewDetailShell = memo(function ReviewDetailShell({ title, infoText, actions = null, children }) {
   return (
-    <GlassCard padding="p-4">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+    <GlassCard padding="p-4 md:p-5">
+      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <p className="text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>
-              Attention
+              Review detail
             </p>
-            <InfoTooltip text="Use this strip to jump straight into schedule cleanup without repeating the same signal cards again below." widthClassName="w-64" />
+            <InfoTooltip text={infoText} align="right" widthClassName="w-72" />
           </div>
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            {summaryItems.map((item) => (
-              <span
-                key={item.label}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px]"
-                style={{ background: 'rgba(255,255,255,0.04)', color: item.tone, border: '1px solid rgba(255,255,255,0.08)' }}
-              >
-                <span className="font-semibold">{item.value}</span>
-                <span>{item.label}</span>
-              </span>
-            ))}
-          </div>
+          <h3 className="mt-2 text-base font-semibold" style={{ color: 'var(--text-primary)' }}>{title}</h3>
         </div>
-        <div className="flex items-center gap-2 flex-wrap lg:justify-end">
-          <button
-            type="button"
-            onClick={onOpenRiskView}
-            className="px-3 py-2 rounded-xl text-xs font-medium"
-            style={{ background: 'rgba(239,68,68,0.12)', color: '#fda4af', border: '1px solid rgba(239,68,68,0.18)' }}
-          >
-            Open risk view
-          </button>
-          <button
-            type="button"
-            onClick={onExpandAll}
-            className="px-3 py-2 rounded-xl text-xs font-medium"
-            style={{ background: 'rgba(255,255,255,0.04)', color: 'var(--text-primary)', border: '1px solid rgba(255,255,255,0.08)' }}
-          >
-            Expand tasks
-          </button>
-        </div>
+        {actions && <div className="flex items-center gap-2 flex-wrap md:justify-end">{actions}</div>}
       </div>
+      <div className="mt-4">{children}</div>
     </GlassCard>
+  )
+})
+
+const InsightRow = memo(function InsightRow({ title, meta, tone = 'default', onClick }) {
+  const toneColor = tone === 'danger'
+    ? '#ef4444'
+    : tone === 'warning'
+      ? '#f59e0b'
+      : tone === 'accent'
+        ? 'var(--accent)'
+        : 'var(--text-primary)'
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="w-full flex items-center justify-between gap-3 rounded-2xl px-3 py-3 text-left transition-colors hover:bg-white/4"
+      style={{ border: '1px solid rgba(255,255,255,0.06)' }}
+    >
+      <div className="min-w-0">
+        <div className="text-sm font-medium truncate" style={{ color: toneColor }}>{title}</div>
+        {meta && (
+          <div className="mt-1 text-[11px] truncate" style={{ color: 'var(--text-secondary)' }}>
+            {meta}
+          </div>
+        )}
+      </div>
+      <ArrowRight size={13} style={{ color: 'var(--text-secondary)' }} />
+    </button>
   )
 })
 
@@ -224,10 +221,14 @@ const ProgramDashboard = memo(function ProgramDashboard() {
   const milestones = useProjectStore((s) => s.milestones)
   const tasks     = useTaskStore((s) => s.tasks)
   const setPage   = useSettingsStore((s) => s.setPage)
+  const selectTask = useSettingsStore((s) => s.selectTask)
+  const setActiveProgram = useSettingsStore((s) => s.setActiveProgram)
+  const setActiveProject = useSettingsStore((s) => s.setActiveProject)
   const setGanttConfig = useSettingsStore((s) => s.setGanttConfig)
   const allStats  = useAllProgramStats()
   const [selectedProgramId, setSelectedProgramId] = useState('')
   const [selectedProjectId, setSelectedProjectId] = useState('')
+  const [activeInsight, setActiveInsight] = useState('launch')
   const insights  = useTimelineIntelligence({
     programs,
     projects,
@@ -305,16 +306,6 @@ const ProgramDashboard = memo(function ProgramDashboard() {
     [milestones, scopedProjectIds]
   )
 
-  const summary = useMemo(() => {
-    const total = scopedTasks.length
-    const done = scopedTasks.filter((task) => task.status === 'done').length
-    const overdue = scopedTasks.filter((task) => task.dueDate && new Date(task.dueDate) < new Date() && task.status !== 'done').length
-    const completion = total ? Math.round((done / total) * 100) : 0
-    const atRisk = scopedPrograms.filter((program) => allStats[program.id]?.health === 'at-risk').length
-    const offTrack = scopedPrograms.filter((program) => allStats[program.id]?.health === 'off-track').length
-    return { total, done, overdue, completion, atRisk, offTrack }
-  }, [scopedTasks, scopedPrograms, allStats])
-
   const milestoneTimelineItems = useMemo(
     () => scopedMilestones
       .filter((milestone) => milestone.dueDate)
@@ -324,6 +315,7 @@ const ProgramDashboard = memo(function ProgramDashboard() {
         return {
           id: milestone.id,
           name: milestone.name,
+          projectId: milestone.projectId,
           dueDate: milestone.dueDate,
           completed: milestone.completed || milestone.status === 'completed',
           color: project?.color || program?.color || '#38bdf8',
@@ -366,7 +358,281 @@ const ProgramDashboard = memo(function ProgramDashboard() {
   )
 
   const nextMilestone = milestoneTimelineItems[0] ?? null
-  const flaggedPrograms = scopedProgramCards.filter(({ stats }) => ['at-risk', 'off-track'].includes(stats.health)).length
+  const flaggedProgramCards = useMemo(
+    () => scopedProgramCards.filter(({ stats }) => ['at-risk', 'off-track'].includes(stats.health)),
+    [scopedProgramCards]
+  )
+  const flaggedPrograms = flaggedProgramCards.length
+  const scopedOpenTasks = useMemo(
+    () => scopedTasks.filter((task) => task.status !== 'done'),
+    [scopedTasks]
+  )
+  const actionQueue = useMemo(
+    () => [...scopedOpenTasks]
+      .sort((left, right) => {
+        const score = (task) => {
+          let value = 0
+          if (task.status === 'blocked') value += 50
+          if (task.priority === 'critical') value += 30
+          else if (task.priority === 'high') value += 20
+          else if (task.priority === 'medium') value += 10
+          if (task.dueDate) value += Math.max(0, 40 - Math.round((new Date(task.dueDate) - new Date()) / 86400000))
+          return value
+        }
+        return score(right) - score(left)
+      })
+      .slice(0, 8),
+    [scopedOpenTasks]
+  )
+
+  const openRiskView = () => {
+    setGanttConfig({
+      viewMode: 'risk',
+      showDependencies: true,
+      onlyDelayed: true,
+      onlyCritical: true,
+      onlyDependencyRisk: true,
+    })
+    setPage('timeline')
+  }
+
+  const expandAllInTimeline = () => {
+    setGanttConfig({
+      expandedProjectIds: projects
+        .filter((project) => tasks.some((task) => task.projectId === project.id))
+        .map((project) => project.id),
+    })
+    setPage('timeline')
+  }
+
+  const openTaskDetails = (taskId) => {
+    selectTask(taskId)
+  }
+
+  const openProgramWorkspace = (programId) => {
+    setActiveProgram(programId)
+    setPage('projects')
+  }
+
+  const openProjectWorkspace = (projectId) => {
+    setActiveProject(projectId)
+    setPage('projects')
+  }
+
+  const getTaskContext = (task) => {
+    const project = task.projectId ? projectById.get(task.projectId) : null
+    const programId = task.programId ?? project?.programId
+    const program = programId ? programs.find((entry) => entry.id === programId) : null
+    if (project) return `${program?.name ? `${program.name} · ` : ''}${project.name}`
+    if (program) return `${program.name} · Program task`
+    return 'Standalone task'
+  }
+
+  const reviewDetail = useMemo(() => {
+    if (activeInsight === 'programs') {
+      return {
+        title: 'Programs in scope',
+        infoText: 'Use this to jump into the specific workstream that needs a structure or delivery review.',
+        actions: null,
+        content: (
+          scopedProgramCards.length > 0 ? (
+            <div className="grid gap-3 md:grid-cols-2">
+              {scopedProgramCards.map(({ program, stats }) => (
+                <ProgramCard key={program.id} program={program} stats={stats} />
+              ))}
+            </div>
+          ) : (
+            <div className="text-sm" style={{ color: 'var(--text-secondary)' }}>No programs match the current scope.</div>
+          )
+        ),
+      }
+    }
+
+    if (activeInsight === 'tasks') {
+      return {
+        title: 'Open tasks in scope',
+        infoText: 'This queue keeps only live execution items so you can move directly from review into action.',
+        actions: (
+          <button
+            type="button"
+            onClick={() => setPage('tasks')}
+            className="px-3 py-2 rounded-xl text-xs font-medium"
+            style={{ background: 'rgba(var(--accent-rgb),0.12)', color: 'var(--accent)', border: '1px solid rgba(var(--accent-rgb),0.18)' }}
+          >
+            Open All Tasks
+          </button>
+        ),
+        content: (
+          actionQueue.length > 0 ? (
+            <div className="space-y-2">
+              {actionQueue.map((task) => (
+                <QueueRow key={task.id} task={task} context={getTaskContext(task)} onOpen={() => openTaskDetails(task.id)} />
+              ))}
+            </div>
+          ) : (
+            <div className="text-sm" style={{ color: 'var(--text-secondary)' }}>No open tasks in this scope.</div>
+          )
+        ),
+      }
+    }
+
+    if (activeInsight === 'flagged') {
+      return {
+        title: 'Flagged programs',
+        infoText: 'These programs have enough overdue or blocked pressure to warrant a structure-level review.',
+        actions: flaggedPrograms > 0 ? (
+          <button
+            type="button"
+            onClick={openRiskView}
+            className="px-3 py-2 rounded-xl text-xs font-medium"
+            style={{ background: 'rgba(239,68,68,0.12)', color: '#fda4af', border: '1px solid rgba(239,68,68,0.18)' }}
+          >
+            Open risk view
+          </button>
+        ) : null,
+        content: (
+          flaggedProgramCards.length > 0 ? (
+            <div className="space-y-2">
+              {flaggedProgramCards.map(({ program, stats }) => (
+                <InsightRow
+                  key={program.id}
+                  title={program.name}
+                  meta={`${stats.projectCount} projects · ${stats.total} tasks · ${stats.overdue} overdue · ${stats.blocked} blocked`}
+                  tone={stats.health === 'off-track' ? 'danger' : 'warning'}
+                  onClick={() => openProgramWorkspace(program.id)}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="text-sm" style={{ color: 'var(--text-secondary)' }}>No flagged programs in this scope.</div>
+          )
+        ),
+      }
+    }
+
+    if (activeInsight === 'conflicts') {
+      return {
+        title: 'Schedule conflicts',
+        infoText: 'These items have incompatible dates and should be corrected before the plan is trusted.',
+        actions: (
+          <button
+            type="button"
+            onClick={openRiskView}
+            className="px-3 py-2 rounded-xl text-xs font-medium"
+            style={{ background: 'rgba(239,68,68,0.12)', color: '#fda4af', border: '1px solid rgba(239,68,68,0.18)' }}
+          >
+            Open risk view
+          </button>
+        ),
+        content: (
+          insights.scheduleConflicts.length > 0 ? (
+            <div className="space-y-2">
+              {insights.scheduleConflicts.slice(0, 8).map((issue) => (
+                <InsightRow
+                  key={issue.id}
+                  title={issue.title}
+                  meta={issue.detail}
+                  tone={issue.severity === 'high' ? 'danger' : 'warning'}
+                  onClick={openRiskView}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="text-sm" style={{ color: 'var(--text-secondary)' }}>No schedule conflicts in this scope.</div>
+          )
+        ),
+      }
+    }
+
+    if (activeInsight === 'unscheduled') {
+      return {
+        title: 'Tasks missing dates',
+        infoText: 'These tasks are real work but they do not yet have a full planning window, so they will keep weakening the roadmap.',
+        actions: (
+          <button
+            type="button"
+            onClick={() => setPage('tasks')}
+            className="px-3 py-2 rounded-xl text-xs font-medium"
+            style={{ background: 'rgba(245,158,11,0.12)', color: '#fbbf24', border: '1px solid rgba(245,158,11,0.18)' }}
+          >
+            Open All Tasks
+          </button>
+        ),
+        content: (
+          insights.unscheduledTasks.length > 0 ? (
+            <div className="space-y-2">
+              {insights.unscheduledTasks.slice(0, 8).map((task) => (
+                <QueueRow key={task.id} task={task} context={getTaskContext(task)} onOpen={() => openTaskDetails(task.id)} />
+              ))}
+            </div>
+          ) : (
+            <div className="text-sm" style={{ color: 'var(--text-secondary)' }}>Everything in this scope has both a start and due date.</div>
+          )
+        ),
+      }
+    }
+
+    if (activeInsight === 'launch') {
+      return {
+        title: 'Launch sequence',
+        infoText: 'This zoomed-out timeline keeps the next committed checkpoints visible without opening the full Gantt.',
+        actions: nextMilestone ? (
+          <button
+            type="button"
+            onClick={() => nextMilestone?.projectId && openProjectWorkspace(nextMilestone.projectId)}
+            className="px-3 py-2 rounded-xl text-xs font-medium"
+            style={{ background: 'rgba(var(--accent-rgb),0.12)', color: 'var(--accent)', border: '1px solid rgba(var(--accent-rgb),0.18)' }}
+          >
+            Open project
+          </button>
+        ) : null,
+        content: (
+          milestoneTimelineItems.length > 0 ? (
+            <MilestoneTimeline milestones={milestoneTimelineItems} />
+          ) : (
+            <div className="text-sm" style={{ color: 'var(--text-secondary)' }}>No milestone dates available yet.</div>
+          )
+        ),
+      }
+    }
+
+    return {
+      title: 'Blocked or late work',
+      infoText: 'Use this list to move directly into the items most likely to disturb delivery confidence.',
+      actions: (
+        <button
+          type="button"
+          onClick={openRiskView}
+          className="px-3 py-2 rounded-xl text-xs font-medium"
+          style={{ background: 'rgba(239,68,68,0.12)', color: '#fda4af', border: '1px solid rgba(239,68,68,0.18)' }}
+        >
+          Open risk view
+        </button>
+      ),
+      content: (
+        insights.blockedOrLateTasks.length > 0 ? (
+          <div className="space-y-2">
+            {insights.blockedOrLateTasks.slice(0, 8).map((task) => (
+              <QueueRow key={task.id} task={task} context={getTaskContext(task)} onOpen={() => openTaskDetails(task.id)} />
+            ))}
+          </div>
+        ) : (
+          <div className="text-sm" style={{ color: 'var(--text-secondary)' }}>No blocked or overdue work in this scope.</div>
+        )
+      ),
+    }
+  }, [
+    activeInsight,
+    scopedProgramCards,
+    actionQueue,
+    flaggedPrograms,
+    flaggedProgramCards,
+    insights.scheduleConflicts,
+    insights.unscheduledTasks,
+    insights.blockedOrLateTasks,
+    milestoneTimelineItems,
+    nextMilestone,
+  ])
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
@@ -388,13 +654,13 @@ const ProgramDashboard = memo(function ProgramDashboard() {
             <PageHero
               eyebrow="Analytics"
               title="Review delivery and launch signals"
-              infoText="Start with launch timing, missing schedules, and flagged workstreams before dropping into program detail."
+              infoText="This page should answer what is slipping, what launches next, and which workstream needs attention before you open Gantt or Tasks."
               compact
               stats={[
-                { label: 'Programs', value: scopedPrograms.length, tone: 'accent' },
-                { label: 'Tasks', value: summary.total, tone: 'default' },
-                { label: 'Overdue', value: summary.overdue, tone: summary.overdue > 0 ? 'danger' : 'default' },
-                { label: 'Completion', value: `${summary.completion}%`, tone: summary.completion > 0 ? 'success' : 'default' },
+                { label: 'Programs', value: scopedPrograms.length, tone: 'accent', onClick: () => setActiveInsight('programs'), active: activeInsight === 'programs' },
+                { label: 'Open tasks', value: scopedOpenTasks.length, tone: 'default', onClick: () => setActiveInsight('tasks'), active: activeInsight === 'tasks' },
+                { label: 'Flagged', value: flaggedPrograms, tone: flaggedPrograms > 0 ? 'danger' : 'default', onClick: () => setActiveInsight('flagged'), active: activeInsight === 'flagged' },
+                { label: 'Next launch', value: nextMilestone ? new Date(nextMilestone.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'TBD', tone: nextMilestone ? 'success' : 'default', onClick: () => setActiveInsight('launch'), active: activeInsight === 'launch' },
               ]}
             />
 
@@ -465,6 +731,8 @@ const ProgramDashboard = memo(function ProgramDashboard() {
                 detail={flaggedPrograms > 0 ? 'Programs showing overdue work or blocked flow.' : 'No program is currently flagged.'}
                 tone={flaggedPrograms > 0 ? 'danger' : 'accent'}
                 icon={Flag}
+                onClick={() => setActiveInsight('flagged')}
+                active={activeInsight === 'flagged'}
               />
               <ReviewFocusCard
                 label="Schedule conflicts"
@@ -472,6 +740,8 @@ const ProgramDashboard = memo(function ProgramDashboard() {
                 detail="Dates that invert task or project windows."
                 tone={(insights.cards.find((card) => card.id === 'conflicts')?.value ?? 0) > 0 ? 'danger' : 'neutral'}
                 icon={AlertTriangle}
+                onClick={() => setActiveInsight('conflicts')}
+                active={activeInsight === 'conflicts'}
               />
               <ReviewFocusCard
                 label="Unscheduled"
@@ -479,52 +749,42 @@ const ProgramDashboard = memo(function ProgramDashboard() {
                 detail="Tasks still missing a full start and due range."
                 tone={(insights.cards.find((card) => card.id === 'unscheduled')?.value ?? 0) > 0 ? 'warning' : 'neutral'}
                 icon={FolderClock}
+                onClick={() => setActiveInsight('unscheduled')}
+                active={activeInsight === 'unscheduled'}
               />
               <ReviewFocusCard
-                label="Next launch"
-                value={nextMilestone ? new Date(nextMilestone.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'TBD'}
-                detail={nextMilestone ? nextMilestone.name : 'No upcoming milestone in scope.'}
-                tone={nextMilestone ? 'accent' : 'neutral'}
+                label="Blocked or late"
+                value={insights.cards.find((card) => card.id === 'blocked')?.value ?? 0}
+                detail="Items that need schedule or dependency intervention."
+                tone={(insights.cards.find((card) => card.id === 'blocked')?.value ?? 0) > 0 ? 'danger' : 'neutral'}
                 icon={CalendarClock}
+                onClick={() => setActiveInsight('blocked')}
+                active={activeInsight === 'blocked'}
               />
             </div>
 
-            <GlassCard padding="p-5">
-              <div className="flex items-center gap-2 mb-4">
-                <div className="w-8 h-8 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(var(--accent-rgb),0.1)', border: '1px solid rgba(var(--accent-rgb),0.18)' }}>
-                  <CalendarClock size={15} style={{ color: 'var(--accent)' }} />
+            <ReviewDetailShell title={reviewDetail.title} infoText={reviewDetail.infoText} actions={reviewDetail.actions}>
+              {reviewDetail.content}
+            </ReviewDetailShell>
+
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>
+                  Program pulse
                 </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Milestone Timeline</p>
-                    <InfoTooltip text="Zoomed-out launch view of the next checkpoints across programs." align="right" widthClassName="w-64" />
-                  </div>
+                <div className="mt-1 text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                  Compare health across the active portfolio
                 </div>
               </div>
-              <MilestoneTimeline milestones={milestoneTimelineItems} />
-            </GlassCard>
-
-            <AttentionStrip
-              insights={insights}
-              onOpenRiskView={() => {
-                setGanttConfig({
-                  viewMode: 'risk',
-                  showDependencies: true,
-                  onlyDelayed: true,
-                  onlyCritical: true,
-                  onlyDependencyRisk: true,
-                })
-                setPage('timeline')
-              }}
-              onExpandAll={() => {
-                setGanttConfig({
-                  expandedProjectIds: projects
-                    .filter((project) => tasks.some((task) => task.projectId === project.id))
-                    .map((project) => project.id),
-                })
-                setPage('timeline')
-              }}
-            />
+              <button
+                type="button"
+                onClick={expandAllInTimeline}
+                className="px-3 py-2 rounded-xl text-xs font-medium"
+                style={{ background: 'rgba(255,255,255,0.04)', color: 'var(--text-primary)', border: '1px solid rgba(255,255,255,0.08)' }}
+              >
+                Expand tasks in Gantt
+              </button>
+            </div>
 
             <div className="grid gap-4 md:grid-cols-2">
               {scopedProgramCards.map(({ program, stats }) => (
