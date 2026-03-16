@@ -1,4 +1,4 @@
-import { memo, useCallback, useMemo, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useState } from 'react'
 import { DragDropContext, Draggable, Droppable } from '@hello-pangea/dnd'
 import {
   CalendarClock,
@@ -389,6 +389,7 @@ const Today = memo(function Today() {
   const removeCommitment = usePlanningStore((state) => state.removeCommitment)
   const setCommitmentLayout = usePlanningStore((state) => state.setCommitmentLayout)
   const carryForwardPeriod = usePlanningStore((state) => state.carryForwardPeriod)
+  const syncScheduledCommitments = usePlanningStore((state) => state.syncScheduledCommitments)
   const selectTask = useSettingsStore((state) => state.selectTask)
   const programs = useProjectStore((state) => state.programs)
   const projects = useProjectStore((state) => state.projects)
@@ -402,7 +403,11 @@ const Today = memo(function Today() {
   const programById = useMemo(() => new Map(programs.map((program) => [program.id, program])), [programs])
   const taskById = useMemo(() => new Map(tasks.filter((task) => !task.deletedAt).map((task) => [task.id, task])), [tasks])
 
-  const currentCommitments = useMemo(() => {
+  useEffect(() => {
+    syncScheduledCommitments()
+  }, [syncScheduledCommitments, tasks, weekBounds.startKey, monthBounds.startKey])
+
+  const periodMatchedCommitments = useMemo(() => {
     const currentPeriods = {
       day: todayBounds.startKey,
       week: weekBounds.startKey,
@@ -414,6 +419,14 @@ const Today = memo(function Today() {
       return task && currentPeriods[commitment.periodType] === commitment.periodStart
     })
   }, [commitments, taskById, todayBounds.startKey, weekBounds.startKey, monthBounds.startKey])
+
+  const currentCommitments = useMemo(
+    () => periodMatchedCommitments.filter((commitment) => {
+      const task = taskById.get(commitment.taskId)
+      return task && task.status !== 'done'
+    }),
+    [periodMatchedCommitments, taskById]
+  )
 
   const commitmentEntries = useMemo(() => {
     const contextByTask = new Map()
@@ -517,11 +530,15 @@ const Today = memo(function Today() {
     return {
       focus: dayCount,
       weekCommitted: weekEntries.length,
-      weekDone: weekEntries.filter((entry) => entry.task.status === 'done').length,
+      weekDone: periodMatchedCommitments.filter((commitment) => {
+        if (commitment.periodType !== 'week') return false
+        const task = taskById.get(commitment.taskId)
+        return task?.status === 'done'
+      }).length,
       monthCommitted: monthEntries.length,
       overdueOpen: tasks.filter((task) => !task.deletedAt && task.status !== 'done' && task.dueDate && differenceInCalendarDays(new Date(task.dueDate), new Date()) < 0).length,
     }
-  }, [entriesByDroppable, tasks])
+  }, [entriesByDroppable, periodMatchedCommitments, taskById, tasks])
 
   const carryForwardState = useMemo(() => {
     const currentWeekTasks = new Set(

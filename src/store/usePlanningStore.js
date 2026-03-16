@@ -6,7 +6,12 @@ import { supabase } from '../lib/supabase'
 import useWorkspaceStore from './useWorkspaceStore'
 import useAuthStore from './useAuthStore'
 import useTaskStore from './useTaskStore'
-import { PLANNING_BUCKETS, getPeriodBounds } from '../lib/planning'
+import {
+  PLANNING_BUCKETS,
+  getPeriodBounds,
+  resolveAutoPlanningBucket,
+  taskQualifiesForPlanningPeriod,
+} from '../lib/planning'
 
 const now = () => new Date().toISOString()
 const VALID_PERIODS = ['day', 'week', 'month']
@@ -345,6 +350,63 @@ const usePlanningStore = create(
           })
 
           draft.commitments = sanitizeCommitments(draft.commitments)
+        })
+
+        const { workspaceId, userId } = getSyncContext()
+        if (workspaceId && created.length > 0) {
+          void supabase.from('task_commitments').upsert(
+            created.map((commitment) => toCommitmentRow(commitment, workspaceId, userId))
+          )
+        }
+
+        return created.length
+      },
+
+      syncScheduledCommitments: (referenceDate = new Date()) => {
+        const taskMap = useTaskStore.getState().tasks ?? []
+        const currentPeriods = {
+          week: getPeriodBounds('week', referenceDate),
+          month: getPeriodBounds('month', referenceDate),
+        }
+        const created = []
+
+        set((state) => {
+          const existingKeys = new Set(
+            state.commitments.map((commitment) => `${commitment.taskId}:${commitment.periodType}:${commitment.periodStart}`)
+          )
+
+          ;(['week', 'month']).forEach((periodType) => {
+            const bounds = currentPeriods[periodType]
+
+            taskMap.forEach((task) => {
+              if (!taskQualifiesForPlanningPeriod(task, periodType, bounds)) return
+
+              const key = `${task.id}:${periodType}:${bounds.startKey}`
+              if (existingKeys.has(key)) return
+
+              const createdCommitment = normalizeCommitment({
+                taskId: task.id,
+                periodType,
+                periodStart: bounds.startKey,
+                periodEnd: bounds.endKey,
+                bucket: resolveAutoPlanningBucket(task, periodType),
+                sortOrder: getNextSortOrder(
+                  state.commitments,
+                  periodType,
+                  bounds.startKey,
+                  resolveAutoPlanningBucket(task, periodType)
+                ),
+              })
+
+              state.commitments.push(createdCommitment)
+              created.push(createdCommitment)
+              existingKeys.add(key)
+            })
+          })
+
+          if (created.length > 0) {
+            state.commitments = sanitizeCommitments(state.commitments)
+          }
         })
 
         const { workspaceId, userId } = getSyncContext()

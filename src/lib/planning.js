@@ -104,3 +104,21 @@ export const isCommitmentCurrent = (commitment, periodType, referenceDate = new 
 }
 
 export const isForToday = (value) => value && isSameDay(new Date(value), new Date())
+
+export const resolveAutoPlanningBucket = (task, periodType) => {
+  if (periodType === 'day') return 'focus'
+  if (task.status === 'in-progress' || task.status === 'review') return 'must'
+  if (task.priority === 'critical' || task.priority === 'high') return 'must'
+  if (task.priority === 'medium') return 'should'
+  return 'stretch'
+}
+
+export const taskQualifiesForPlanningPeriod = (task, periodType, bounds) => {
+  if (!task || task.deletedAt || task.status === 'done' || !task.startDate) return false
+  if (periodType === 'day') return false
+
+  const startDate = startOfDay(new Date(task.startDate))
+  if (Number.isNaN(startDate.getTime())) return false
+
+  return startDate <= bounds.end
+}
