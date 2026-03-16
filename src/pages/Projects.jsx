@@ -331,18 +331,40 @@ const MetricTile = memo(function MetricTile({ icon: Icon, label, value, detail, 
   )
 })
 
+const SummaryPill = memo(function SummaryPill({ label, value, tone = 'default', accentColor = 'var(--accent)' }) {
+  const palette = tone === 'danger'
+    ? { background: 'rgba(239,68,68,0.10)', border: 'rgba(239,68,68,0.18)', color: '#fca5a5' }
+    : tone === 'accent'
+      ? { background: `${accentColor}16`, border: `${accentColor}24`, color: accentColor }
+      : { background: 'rgba(255,255,255,0.04)', border: 'rgba(255,255,255,0.06)', color: 'var(--text-primary)' }
+
+  return (
+    <div
+      className="inline-flex items-center gap-2 rounded-full px-3 py-1.5"
+      style={{ background: palette.background, border: `1px solid ${palette.border}` }}
+    >
+      <span className="text-[10px] font-semibold uppercase tracking-[0.2em]" style={{ color: 'var(--text-secondary)' }}>
+        {label}
+      </span>
+      <span className="text-[11px] font-semibold" style={{ color: palette.color }}>
+        {value}
+      </span>
+    </div>
+  )
+})
+
 const MilestonePreviewStrip = memo(function MilestonePreviewStrip({ label, milestones, accentColor, onToggle, expanded }) {
   const visibleMilestones = sortMilestones(milestones).slice(0, 3)
 
   return (
     <div
-      className="rounded-2xl px-3.5 py-3"
+      className="rounded-2xl px-3 py-2.5"
       style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}
     >
       <div className="flex items-center justify-between gap-3">
-        <div>
+        <div className="min-w-0">
           <p className="text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>{label}</p>
-          <p className="text-[11px] mt-1" style={{ color: 'var(--text-secondary)' }}>
+          <p className="text-[11px] mt-1 truncate" style={{ color: 'var(--text-secondary)' }}>
             {milestones.length > 0
               ? `${milestones.length} milestone${milestones.length === 1 ? '' : 's'} in this workstream`
               : 'No milestones pinned yet'}
@@ -364,7 +386,7 @@ const MilestonePreviewStrip = memo(function MilestonePreviewStrip({ label, miles
           {visibleMilestones.map((milestone) => (
             <div
               key={milestone.id}
-              className="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-full text-[11px]"
+              className="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-full text-[10px]"
               style={{ background: `${accentColor}14`, color: 'var(--text-primary)', border: `1px solid ${accentColor}24` }}
             >
               <span style={{ color: accentColor }}>◆</span>
@@ -381,7 +403,7 @@ const MilestonePreviewStrip = memo(function MilestonePreviewStrip({ label, miles
 })
 
 const ProgramMilestonesOverview = memo(function ProgramMilestonesOverview({ milestones, projects, accentColor }) {
-  const visibleMilestones = useMemo(() => sortMilestones(milestones).slice(0, 5), [milestones])
+  const visibleMilestones = useMemo(() => sortMilestones(milestones).slice(0, 4), [milestones])
   const projectMap = useMemo(
     () => new Map(projects.map((project) => [project.id, project])),
     [projects]
@@ -394,7 +416,7 @@ const ProgramMilestonesOverview = memo(function ProgramMilestonesOverview({ mile
 
   return (
     <div
-      className="rounded-2xl px-3.5 py-3"
+      className="rounded-2xl px-3 py-2.5"
       style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}
     >
       <div className="flex items-start justify-between gap-3">
@@ -424,7 +446,7 @@ const ProgramMilestonesOverview = memo(function ProgramMilestonesOverview({ mile
       </div>
 
       {visibleMilestones.length > 0 ? (
-        <div className="mt-3 space-y-2">
+        <div className="mt-3 space-y-1.5">
           {visibleMilestones.map((milestone) => {
             const project = projectMap.get(milestone.projectId)
             const isCompleted = milestone.status === 'completed'
@@ -459,11 +481,6 @@ const ProgramMilestonesOverview = memo(function ProgramMilestonesOverview({ mile
                       </span>
                     )}
                   </div>
-                  {milestone.description ? (
-                    <p className="text-[10px] mt-0.5 truncate" style={{ color: 'var(--text-secondary)' }}>
-                      {milestone.description}
-                    </p>
-                  ) : null}
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
                   {milestone.dueDate ? (
@@ -842,11 +859,12 @@ const ProjectPanel = memo(function ProjectPanel({ project, depth = 0 }) {
 
       {expanded && (
         <div className="px-4 pb-3.5 pt-2.5 space-y-2.5" style={{ background: `${project.color}05` }}>
-          <div className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-4">
-            <MetricTile icon={CheckCircle2} label="Progress" value={`${completion}% complete`} detail={`${done} of ${total || 0} tasks closed`} tone="accent" />
-            <MetricTile icon={Clock} label="Execution" value={`${inProgress} active`} detail={unscheduled > 0 ? `${unscheduled} tasks still need dates` : 'Tasks are sequenced'} />
-            <MetricTile icon={Calendar} label="Schedule" value={windowLabel} detail={project.dueDate ? `Project due ${formatShortDate(project.dueDate)}` : 'No project-level due date'} />
-            <MetricTile icon={AlertTriangle} label="Health" value={health.label} detail={health.detail} tone={overdue > 0 || blocked > 0 ? 'danger' : 'default'} />
+          <div className="flex flex-wrap gap-2">
+            <SummaryPill label="Tasks" value={`${total} total · ${done} done`} accentColor={project.color} tone="accent" />
+            <SummaryPill label="Active" value={`${inProgress} in flow`} accentColor={project.color} />
+            <SummaryPill label="Schedule" value={windowLabel} accentColor={project.color} />
+            <SummaryPill label="Health" value={health.label} accentColor={project.color} tone={overdue > 0 || blocked > 0 ? 'danger' : 'default'} />
+            {unscheduled > 0 && <SummaryPill label="Needs dates" value={`${unscheduled} unscheduled`} accentColor={project.color} tone="danger" />}
           </div>
 
           <MilestonePreviewStrip
@@ -868,7 +886,6 @@ const ProjectPanel = memo(function ProjectPanel({ project, depth = 0 }) {
               <div className="flex items-center justify-between gap-3 mb-3">
                 <div>
                   <p className="text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>Sub-projects</p>
-                  <p className="text-[11px] mt-1" style={{ color: 'var(--text-secondary)' }}>Keep the hierarchy clean. Open a sub-project only when you want its work.</p>
                 </div>
                 <span className="text-[10px] px-2 py-1 rounded-full" style={{ background: `${project.color}18`, color: project.color }}>{childProjects.length}</span>
               </div>
@@ -886,7 +903,6 @@ const ProjectPanel = memo(function ProjectPanel({ project, depth = 0 }) {
                 <div className="space-y-2.5">
                   <div>
                     <p className="text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>Add sub-project</p>
-                    <p className="text-[11px] mt-1" style={{ color: 'var(--text-secondary)' }}>Split this project into clearer sub-projects without opening another program.</p>
                   </div>
                   <input
                     autoFocus
@@ -924,9 +940,6 @@ const ProjectPanel = memo(function ProjectPanel({ project, depth = 0 }) {
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-3">
               <div>
                 <p className="text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>Work items</p>
-                <p className="text-[11px] mt-1" style={{ color: 'var(--text-secondary)' }}>
-                  Open work only when you want to review or update the tasks inside this project.
-                </p>
               </div>
               <div className="flex items-center gap-2 flex-wrap">
                 {directTasks.length > 0 && showWork && (
@@ -955,8 +968,8 @@ const ProjectPanel = memo(function ProjectPanel({ project, depth = 0 }) {
 
             {showWork ? (
               directTasks.length === 0 ? (
-                <div className="rounded-2xl px-3 py-4 text-center" style={{ background: 'rgba(255,255,255,0.02)', border: '1px dashed rgba(255,255,255,0.08)', color: 'var(--text-secondary)' }}>
-                  No direct tasks yet. Add work here or keep it inside sub-projects.
+                <div className="rounded-2xl px-3 py-3 text-center text-[11px]" style={{ background: 'rgba(255,255,255,0.02)', border: '1px dashed rgba(255,255,255,0.08)', color: 'var(--text-secondary)' }}>
+                  No direct tasks yet.
                 </div>
               ) : view === 'list' ? (
                 <div className="space-y-1">
@@ -1184,43 +1197,22 @@ const ProgramSection = memo(function ProgramSection({ program, projects }) {
 
       {!collapsed && (
         <div className="px-4 md:px-5 pb-4 pt-3.5 space-y-3" style={{ borderTop: `1px solid ${program.color}12` }}>
-          <div className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-4">
-            <MetricTile icon={Folder} label="Projects" value={`${topLevelProjects.length} active projects`} detail={topLevelProjects.length > 0 ? `${projects.length - topLevelProjects.length > 0 ? `${projects.length - topLevelProjects.length} nested beneath them` : 'No nested sub-projects yet'}` : 'Create the first project to start structuring work'} tone="accent" />
-            <MetricTile icon={CheckCircle2} label="Progress" value={`${completion}% complete`} detail={`${doneTasks} of ${totalTasks || 0} tasks closed`} />
-            <MetricTile icon={Clock} label="Execution" value={`${inProgress} active`} detail={unscheduled > 0 ? `${unscheduled} tasks still need dates` : 'Work is sequenced across projects'} />
-            <MetricTile icon={AlertTriangle} label="Health" value={health.label} detail={health.detail} tone={overdue > 0 || blocked > 0 ? 'danger' : 'default'} />
+          <div className="flex flex-wrap gap-2">
+            <SummaryPill label="Projects" value={`${topLevelProjects.length} active`} accentColor={program.color} tone="accent" />
+            <SummaryPill label="Tasks" value={`${totalTasks} total · ${doneTasks} done`} accentColor={program.color} />
+            <SummaryPill label="Active" value={`${inProgress} in flow`} accentColor={program.color} />
+            <SummaryPill label="Health" value={health.label} accentColor={program.color} tone={overdue > 0 || blocked > 0 ? 'danger' : 'default'} />
+            <SummaryPill label="Schedule" value={windowLabel} accentColor={program.color} />
+            {unscheduled > 0 && <SummaryPill label="Needs dates" value={`${unscheduled} unscheduled`} accentColor={program.color} tone="danger" />}
           </div>
 
           <ProgramMilestonesOverview milestones={projectMilestones} projects={projects} accentColor={program.color} />
-
-          {programDirectTasks.length > 0 && (
-            <div className="rounded-2xl px-3 py-2.5 flex items-center justify-between gap-3" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
-              <div className="min-w-0">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>Program-level tasks</p>
-                <p className="text-[11px] mt-1 truncate" style={{ color: 'var(--text-secondary)' }}>
-                  {programDirectTasks.length} task{programDirectTasks.length === 1 ? '' : 's'} sit at program level. Manage them from All Tasks if needed.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  useSettingsStore.getState().setActiveProgram(program.id)
-                  useSettingsStore.getState().setPage('tasks')
-                }}
-                className="text-[11px] px-2.5 py-2 rounded-xl flex-shrink-0"
-                style={{ background: `${program.color}18`, color: program.color }}
-              >
-                Open tasks
-              </button>
-            </div>
-          )}
 
           {addingProject && (
             <div className="rounded-2xl p-3" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(var(--accent-rgb),0.18)' }}>
               <div className="flex flex-col gap-2.5">
                 <div>
                   <p className="text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>New project</p>
-                  <p className="text-[11px] mt-1" style={{ color: 'var(--text-secondary)' }}>Add the next project inside this program.</p>
                 </div>
                 <input
                   autoFocus
@@ -1246,7 +1238,7 @@ const ProgramSection = memo(function ProgramSection({ program, projects }) {
 
           <div className="space-y-3">
             {topLevelProjects.length === 0 && programDirectTasks.length === 0 && !addingProject ? (
-              <div className="rounded-2xl px-4 py-5 text-center" style={{ background: 'rgba(255,255,255,0.02)', border: '1px dashed rgba(255,255,255,0.08)', color: 'var(--text-secondary)' }}>
+              <div className="rounded-2xl px-4 py-4 text-center text-[11px]" style={{ background: 'rgba(255,255,255,0.02)', border: '1px dashed rgba(255,255,255,0.08)', color: 'var(--text-secondary)' }}>
                     No projects yet. Add the first project for this program.
               </div>
             ) : (
@@ -1540,28 +1532,49 @@ const Projects = memo(function Projects() {
           eyebrow="Programs"
           title={headerTitle}
           infoText={focusedProgram
-            ? 'Review the selected program, manage its projects, and add program-level work directly where it belongs.'
-            : 'Scan programs, open the one you want, and manage projects, milestones, and program tasks in one place.'}
+            ? 'Review the selected program, manage its projects, and keep milestones and work items tucked under the structure.'
+            : 'Use one program at a time when you want a cleaner workspace, or clear the scope to scan all programs.'}
           stats={[
             { label: 'Programs', value: programs.length, tone: 'accent' },
             { label: 'Projects', value: topLevelProjectCount, tone: 'default' },
-            { label: 'Tasks', value: totalTasks, tone: 'default' },
-            { label: 'Tasks done', value: `${doneTasks}/${totalTasks}`, tone: 'success' },
+            { label: 'Done', value: `${doneTasks}/${totalTasks}`, tone: 'success' },
           ]}
           compact
           actions={
             <>
-              {focusedProgram && (
-                <button type="button" onClick={clearFocus} className="btn-ghost px-3 py-2 text-xs">
-                  All programs
-                </button>
-              )}
               <button type="button" onClick={() => setAddingProgram(true)} className="btn-accent flex items-center gap-1.5 px-3 py-2 text-xs">
                 <Plus size={13} /> New program
               </button>
             </>
           }
         >
+          {programs.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="hidden md:inline text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>
+                Focus
+              </span>
+              <select
+                value={focusedProgram?.id ?? ''}
+                onChange={(event) => {
+                  const nextProgramId = event.target.value || null
+                  setActiveProject(null)
+                  setActiveProgram(nextProgramId)
+                }}
+                className="text-xs px-3 py-2 rounded-xl min-w-[220px]"
+                style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-primary)' }}
+              >
+                <option value="">All programs</option>
+                {programs.map((program) => (
+                  <option key={program.id} value={program.id}>{program.name}</option>
+                ))}
+              </select>
+              {focusedProgram && (
+                <button type="button" onClick={clearFocus} className="btn-ghost px-3 py-2 text-xs">
+                  Show all
+                </button>
+              )}
+            </div>
+          )}
         </PageHero>
       </div>
 

@@ -568,7 +568,11 @@ const Tasks = memo(function Tasks() {
                 {visibleProjects.map((project) => {
                   const parent = project.parentId ? projectById.get(project.parentId) : null
                   const program = project.programId ? programById.get(project.programId) : null
-                  const label = parent ? `${parent.name} / ${project.name}` : (program ? `${program.name} / ${project.name}` : project.name)
+                  const label = parent
+                    ? `${parent.name} / ${project.name}`
+                    : filterProgramId
+                      ? project.name
+                      : (program ? `${program.name} / ${project.name}` : project.name)
                   return <option key={project.id} value={project.id}>{label}</option>
                 })}
               </select>

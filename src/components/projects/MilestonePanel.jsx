@@ -1,15 +1,75 @@
 import { memo, useState } from 'react'
-import { Plus, Check, Trash2, Flag, Calendar } from 'lucide-react'
+import { Plus, Check, Trash2, Flag, Calendar, MoreHorizontal, Pencil } from 'lucide-react'
 import { format } from 'date-fns'
 import useProjectStore from '../../store/useProjectStore'
 
 const MilestoneRow = memo(function MilestoneRow({ milestone, projectColor }) {
   const toggleMilestone = useProjectStore((s) => s.toggleMilestone)
   const deleteMilestone = useProjectStore((s) => s.deleteMilestone)
+  const updateMilestone = useProjectStore((s) => s.updateMilestone)
   const [confirmDel, setConfirmDel] = useState(false)
+  const [showMenu, setShowMenu] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [name, setName] = useState(milestone.name)
+  const [description, setDescription] = useState(milestone.description ?? '')
+  const [dueDate, setDueDate] = useState(milestone.dueDate ? milestone.dueDate.slice(0, 10) : '')
 
   const isCompleted = milestone.status === 'completed'
   const isOverdue   = milestone.dueDate && new Date(milestone.dueDate) < new Date() && !isCompleted
+
+  const saveEdit = () => {
+    if (!name.trim()) return
+    updateMilestone(milestone.id, {
+      name: name.trim(),
+      description: description.trim(),
+      dueDate: dueDate ? new Date(dueDate).toISOString() : null,
+    })
+    setEditing(false)
+  }
+
+  if (editing) {
+    return (
+      <div
+        className="rounded-xl p-3 space-y-2"
+        style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${projectColor}30` }}
+      >
+        <input
+          autoFocus
+          value={name}
+          onChange={(event) => setName(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') saveEdit()
+            if (event.key === 'Escape') setEditing(false)
+          }}
+          placeholder="Milestone name"
+          className="w-full text-xs px-2.5 py-2 rounded-lg"
+          style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-primary)' }}
+        />
+        <input
+          value={description}
+          onChange={(event) => setDescription(event.target.value)}
+          placeholder="Description (optional)"
+          className="w-full text-xs px-2.5 py-2 rounded-lg"
+          style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: 'var(--text-primary)' }}
+        />
+        <input
+          type="date"
+          value={dueDate}
+          onChange={(event) => setDueDate(event.target.value)}
+          className="w-full text-xs px-2.5 py-2 rounded-lg"
+          style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: 'var(--text-primary)', colorScheme: 'dark' }}
+        />
+        <div className="flex items-center justify-end gap-2">
+          <button type="button" onClick={() => setEditing(false)} className="px-2.5 py-1.5 rounded-lg text-[11px]" style={{ color: 'var(--text-secondary)', background: 'rgba(255,255,255,0.06)' }}>
+            Cancel
+          </button>
+          <button type="button" onClick={saveEdit} className="px-2.5 py-1.5 rounded-lg text-[11px] font-medium" style={{ color: '#fff', background: projectColor }}>
+            Save
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div
@@ -58,25 +118,62 @@ const MilestoneRow = memo(function MilestoneRow({ milestone, projectColor }) {
         </span>
       )}
 
-      {/* Delete */}
-      {confirmDel ? (
-        <div className="flex items-center gap-1 flex-shrink-0">
-          <button onClick={() => deleteMilestone(milestone.id)} className="p-1 rounded" style={{ background: 'rgba(239,68,68,0.15)', color: '#ef4444' }}>
-            <Check size={10} />
-          </button>
-          <button onClick={() => setConfirmDel(false)} className="p-1 rounded" style={{ color: 'var(--text-secondary)' }}>
-            <span className="text-[10px]">✕</span>
-          </button>
-        </div>
-      ) : (
-        <button
-          onClick={() => setConfirmDel(true)}
-          className="p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
-          style={{ color: 'var(--text-secondary)' }}
-        >
-          <Trash2 size={11} />
-        </button>
-      )}
+      <div className="relative flex-shrink-0">
+        {confirmDel ? (
+          <div className="flex items-center gap-1">
+            <button onClick={() => deleteMilestone(milestone.id)} className="p-1 rounded" style={{ background: 'rgba(239,68,68,0.15)', color: '#ef4444' }}>
+              <Check size={10} />
+            </button>
+            <button onClick={() => setConfirmDel(false)} className="p-1 rounded" style={{ color: 'var(--text-secondary)' }}>
+              <span className="text-[10px]">✕</span>
+            </button>
+          </div>
+        ) : (
+          <>
+            <button
+              onClick={() => setShowMenu((current) => !current)}
+              className="p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+              style={{ color: 'var(--text-secondary)' }}
+            >
+              <MoreHorizontal size={12} />
+            </button>
+            {showMenu && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
+                <div
+                  className="absolute right-0 top-full mt-1 z-50 rounded-xl overflow-hidden min-w-[140px]"
+                  style={{ background: '#ffffff', border: '1px solid rgba(15,23,42,0.12)', boxShadow: '0 16px 48px rgba(15,23,42,0.18)' }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowMenu(false)
+                      setEditing(true)
+                    }}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-left hover:bg-slate-100 transition-colors"
+                    style={{ color: '#0f172a' }}
+                  >
+                    <Pencil size={11} />
+                    Edit milestone
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowMenu(false)
+                      setConfirmDel(true)
+                    }}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-left hover:bg-slate-100 transition-colors"
+                    style={{ color: '#dc2626' }}
+                  >
+                    <Trash2 size={11} />
+                    Delete milestone
+                  </button>
+                </div>
+              </>
+            )}
+          </>
+        )}
+      </div>
     </div>
   )
 })

@@ -1,5 +1,5 @@
 import { memo, useState, useCallback, useEffect } from 'react'
-import { X, Trash2, Calendar, Tag, ChevronDown, Folder, AlertTriangle } from 'lucide-react'
+import { X, Trash2, Calendar, Tag, ChevronDown, Folder, AlertTriangle, Flag } from 'lucide-react'
 import { format } from 'date-fns'
 import useSettingsStore from '../../store/useSettingsStore'
 import useTaskStore from '../../store/useTaskStore'
@@ -59,6 +59,8 @@ const TaskDetail = memo(function TaskDetail() {
   const deleteTask     = useTaskStore((s) => s.deleteTask)
   const projects       = useProjectStore((s) => s.projects)
   const programs       = useProjectStore((s) => s.programs)
+  const milestones     = useProjectStore((s) => s.milestones ?? [])
+  const addMilestone   = useProjectStore((s) => s.addMilestone)
 
   const task = tasks.find((t) => t.id === selectedTaskId)
   const isBlockedByDep = useIsBlockedByDependency(selectedTaskId)
@@ -68,11 +70,13 @@ const TaskDetail = memo(function TaskDetail() {
   const [editingDesc, setEditingDesc]   = useState(false)
   const [descValue, setDescValue]       = useState('')
   const [tagInput, setTagInput]         = useState('')
+  const [milestonePromoted, setMilestonePromoted] = useState(false)
 
   useEffect(() => {
     if (task) {
       setTitleValue(task.title)
       setDescValue(task.description || '')
+      setMilestonePromoted(false)
     }
   }, [task])
 
@@ -116,6 +120,9 @@ const TaskDetail = memo(function TaskDetail() {
     ? (projectById.get(task.projectId)?.programId ?? task.programId ?? null)
     : task?.programId ?? null
   const visibleProjects = projects.filter((project) => !selectedProgramId || project.programId === selectedProgramId)
+  const matchingMilestone = task?.projectId
+    ? milestones.find((milestone) => milestone.projectId === task.projectId && milestone.name === task.title)
+    : null
 
   if (!task) return null
 
@@ -233,6 +240,50 @@ const TaskDetail = memo(function TaskDetail() {
               </div>
             </div>
             <CommitTaskMenu taskId={task.id} />
+          </div>
+        </div>
+
+        <div>
+          <label className="text-[10px] font-semibold uppercase tracking-wide mb-1.5 flex items-center gap-1.5" style={{ color: 'var(--text-secondary)' }}>
+            <Flag size={10} />
+            Milestone
+          </label>
+          <div
+            className="flex items-center justify-between gap-3 rounded-2xl px-3 py-3"
+            style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}
+          >
+            <div className="min-w-0">
+              <div className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+                {matchingMilestone ? 'Milestone already created' : 'Promote this task to a milestone'}
+              </div>
+              <div className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
+                {!task.projectId
+                  ? 'Assign this task to a project first. Milestones live inside projects.'
+                  : matchingMilestone
+                    ? 'This project already has a milestone with the same task name.'
+                    : milestonePromoted
+                      ? 'Milestone created. The task stays in place for execution.'
+                      : 'Creates a milestone from this task and keeps the task for execution.'}
+              </div>
+            </div>
+            <button
+              type="button"
+              disabled={!task.projectId || !!matchingMilestone}
+              onClick={() => {
+                if (!task.projectId || matchingMilestone) return
+                addMilestone({
+                  projectId: task.projectId,
+                  name: task.title,
+                  dueDate: task.dueDate ?? null,
+                  description: task.description ?? '',
+                })
+                setMilestonePromoted(true)
+              }}
+              className="px-3 py-2 rounded-xl text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{ background: 'rgba(var(--accent-rgb),0.15)', color: 'var(--accent)', border: '1px solid rgba(var(--accent-rgb),0.22)' }}
+            >
+              {matchingMilestone ? 'Exists' : 'Create milestone'}
+            </button>
           </div>
         </div>
 
