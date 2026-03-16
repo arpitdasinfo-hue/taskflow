@@ -115,6 +115,97 @@ const fromMilestoneRow = (row) => ({
   createdAt: row.created_at ?? now(),
 })
 
+const getProjectSyncErrorMessage = (error) => {
+  const rawMessage = error?.message || 'Unable to sync program, project, or milestone changes to Supabase.'
+  const normalized = rawMessage.toLowerCase()
+
+  if (normalized.includes('row-level security')) {
+    return 'Program and milestone sync is blocked by Supabase RLS. Please run the latest scripts/supabase_policies.sql in Supabase SQL Editor.'
+  }
+
+  if (normalized.includes('project_id')) {
+    return 'Milestone sync is blocked because the linked project is not available in Supabase yet. Refresh once and try again.'
+  }
+
+  return rawMessage
+}
+
+const reportProjectSyncError = (set, error, action) => {
+  const message = getProjectSyncErrorMessage(error)
+  console.error(`[sync] Failed to ${action}:`, error)
+  set((state) => {
+    state.syncError = message
+  })
+}
+
+const clearProjectSyncError = (set) => {
+  set((state) => {
+    state.syncError = ''
+  })
+}
+
+const markProjectSyncSuccess = (set) => {
+  set((state) => {
+    state.syncError = ''
+    state.lastSyncedAt = now()
+  })
+}
+
+async function persistMilestoneRow(milestone) {
+  const { error } = await supabase
+    .from('milestones')
+    .upsert(toMilestoneRow(milestone), { onConflict: 'id' })
+
+  if (error) throw error
+}
+
+async function deleteMilestoneRow(id) {
+  const { error } = await supabase.from('milestones').delete().eq('id', id)
+  if (error) throw error
+}
+
+async function ensureMilestoneParents(milestone, workspaceId, userId, getState) {
+  if (!workspaceId || !milestone?.projectId) return
+
+  const state = getState()
+  const projectMap = new Map((state.projects ?? []).map((project) => [project.id, project]))
+  const programMap = new Map((state.programs ?? []).map((program) => [program.id, program]))
+  const targetProject = projectMap.get(milestone.projectId)
+
+  if (!targetProject) return
+
+  const projectChain = []
+  let currentProject = targetProject
+  while (currentProject) {
+    projectChain.unshift(currentProject)
+    currentProject = currentProject.parentId ? projectMap.get(currentProject.parentId) : null
+  }
+
+  const rootProgramId = projectChain[0]?.programId ?? targetProject.programId ?? null
+  const rootProgram = rootProgramId ? programMap.get(rootProgramId) : null
+
+  if (rootProgram) {
+    const { error: programError } = await supabase
+      .from('programs')
+      .upsert(toProgramRow(rootProgram, workspaceId, userId), { onConflict: 'id' })
+
+    if (programError) throw programError
+  }
+
+  for (const project of projectChain) {
+    const { error: projectError } = await supabase
+      .from('projects')
+      .upsert(toProjectRow(project, workspaceId, userId), { onConflict: 'id' })
+
+    if (projectError) throw projectError
+  }
+}
+
+async function persistMilestoneWithParents(milestone, workspaceId, userId, getState) {
+  await ensureMilestoneParents(milestone, workspaceId, userId, getState)
+  await persistMilestoneRow(milestone)
+}
+
 async function fetchWorkspaceProjectData(workspaceId) {
   const [programRes, projectRes] = await Promise.all([
     supabase
@@ -160,6 +251,10 @@ const useProjectStore = create(
       projects: [],
       milestones: [],
       syncing: false,
+      syncError: '',
+      lastSyncedAt: null,
+
+      clearSyncError: () => clearProjectSyncError(set),
 
       // ── Program CRUD ────────────────────────────────────────────────────
       addProgram: (data) => {
@@ -184,7 +279,8 @@ const useProjectStore = create(
             .from('programs')
             .upsert(toProgramRow(created, workspaceId, userId))
             .then(({ error }) => {
-              if (error) console.error('[sync] Failed to persist program:', error)
+              if (error) reportProjectSyncError(set, error, 'create program')
+              else markProjectSyncSuccess(set)
             })
         }
 
@@ -200,7 +296,13 @@ const useProjectStore = create(
         const updated = get().programs.find((p) => p.id === id)
         const { workspaceId, userId } = getSyncContext()
         if (workspaceId && updated) {
-          void supabase.from('programs').upsert(toProgramRow(updated, workspaceId, userId))
+          void supabase
+            .from('programs')
+            .upsert(toProgramRow(updated, workspaceId, userId))
+            .then(({ error }) => {
+              if (error) reportProjectSyncError(set, error, 'update program')
+              else markProjectSyncSuccess(set)
+            })
         }
       },
 
@@ -223,7 +325,13 @@ const useProjectStore = create(
         const updated = get().programs.find((p) => p.id === id)
         const { workspaceId, userId } = getSyncContext()
         if (workspaceId && updated) {
-          void supabase.from('programs').upsert(toProgramRow(updated, workspaceId, userId))
+          void supabase
+            .from('programs')
+            .upsert(toProgramRow(updated, workspaceId, userId))
+            .then(({ error }) => {
+              if (error) reportProjectSyncError(set, error, 'move program')
+              else markProjectSyncSuccess(set)
+            })
         }
       },
 
@@ -235,7 +343,14 @@ const useProjectStore = create(
 
         const { workspaceId } = getSyncContext()
         if (workspaceId) {
-          void supabase.from('programs').delete().eq('id', id)
+          void supabase
+            .from('programs')
+            .delete()
+            .eq('id', id)
+            .then(({ error }) => {
+              if (error) reportProjectSyncError(set, error, 'delete program')
+              else markProjectSyncSuccess(set)
+            })
         }
       },
 
@@ -264,7 +379,8 @@ const useProjectStore = create(
             .from('projects')
             .upsert(toProjectRow(created, workspaceId, userId))
             .then(({ error }) => {
-              if (error) console.error('[sync] Failed to persist project:', error)
+              if (error) reportProjectSyncError(set, error, 'create project')
+              else markProjectSyncSuccess(set)
             })
         }
 
@@ -280,7 +396,13 @@ const useProjectStore = create(
         const updated = get().projects.find((p) => p.id === id)
         const { workspaceId, userId } = getSyncContext()
         if (workspaceId && updated) {
-          void supabase.from('projects').upsert(toProjectRow(updated, workspaceId, userId))
+          void supabase
+            .from('projects')
+            .upsert(toProjectRow(updated, workspaceId, userId))
+            .then(({ error }) => {
+              if (error) reportProjectSyncError(set, error, 'update project')
+              else markProjectSyncSuccess(set)
+            })
         }
       },
 
@@ -317,7 +439,13 @@ const useProjectStore = create(
         const updated = get().projects.find((p) => p.id === id)
         const { workspaceId, userId } = getSyncContext()
         if (workspaceId && updated) {
-          void supabase.from('projects').upsert(toProjectRow(updated, workspaceId, userId))
+          void supabase
+            .from('projects')
+            .upsert(toProjectRow(updated, workspaceId, userId))
+            .then(({ error }) => {
+              if (error) reportProjectSyncError(set, error, 'move project')
+              else markProjectSyncSuccess(set)
+            })
         }
       },
 
@@ -329,7 +457,14 @@ const useProjectStore = create(
 
         const { workspaceId } = getSyncContext()
         if (workspaceId) {
-          void supabase.from('projects').delete().eq('id', id)
+          void supabase
+            .from('projects')
+            .delete()
+            .eq('id', id)
+            .then(({ error }) => {
+              if (error) reportProjectSyncError(set, error, 'delete project')
+              else markProjectSyncSuccess(set)
+            })
         }
       },
 
@@ -351,13 +486,24 @@ const useProjectStore = create(
         })
 
         if (created) {
-          void supabase.from('milestones').upsert(toMilestoneRow(created))
+          const { workspaceId, userId } = getSyncContext()
+          void persistMilestoneWithParents(created, workspaceId, userId, get)
+            .then(() => markProjectSyncSuccess(set))
+            .catch((error) => {
+              set((state) => {
+                state.milestones = (state.milestones ?? []).filter((milestone) => milestone.id !== created.id)
+              })
+              reportProjectSyncError(set, error, 'create milestone')
+            })
         }
 
         return created
       },
 
       updateMilestone: (id, updates) => {
+        const previous = (get().milestones ?? []).find((m) => m.id === id)
+        if (!previous) return
+
         set((s) => {
           const milestone = (s.milestones ?? []).find((m) => m.id === id)
           if (milestone) Object.assign(milestone, updates)
@@ -365,18 +511,45 @@ const useProjectStore = create(
 
         const updated = (get().milestones ?? []).find((m) => m.id === id)
         if (updated) {
-          void supabase.from('milestones').upsert(toMilestoneRow(updated))
+          const { workspaceId, userId } = getSyncContext()
+          void persistMilestoneWithParents(updated, workspaceId, userId, get)
+            .then(() => markProjectSyncSuccess(set))
+            .catch((error) => {
+              set((state) => {
+                const milestone = (state.milestones ?? []).find((entry) => entry.id === id)
+                if (milestone) Object.assign(milestone, previous)
+              })
+              reportProjectSyncError(set, error, 'update milestone')
+            })
         }
       },
 
       deleteMilestone: (id) => {
+        const previousMilestones = get().milestones ?? []
+        const removedIndex = previousMilestones.findIndex((m) => m.id === id)
+        const removedMilestone = removedIndex === -1 ? null : previousMilestones[removedIndex]
+
         set((s) => {
           s.milestones = (s.milestones ?? []).filter((m) => m.id !== id)
         })
-        void supabase.from('milestones').delete().eq('id', id)
+
+        if (!removedMilestone) return
+
+        void deleteMilestoneRow(id)
+          .then(() => markProjectSyncSuccess(set))
+          .catch((error) => {
+            set((state) => {
+              if ((state.milestones ?? []).some((milestone) => milestone.id === id)) return
+              state.milestones.splice(Math.max(removedIndex, 0), 0, removedMilestone)
+            })
+            reportProjectSyncError(set, error, 'delete milestone')
+          })
       },
 
       toggleMilestone: (id) => {
+        const previous = (get().milestones ?? []).find((m) => m.id === id)
+        if (!previous) return
+
         set((s) => {
           const milestone = (s.milestones ?? []).find((m) => m.id === id)
           if (milestone) milestone.status = milestone.status === 'completed' ? 'pending' : 'completed'
@@ -384,7 +557,16 @@ const useProjectStore = create(
 
         const updated = (get().milestones ?? []).find((m) => m.id === id)
         if (updated) {
-          void supabase.from('milestones').upsert(toMilestoneRow(updated))
+          const { workspaceId, userId } = getSyncContext()
+          void persistMilestoneWithParents(updated, workspaceId, userId, get)
+            .then(() => markProjectSyncSuccess(set))
+            .catch((error) => {
+              set((state) => {
+                const milestone = (state.milestones ?? []).find((entry) => entry.id === id)
+                if (milestone) Object.assign(milestone, previous)
+              })
+              reportProjectSyncError(set, error, 'toggle milestone')
+            })
         }
       },
 
@@ -432,6 +614,9 @@ const useProjectStore = create(
             s.projects = projectRows.map(fromProjectRow)
             s.milestones = milestoneRows.map(fromMilestoneRow)
           })
+          markProjectSyncSuccess(set)
+        } catch (error) {
+          reportProjectSyncError(set, error, 'load projects and milestones')
         } finally {
           set((s) => { s.syncing = false })
         }

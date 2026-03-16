@@ -88,6 +88,9 @@ const Settings = memo(function Settings() {
   const clearTaskSyncError = useTaskStore((s) => s.clearSyncError)
   const taskLastSyncedAt = useTaskStore((s) => s.lastSyncedAt)
   const projectSyncing = useProjectStore((s) => s.syncing)
+  const projectSyncError = useProjectStore((s) => s.syncError)
+  const clearProjectSyncError = useProjectStore((s) => s.clearSyncError)
+  const projectLastSyncedAt = useProjectStore((s) => s.lastSyncedAt)
   const planningSyncing = usePlanningStore((s) => s.syncing)
   const [showExport, setShowExport] = useState(false)
 
@@ -154,11 +157,11 @@ const Settings = memo(function Settings() {
                       <CheckCircle2 size={14} style={{ color: '#10b981' }} />
                     )}
                     <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-                      {taskSyncError || workspaceError ? 'Cloud sync needs attention' : 'Cloud sync healthy'}
-                    </span>
-                  </div>
-                  <p className="mt-2 text-xs leading-6" style={{ color: 'var(--text-secondary)' }}>
-                    {workspaceError || taskSyncError || 'Workspace is connected and task writes are reaching Supabase.'}
+                    {taskSyncError || projectSyncError || workspaceError ? 'Cloud sync needs attention' : 'Cloud sync healthy'}
+                  </span>
+                </div>
+                <p className="mt-2 text-xs leading-6" style={{ color: 'var(--text-secondary)' }}>
+                    {workspaceError || taskSyncError || projectSyncError || 'Workspace is connected and task writes are reaching Supabase.'}
                   </p>
                 </div>
 
@@ -168,7 +171,8 @@ const Settings = memo(function Settings() {
                     { label: 'Workspace id', value: workspaceId || 'Workspace not resolved' },
                     { label: 'Task sync', value: taskSyncing ? 'Syncing now' : taskSyncError ? 'Issue detected' : 'Healthy' },
                     { label: 'Last task sync', value: formatLastSeen(taskLastSyncedAt) },
-                    { label: 'Project sync', value: projectSyncing ? 'Syncing now' : 'Idle' },
+                    { label: 'Project / milestone sync', value: projectSyncing ? 'Syncing now' : projectSyncError ? 'Issue detected' : 'Healthy' },
+                    { label: 'Last project sync', value: formatLastSeen(projectLastSyncedAt) },
                     { label: 'Planner sync', value: planningSyncing ? 'Syncing now' : 'Idle' },
                   ].map(({ label, value }) => (
                     <div
@@ -186,7 +190,7 @@ const Settings = memo(function Settings() {
                   ))}
                 </div>
 
-                {taskSyncError && (
+                {(taskSyncError || projectSyncError) && (
                   <div className="flex items-center justify-between gap-3 rounded-2xl px-4 py-3" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
                     <div className="flex items-center gap-2 min-w-0">
                       <RefreshCw size={14} style={{ color: 'var(--accent)' }} />
@@ -196,7 +200,10 @@ const Settings = memo(function Settings() {
                     </div>
                     <button
                       type="button"
-                      onClick={clearTaskSyncError}
+                      onClick={() => {
+                        clearTaskSyncError()
+                        clearProjectSyncError()
+                      }}
                       className="px-3 py-2 rounded-xl text-xs font-medium"
                       style={{ background: 'rgba(var(--accent-rgb),0.12)', color: 'var(--accent)', border: '1px solid rgba(var(--accent-rgb),0.24)' }}
                     >

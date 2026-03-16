@@ -164,6 +164,8 @@ export default function App() {
   const resetWorkspace = useWorkspaceStore((s) => s.reset)
   const workspaceError = useWorkspaceStore((s) => s.error)
   const loadProjectsFromSupabase = useProjectStore((s) => s.loadFromSupabase)
+  const projectSyncError = useProjectStore((s) => s.syncError)
+  const clearProjectSyncError = useProjectStore((s) => s.clearSyncError)
   const loadTasksFromSupabase = useTaskStore((s) => s.loadFromSupabase)
   const taskSyncError = useTaskStore((s) => s.syncError)
   const clearTaskSyncError = useTaskStore((s) => s.clearSyncError)
@@ -204,6 +206,7 @@ export default function App() {
   const shareToken = window.location.pathname.startsWith('/share/')
     ? window.location.pathname.split('/share/')[1]
     : ''
+  const syncIssueMessage = workspaceError || taskSyncError || projectSyncError
 
   useEffect(() => { init() }, [init])
 
@@ -467,10 +470,11 @@ export default function App() {
       {activePage !== 'trash' && <QuickAdd />}
 
       <SyncIssueBanner
-        message={workspaceError || taskSyncError}
+        message={syncIssueMessage}
         onDismiss={() => {
           useWorkspaceStore.setState({ error: '' })
           clearTaskSyncError()
+          clearProjectSyncError()
         }}
       />
 

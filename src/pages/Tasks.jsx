@@ -7,7 +7,7 @@ import BulkActionBar from '../components/tasks/BulkActionBar'
 import CommitTaskMenu from '../components/planning/CommitTaskMenu'
 import EmptyState from '../components/common/EmptyState'
 import PageHero from '../components/common/PageHero'
-import { InlineDateChip, InlineStatusChip } from '../components/common/InlineFieldChips'
+import { InlineDateChip, InlinePriorityChip, InlineStatusChip } from '../components/common/InlineFieldChips'
 import Header from '../components/layout/Header'
 import useSettingsStore from '../store/useSettingsStore'
 import useTaskStore from '../store/useTaskStore'
@@ -34,18 +34,6 @@ const SELECT_STYLE = {
   border: '1px solid rgba(255,255,255,0.1)',
   color: 'var(--text-primary)',
 }
-
-const PriorityPill = memo(function PriorityPill({ value }) {
-  return (
-    <span
-      className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-medium whitespace-nowrap"
-      style={{ background: `${PRIORITY_COLOR[value]}16`, color: PRIORITY_COLOR[value] }}
-    >
-      <span className="w-1.5 h-1.5 rounded-full" style={{ background: PRIORITY_COLOR[value] }} />
-      {PRIORITY_LABEL[value]}
-    </span>
-  )
-})
 
 const TaskContextChip = memo(function TaskContextChip({ task, projectById, programById }) {
   const project = task.projectId ? projectById.get(task.projectId) : null
@@ -347,7 +335,13 @@ const TableRow = memo(function TableRow({ task, selectMode, projectById, program
         />
       </td>
       <td className="px-3 py-2.5 border-b whitespace-nowrap" style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
-        <PriorityPill value={task.priority} />
+        <InlinePriorityChip
+          compact
+          value={task.priority}
+          onChange={(nextPriority) => updateTask(task.id, { priority: nextPriority })}
+          labels={PRIORITY_LABEL}
+          colors={PRIORITY_COLOR}
+        />
       </td>
       <td className="px-3 py-2.5 border-b whitespace-nowrap text-right" style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
         {!selectMode && <CommitTaskMenu taskId={task.id} compact />}
