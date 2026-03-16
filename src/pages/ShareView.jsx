@@ -881,6 +881,7 @@ export default function ShareView({ token }) {
 
   const projectById = useMemo(() => new Map(filteredProjects.map((project) => [project.id, project])), [filteredProjects])
   const programById = useMemo(() => new Map(programs.map((program) => [program.id, program])), [programs])
+  const taskById = useMemo(() => new Map(tasks.map((task) => [task.id, task])), [tasks])
   const milestoneTimelineItems = useMemo(
     () => filteredMilestones.map((milestone) => {
       const project = milestone.projectId ? projectById.get(milestone.projectId) : null
@@ -1427,7 +1428,11 @@ export default function ShareView({ token }) {
                                     <td className="py-3" style={{ color: 'var(--text-secondary)' }}>{fmtDate(task.dueDate)}</td>
                                     {shareConfig.modules.dependencies && (
                                       <td className="py-3" style={{ color: 'var(--text-secondary)' }}>
-                                        {task.dependsOn?.length ? task.dependsOn.join(', ') : '—'}
+                                        {task.dependsOn?.length
+                                          ? task.dependsOn
+                                              .map((dependencyId) => taskById.get(dependencyId)?.title || 'Unavailable task')
+                                              .join(', ')
+                                          : '—'}
                                       </td>
                                     )}
                                   </tr>
