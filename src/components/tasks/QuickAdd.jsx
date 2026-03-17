@@ -211,6 +211,7 @@ const QuickAdd = memo(function QuickAdd() {
     const createdTask = addTask({
       title: name.trim(),
       priority,
+      scope: workspaceViewScope,
       programId: filterProgramId || null,
       projectId: selectedSubProjectId || selectedProjectId || null,
       startDate: startDate ? new Date(startDate).toISOString() : null,

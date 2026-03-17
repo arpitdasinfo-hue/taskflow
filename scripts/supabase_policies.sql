@@ -247,6 +247,12 @@ drop policy if exists "tasks shared read" on tasks;
 create policy "tasks shared read" on tasks for select
   using (
     (
+      tasks.program_id is not null
+      or tasks.project_id is not null
+      or coalesce(tasks.scope, 'professional') <> 'personal'
+    )
+    and
+    (
       tasks.program_id is null
       or exists (
         select 1

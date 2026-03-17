@@ -102,6 +102,7 @@ const mapTask = (row) => ({
   workspaceId: row.workspace_id,
   programId: row.program_id || null,
   projectId: row.project_id || null,
+  scope: row.scope ?? 'professional',
   title: row.title,
   description: row.description || '',
   status: row.status || 'todo',

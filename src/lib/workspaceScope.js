@@ -35,7 +35,7 @@ export const projectMatchesWorkspaceScope = (project, programsOrMap = [], scope)
 export const getTaskWorkspaceScope = (task, programsOrMap = [], projectsOrMap = []) => {
   const projectMap = toProjectMap(projectsOrMap)
   const programId = getTaskProgramId(task, projectMap)
-  if (!programId) return 'professional'
+  if (!programId) return normalizeWorkspaceViewScope(task?.scope)
   return getProgramWorkspaceScope(toProgramMap(programsOrMap).get(programId))
 }
 

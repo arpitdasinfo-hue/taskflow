@@ -62,6 +62,7 @@ create table if not exists tasks (
   workspace_id uuid references workspaces(id) on delete cascade,
   program_id text references programs(id) on delete set null,
   project_id text references projects(id) on delete set null,
+  scope text not null default 'professional',
   title text not null,
   description text,
   status text default 'todo',
@@ -78,10 +79,12 @@ create table if not exists tasks (
 
 alter table tasks add column if not exists program_id text references programs(id) on delete set null;
 alter table tasks add column if not exists deleted_at timestamptz;
+alter table tasks add column if not exists scope text not null default 'professional';
 alter table programs add column if not exists scope text not null default 'professional';
 alter table milestones add column if not exists task_id text references tasks(id) on delete set null;
 
 update programs set scope = 'professional' where scope is null;
+update tasks set scope = 'professional' where scope is null;
 
 create table if not exists task_commitments (
   id text primary key,
@@ -152,6 +155,7 @@ create index if not exists idx_share_links_created_by on share_links(created_by)
 create index if not exists idx_share_links_resource on share_links(resource_type, resource_id);
 create index if not exists idx_share_view_events_link on share_view_events(share_link_id);
 create index if not exists idx_tasks_workspace_deleted_at on tasks(workspace_id, deleted_at);
+create index if not exists idx_tasks_workspace_scope on tasks(workspace_id, scope);
 create index if not exists idx_programs_workspace_scope on programs(workspace_id, scope);
 create index if not exists idx_milestones_project_task on milestones(project_id, task_id);
 create unique index if not exists idx_task_commitments_task_period

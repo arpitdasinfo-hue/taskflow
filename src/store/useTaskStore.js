@@ -6,6 +6,7 @@ import { supabase } from '../lib/supabase'
 import useWorkspaceStore from './useWorkspaceStore'
 import useAuthStore from './useAuthStore'
 import useProjectStore from './useProjectStore'
+import { getProgramWorkspaceScope, getTaskWorkspaceScope, normalizeWorkspaceViewScope } from '../lib/workspaceScope'
 
 const now = () => new Date().toISOString()
 
@@ -39,6 +40,10 @@ const getTaskSyncErrorMessage = (error) => {
 
   if (normalized.includes('start_date')) {
     return 'Task schedule sync is blocked. Please confirm the tasks.start_date column exists in Supabase and matches the latest schema.'
+  }
+
+  if (normalized.includes('scope')) {
+    return 'Task workspace sync is blocked. Please confirm the tasks.scope column exists in Supabase and matches the latest schema.'
   }
 
   if (normalized.includes('row-level security')) {
@@ -77,15 +82,29 @@ const getProgramIdForProject = (projectId) => {
   return project?.programId ?? null
 }
 
+const getProgramScopeForProgram = (programId) => {
+  if (!programId) return 'professional'
+  const program = useProjectStore.getState().programs.find((entry) => entry.id === programId)
+  return getProgramWorkspaceScope(program)
+}
+
 const normalizeTaskScope = (task = null, updates = {}) => {
   const nextProjectId = hasOwn(updates, 'projectId') ? updates.projectId ?? null : task?.projectId ?? null
   let nextProgramId = hasOwn(updates, 'programId') ? updates.programId ?? null : task?.programId ?? null
 
   if (nextProjectId) nextProgramId = getProgramIdForProject(nextProjectId)
 
+  const currentTaskScope = task
+    ? getTaskWorkspaceScope(task, useProjectStore.getState().programs, useProjectStore.getState().projects)
+    : 'professional'
+  const requestedScope = hasOwn(updates, 'scope')
+    ? normalizeWorkspaceViewScope(updates.scope)
+    : normalizeWorkspaceViewScope(task?.scope ?? currentTaskScope)
+
   return {
     projectId: nextProjectId,
     programId: nextProgramId,
+    scope: nextProgramId ? getProgramScopeForProgram(nextProgramId) : requestedScope,
   }
 }
 
@@ -104,10 +123,11 @@ const buildTaskPatchFromUpdates = (task, updates = {}) => {
   if (hasOwn(updates, 'dependsOn')) patch.depends_on = task.dependsOn ?? []
   if (hasOwn(updates, 'deletedAt')) patch.deleted_at = task.deletedAt ?? null
 
-  if (hasOwn(updates, 'projectId') || hasOwn(updates, 'programId')) {
+  if (hasOwn(updates, 'projectId') || hasOwn(updates, 'programId') || hasOwn(updates, 'scope')) {
     const scope = normalizeTaskScope(task)
     patch.project_id = scope.projectId
     patch.program_id = scope.programId
+    patch.scope = scope.scope
   }
 
   return patch
@@ -139,6 +159,7 @@ const toTaskRow = (task, workspaceId, userId) => {
     workspace_id: workspaceId,
     project_id: scope.projectId,
     program_id: scope.programId,
+    scope: scope.scope,
     title: task.title ?? 'Untitled task',
     description: task.description ?? '',
     status: task.status ?? 'todo',
@@ -158,6 +179,7 @@ const fromTaskRow = (row) => ({
   id: row.id,
   projectId: row.project_id ?? null,
   programId: row.program_id ?? null,
+  scope: normalizeWorkspaceViewScope(row.scope),
   title: row.title ?? 'Untitled task',
   description: row.description ?? '',
   status: row.status ?? 'todo',
@@ -302,6 +324,7 @@ const useTaskStore = create(
             ...normalizeTaskScope(null, {
               projectId: data.projectId ?? null,
               programId: data.programId ?? null,
+              scope: data.scope ?? null,
             }),
             title: data.title ?? 'Untitled task',
             description: data.description ?? '',
@@ -363,6 +386,7 @@ const useTaskStore = create(
           const scope = normalizeTaskScope(task, options)
           task.projectId = scope.projectId
           task.programId = scope.programId
+          task.scope = scope.scope
           task.updatedAt = now()
 
           let insertIndex = state.tasks.length
@@ -846,7 +870,7 @@ const useTaskStore = create(
     {
       name: 'taskflow-tasks',
       storage: createJSONStorage(() => localStorage),
-      version: 8,
+      version: 9,
       migrate: (state, version) => {
         let s = state
         if (version < 2) {
@@ -871,6 +895,19 @@ const useTaskStore = create(
         if (version < 8) {
           const sanitized = splitDeletedTasks(s?.tasks ?? [], s?.trashTasks ?? [])
           s = { ...s, tasks: sanitized.tasks, trashTasks: sanitized.trashTasks }
+        }
+        if (version < 9) {
+          s = {
+            ...s,
+            tasks: (s.tasks ?? []).map((task) => ({
+              ...task,
+              scope: normalizeWorkspaceViewScope(task.scope),
+            })),
+            trashTasks: (s.trashTasks ?? []).map((task) => ({
+              ...task,
+              scope: normalizeWorkspaceViewScope(task.scope),
+            })),
+          }
         }
         return s
       },

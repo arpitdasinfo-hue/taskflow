@@ -391,7 +391,7 @@ const Today = memo(function Today() {
   const carryForwardPeriod = usePlanningStore((state) => state.carryForwardPeriod)
   const syncScheduledCommitments = usePlanningStore((state) => state.syncScheduledCommitments)
   const selectTask = useSettingsStore((state) => state.selectTask)
-  const { programs, projects, tasks: scopedTasks, programById, projectById } = useWorkspaceScopedData()
+  const { programs, projects, tasks: scopedTasks, programById, projectById, workspaceViewScope } = useWorkspaceScopedData()
 
   const todayBounds = getPeriodBounds('day')
   const weekBounds = getPeriodBounds('week')
@@ -575,6 +575,7 @@ const Today = memo(function Today() {
 
     const created = addTask({
       title,
+      scope: workspaceViewScope,
       startDate: captureStartDate ? new Date(captureStartDate).toISOString() : null,
       dueDate: captureDueDate ? new Date(captureDueDate).toISOString() : null,
     })
@@ -586,7 +587,7 @@ const Today = memo(function Today() {
     setCaptureTarget('day')
     setCaptureStartDate('')
     setCaptureDueDate('')
-  }, [addTask, captureDueDate, captureStartDate, captureTarget, captureTitle, handleAssignTask])
+  }, [addTask, captureDueDate, captureStartDate, captureTarget, captureTitle, handleAssignTask, workspaceViewScope])
 
   const handleStatusChange = useCallback((taskId, status) => {
     updateTask(taskId, { status })

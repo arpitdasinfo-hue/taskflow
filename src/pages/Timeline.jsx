@@ -48,6 +48,7 @@ const Timeline = memo(function Timeline() {
   const addTask = useTaskStore((s) => s.addTask)
   const updateTask = useTaskStore((s) => s.updateTask)
   const selectTask = useSettingsStore((s) => s.selectTask)
+  const workspaceViewScope = useSettingsStore((s) => s.workspaceViewScope)
   const ganttConfig = useSettingsStore((s) => s.ganttConfig)
   const setGanttConfig = useSettingsStore((s) => s.setGanttConfig)
   const savedGanttViews = useSettingsStore((s) => s.savedGanttViews)
@@ -457,6 +458,7 @@ const Timeline = memo(function Timeline() {
   const createTaskInRange = ({ rowType, programId, projectId, startDate: nextStartDate, dueDate: nextDueDate }) => {
     const created = addTask({
       title: 'New task',
+      scope: workspaceViewScope,
       programId: programId ?? null,
       projectId: projectId ?? null,
       startDate: nextStartDate,
