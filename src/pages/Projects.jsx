@@ -13,7 +13,7 @@ import ColorPalettePicker from '../components/common/ColorPalettePicker'
 import ShareModal from '../components/ShareModal'
 import { ProgramStatusBadge, STATUS_CONFIG, STATUS_OPTIONS } from '../components/common/ProgramStatusBadge'
 import MilestonePanel from '../components/projects/MilestonePanel'
-import useProjectStore, { PROJECT_COLORS } from '../store/useProjectStore'
+import useProjectStore, { PROJECT_COLORS, PROGRAM_SCOPE_CONFIG, PROGRAM_SCOPE_OPTIONS } from '../store/useProjectStore'
 import useTaskStore from '../store/useTaskStore'
 import useSettingsStore from '../store/useSettingsStore'
 import { sortTasksByStartDate } from '../lib/taskSort'
@@ -627,6 +627,11 @@ const ProjectPanel = memo(function ProjectPanel({ project, depth = 0 }) {
   const [deleteArmed, setDeleteArmed] = useState(false)
 
   const childProjects = useMemo(() => allProjects.filter((candidate) => candidate.parentId === project.id), [allProjects, project.id])
+  const parentProgram = useMemo(
+    () => programs.find((program) => program.id === project.programId) ?? null,
+    [programs, project.programId]
+  )
+  const canShareProject = !parentProgram || parentProgram.scope !== 'personal'
   const projectTreeIds = useMemo(() => collectProjectTreeIds(allProjects, project.id), [allProjects, project.id])
   const directTasks = useMemo(() => sortTasksByStartDate(tasks.filter((task) => task.projectId === project.id)), [tasks, project.id])
   const allProjectTasks = useMemo(() => sortTasksByStartDate(tasks.filter((task) => task.projectId && projectTreeIds.includes(task.projectId))), [tasks, projectTreeIds])
@@ -818,7 +823,7 @@ const ProjectPanel = memo(function ProjectPanel({ project, depth = 0 }) {
               iconOnly
               items={[
                 { label: showMovePicker ? 'Hide move picker' : 'Move to program…', onClick: () => setShowMovePicker((current) => !current) },
-                { label: showShare ? 'Hide share link' : 'Share project', onClick: () => setShowShare(true) },
+                ...(canShareProject ? [{ label: showShare ? 'Hide share link' : 'Share project', onClick: () => setShowShare(true) }] : []),
                 { label: deleteArmed ? 'Cancel delete' : 'Delete project', onClick: () => setDeleteArmed((current) => !current), tone: 'danger' },
               ]}
             />
@@ -1005,7 +1010,7 @@ const ProjectPanel = memo(function ProjectPanel({ project, depth = 0 }) {
         </div>
       )}
 
-      {showShare && (
+      {canShareProject && showShare && (
         <ShareModal resourceType="project" resourceId={project.id} resourceName={project.name} onClose={() => setShowShare(false)} />
       )}
     </div>
@@ -1047,6 +1052,8 @@ const ProgramSection = memo(function ProgramSection({ program, projects }) {
   const unscheduled = allTasks.filter((task) => !task.startDate && !task.dueDate).length
   const completion = totalTasks ? Math.round((doneTasks / totalTasks) * 100) : 0
   const health = getHealthMeta({ total: totalTasks, done: doneTasks, blocked, overdue, unscheduled })
+  const scopeConfig = PROGRAM_SCOPE_CONFIG[program.scope ?? 'professional'] ?? PROGRAM_SCOPE_CONFIG.professional
+  const canShareProgram = (program.scope ?? 'professional') !== 'personal'
   const scheduleWindow = buildScheduleWindow(program, projects, allTasks, projectMilestones)
   const windowLabel = formatWindowLabel(scheduleWindow.startDate, scheduleWindow.dueDate)
 
@@ -1152,6 +1159,12 @@ const ProgramSection = memo(function ProgramSection({ program, projects }) {
                   </>
                 )}
               </div>
+              <span
+                className="text-[10px] px-2 py-0.5 rounded-full"
+                style={{ background: scopeConfig.background, color: scopeConfig.color }}
+              >
+                {scopeConfig.label}
+              </span>
               <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: health.background, color: health.color }}>{health.label}</span>
               <InfoTooltip text={program.description} />
             </div>
@@ -1175,7 +1188,7 @@ const ProgramSection = memo(function ProgramSection({ program, projects }) {
             <ActionMenu
               iconOnly
               items={[
-                { label: 'Share program', onClick: () => setShowShare(true) },
+                ...(canShareProgram ? [{ label: 'Share program', onClick: () => setShowShare(true) }] : []),
                 { label: deleteArmed ? 'Cancel delete' : 'Delete program', onClick: () => setDeleteArmed((current) => !current), tone: 'danger' },
               ]}
             />
@@ -1250,7 +1263,7 @@ const ProgramSection = memo(function ProgramSection({ program, projects }) {
         </div>
       )}
 
-      {showShare && <ShareModal resourceType="program" resourceId={program.id} resourceName={program.name} onClose={() => setShowShare(false)} />}
+      {canShareProgram && showShare && <ShareModal resourceType="program" resourceId={program.id} resourceName={program.name} onClose={() => setShowShare(false)} />}
     </div>
   )
 })
@@ -1433,11 +1446,12 @@ const NewProgramForm = memo(function NewProgramForm({ onDone }) {
   const [name, setName] = useState('')
   const [color, setColor] = useState(PROJECT_COLORS[0])
   const [desc, setDesc] = useState('')
+  const [scope, setScope] = useState('professional')
   const addProgram = useProjectStore((state) => state.addProgram)
 
   const submit = () => {
     if (!name.trim()) return
-    addProgram({ name: name.trim(), color, description: desc.trim() })
+    addProgram({ name: name.trim(), color, description: desc.trim(), scope })
     onDone()
   }
 
@@ -1468,6 +1482,25 @@ const NewProgramForm = memo(function NewProgramForm({ onDone }) {
         className="w-full text-sm px-3 py-2 rounded-xl"
         style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', color: 'var(--text-primary)' }}
       />
+      <div className="grid grid-cols-2 gap-2">
+        {PROGRAM_SCOPE_OPTIONS.map((option) => {
+          const active = scope === option.id
+          const palette = PROGRAM_SCOPE_CONFIG[option.id]
+          return (
+            <button
+              key={option.id}
+              type="button"
+              onClick={() => setScope(option.id)}
+              className="px-3 py-2 rounded-xl text-xs font-semibold transition-colors"
+              style={active
+                ? { background: palette.background, color: palette.color, border: `1px solid ${palette.color}44` }
+                : { background: 'rgba(255,255,255,0.04)', color: 'var(--text-secondary)', border: '1px solid rgba(255,255,255,0.08)' }}
+            >
+              {option.label}
+            </button>
+          )
+        })}
+      </div>
       <ColorPalettePicker colors={PROJECT_COLORS} value={color} onChange={(next) => next && setColor(next)} />
       <div className="flex gap-2">
         <button type="button" onClick={submit} className="flex-1 btn-accent py-2 text-xs">Create program</button>

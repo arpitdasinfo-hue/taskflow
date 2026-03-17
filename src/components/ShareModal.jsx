@@ -40,6 +40,8 @@ const ShareModal = memo(function ShareModal({ resourceType, resourceId, resource
   const [config, setConfig] = useState(() => normalizeShareConfig(DEFAULT_SHARE_CONFIG))
   const [neverExpires, setNeverExpires] = useState(true)
   const [expiresAt, setExpiresAt] = useState('')
+  const [shareable, setShareable] = useState(true)
+  const [shareabilityMessage, setShareabilityMessage] = useState('')
 
   const shareUrl = useMemo(() => {
     if (!link?.token) return ''
@@ -48,9 +50,43 @@ const ShareModal = memo(function ShareModal({ resourceType, resourceId, resource
 
   const resourceLabel = useMemo(() => scopeLabel(resourceType), [resourceType])
 
+  const resolveShareability = useCallback(async () => {
+    if (resourceType === 'workspace') {
+      return {
+        shareable: true,
+        message: 'Workspace links only surface professional programs and their delivery data.',
+      }
+    }
+
+    if (resourceType === 'program') {
+      const { data } = await supabase.from('programs').select('id, scope').eq('id', resourceId).maybeSingle()
+      if (!data) return { shareable: false, message: 'Program not found.' }
+      if ((data.scope ?? 'professional') === 'personal') {
+        return { shareable: false, message: 'Personal programs stay private and cannot be shared.' }
+      }
+      return { shareable: true, message: '' }
+    }
+
+    if (resourceType === 'project') {
+      const { data: project } = await supabase.from('projects').select('id, program_id').eq('id', resourceId).maybeSingle()
+      if (!project) return { shareable: false, message: 'Project not found.' }
+      if (!project.program_id) return { shareable: true, message: '' }
+      const { data: program } = await supabase.from('programs').select('id, scope').eq('id', project.program_id).maybeSingle()
+      if (program && (program.scope ?? 'professional') === 'personal') {
+        return { shareable: false, message: 'Projects inside personal programs stay private and cannot be shared.' }
+      }
+      return { shareable: true, message: '' }
+    }
+
+    return { shareable: true, message: '' }
+  }, [resourceId, resourceType])
+
   const loadLink = useCallback(async () => {
     setLoading(true)
     setError('')
+    const shareability = await resolveShareability()
+    setShareable(shareability.shareable)
+    setShareabilityMessage(shareability.message)
     const { data, error: queryError } = await supabase
       .from('share_links')
       .select('*')
@@ -75,7 +111,7 @@ const ShareModal = memo(function ShareModal({ resourceType, resourceId, resource
       setExpiresAt('')
     }
     setLoading(false)
-  }, [resourceId, resourceType, resourceLabel, resourceName])
+  }, [resourceId, resourceType, resourceLabel, resourceName, resolveShareability])
 
   useEffect(() => {
     void loadLink()
@@ -97,6 +133,11 @@ const ShareModal = memo(function ShareModal({ resourceType, resourceId, resource
   const saveLink = async ({ forceEnable = false } = {}) => {
     if (!user?.id) {
       setError('Please sign in to manage share links.')
+      return
+    }
+
+    if (!shareable) {
+      setError(shareabilityMessage || 'This item cannot be shared.')
       return
     }
 
@@ -280,6 +321,17 @@ const ShareModal = memo(function ShareModal({ resourceType, resourceId, resource
                 />
               </div>
 
+              {!shareable && (
+                <div
+                  className="rounded-xl p-3"
+                  style={{ background: 'rgba(244,114,182,0.08)', border: '1px solid rgba(244,114,182,0.16)' }}
+                >
+                  <p className="text-xs font-medium" style={{ color: '#f9a8d4' }}>
+                    {shareabilityMessage}
+                  </p>
+                </div>
+              )}
+
               <div
                 className="rounded-xl p-3"
                 style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}
@@ -421,7 +473,7 @@ const ShareModal = memo(function ShareModal({ resourceType, resourceId, resource
                   <div className="flex gap-2">
                     <button
                       onClick={copyLink}
-                      disabled={working || !isActive}
+                      disabled={working || !isActive || !shareable}
                       className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-medium transition-opacity disabled:opacity-50"
                       style={{ background: 'rgba(var(--accent-rgb),0.12)', color: 'var(--accent)', border: '1px solid rgba(var(--accent-rgb),0.25)' }}
                     >
@@ -430,7 +482,7 @@ const ShareModal = memo(function ShareModal({ resourceType, resourceId, resource
                     </button>
                     <button
                       onClick={() => setDisabled(!link.disabled)}
-                      disabled={working}
+                      disabled={working || !shareable}
                       className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-medium transition-opacity disabled:opacity-50"
                       style={{ background: 'rgba(245,158,11,0.08)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.2)' }}
                     >
@@ -465,7 +517,7 @@ const ShareModal = memo(function ShareModal({ resourceType, resourceId, resource
               <div className="flex gap-2">
                 <button
                   onClick={() => saveLink({ forceEnable: true })}
-                  disabled={working}
+                  disabled={working || !shareable}
                   className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-semibold transition-opacity disabled:opacity-50"
                   style={{ background: 'var(--accent)', color: '#fff' }}
                 >

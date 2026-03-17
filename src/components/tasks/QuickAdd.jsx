@@ -1,7 +1,7 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Calendar, Folder, Layers3, Plus, X } from 'lucide-react'
 import useTaskStore from '../../store/useTaskStore'
-import useProjectStore, { PROJECT_COLORS } from '../../store/useProjectStore'
+import useProjectStore, { PROJECT_COLORS, PROGRAM_SCOPE_OPTIONS } from '../../store/useProjectStore'
 import useSettingsStore from '../../store/useSettingsStore'
 import usePlanningStore from '../../store/usePlanningStore'
 import { PriorityBadge } from '../common/Badge'
@@ -27,6 +27,7 @@ const QuickAdd = memo(function QuickAdd() {
   const [name, setName] = useState('')
   const [desc, setDesc] = useState('')
   const [color, setColor] = useState(null)
+  const [programScope, setProgramScope] = useState('professional')
   const [priority, setPriority] = useState('medium')
   const [startDate, setStartDate] = useState('')
   const [dueDate, setDueDate] = useState('')
@@ -130,6 +131,7 @@ const QuickAdd = memo(function QuickAdd() {
     setName('')
     setDesc('')
     setColor(null)
+    setProgramScope('professional')
     setPriority('medium')
     setStartDate('')
     setDueDate('')
@@ -163,6 +165,7 @@ const QuickAdd = memo(function QuickAdd() {
       setName('')
       setDesc('')
       setColor(null)
+      setProgramScope('professional')
       setPriority('medium')
       setStartDate('')
       setDueDate('')
@@ -187,7 +190,7 @@ const QuickAdd = memo(function QuickAdd() {
     if (!name.trim()) return
 
     if (type === 'program') {
-      addProgram({ name: name.trim(), description: desc.trim(), color: color || undefined })
+      addProgram({ name: name.trim(), description: desc.trim(), color: color || undefined, scope: programScope })
       handleClose()
       return
     }
@@ -221,7 +224,7 @@ const QuickAdd = memo(function QuickAdd() {
     }
 
     handleClose()
-  }, [name, type, desc, color, addProgram, handleClose, addProject, programId, addTask, priority, selectedProjectId, selectedSubProjectId, startDate, dueDate, planningTarget, commitTask, filterProgramId])
+  }, [name, type, desc, color, addProgram, handleClose, addProject, programId, addTask, priority, selectedProjectId, selectedSubProjectId, startDate, dueDate, planningTarget, commitTask, filterProgramId, programScope])
 
   const submitLabel = type === 'task' ? 'Add task' : 'Create'
 
@@ -306,6 +309,29 @@ const QuickAdd = memo(function QuickAdd() {
                     style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-primary)' }}
                     maxLength={140}
                   />
+                </div>
+              )}
+
+              {type === 'program' && (
+                <div>
+                  <label className="text-xs mb-1.5 block" style={{ color: 'var(--text-secondary)' }}>
+                    Program type
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {PROGRAM_SCOPE_OPTIONS.map((option) => (
+                      <button
+                        key={option.id}
+                        type="button"
+                        onClick={() => setProgramScope(option.id)}
+                        className="px-3 py-2 rounded-xl text-xs font-semibold transition-colors"
+                        style={programScope === option.id
+                          ? { background: 'rgba(var(--accent-rgb),0.16)', color: 'var(--accent)', border: '1px solid rgba(var(--accent-rgb),0.24)' }
+                          : { background: 'rgba(255,255,255,0.04)', color: 'var(--text-secondary)', border: '1px solid rgba(255,255,255,0.08)' }}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
 

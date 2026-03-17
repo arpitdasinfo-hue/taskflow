@@ -3,7 +3,7 @@ import { X, Trash2, Calendar, Tag, ChevronDown, Folder, AlertTriangle, Flag } fr
 import { format } from 'date-fns'
 import useSettingsStore from '../../store/useSettingsStore'
 import useTaskStore from '../../store/useTaskStore'
-import useProjectStore from '../../store/useProjectStore'
+import useProjectStore, { findMilestoneForTask } from '../../store/useProjectStore'
 import { PriorityBadge, StatusBadge, TagBadge } from '../common/Badge'
 import SubtaskList from './SubtaskList'
 import NoteList from './NoteList'
@@ -60,7 +60,7 @@ const TaskDetail = memo(function TaskDetail() {
   const projects       = useProjectStore((s) => s.projects)
   const programs       = useProjectStore((s) => s.programs)
   const milestones     = useProjectStore((s) => s.milestones ?? [])
-  const addMilestone   = useProjectStore((s) => s.addMilestone)
+  const markTaskAsMilestone = useProjectStore((s) => s.markTaskAsMilestone)
 
   const task = tasks.find((t) => t.id === selectedTaskId)
   const isBlockedByDep = useIsBlockedByDependency(selectedTaskId)
@@ -120,9 +120,7 @@ const TaskDetail = memo(function TaskDetail() {
     ? (projectById.get(task.projectId)?.programId ?? task.programId ?? null)
     : task?.programId ?? null
   const visibleProjects = projects.filter((project) => !selectedProgramId || project.programId === selectedProgramId)
-  const matchingMilestone = task?.projectId
-    ? milestones.find((milestone) => milestone.projectId === task.projectId && milestone.name === task.title)
-    : null
+  const matchingMilestone = findMilestoneForTask(milestones, task)
 
   if (!task) return null
 
@@ -254,16 +252,16 @@ const TaskDetail = memo(function TaskDetail() {
           >
             <div className="min-w-0">
               <div className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
-                {matchingMilestone ? 'Milestone already created' : 'Promote this task to a milestone'}
+                {matchingMilestone ? 'This task is also a milestone' : 'Mark this task as a milestone'}
               </div>
               <div className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
                 {!task.projectId
                   ? 'Assign this task to a project first. Milestones live inside projects.'
                   : matchingMilestone
-                    ? 'This project already has a milestone with the same task name.'
+                    ? 'This task stays executable and is also tracked as a milestone checkpoint.'
                     : milestonePromoted
-                      ? 'Milestone created. The task stays in place for execution.'
-                      : 'Creates a milestone from this task and keeps the task for execution.'}
+                      ? 'Linked milestone created. The task stays in place for execution.'
+                      : 'Adds a linked milestone while keeping this item as a task. You can still add standalone milestones in the project milestone section.'}
               </div>
             </div>
             <button
@@ -271,18 +269,13 @@ const TaskDetail = memo(function TaskDetail() {
               disabled={!task.projectId || !!matchingMilestone}
               onClick={() => {
                 if (!task.projectId || matchingMilestone) return
-                addMilestone({
-                  projectId: task.projectId,
-                  name: task.title,
-                  dueDate: task.dueDate ?? null,
-                  description: task.description ?? '',
-                })
+                markTaskAsMilestone(task)
                 setMilestonePromoted(true)
               }}
               className="px-3 py-2 rounded-xl text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               style={{ background: 'rgba(var(--accent-rgb),0.15)', color: 'var(--accent)', border: '1px solid rgba(var(--accent-rgb),0.22)' }}
             >
-              {matchingMilestone ? 'Exists' : 'Create milestone'}
+              {matchingMilestone ? 'Linked' : 'Mark milestone'}
             </button>
           </div>
         </div>

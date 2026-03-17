@@ -34,6 +34,24 @@ export const PROJECT_COLORS = [
   '#f97316',
 ]
 
+export const PROGRAM_SCOPE_OPTIONS = [
+  { id: 'professional', label: 'Professional' },
+  { id: 'personal', label: 'Personal' },
+]
+
+export const PROGRAM_SCOPE_CONFIG = {
+  professional: {
+    label: 'Professional',
+    color: '#22d3ee',
+    background: 'rgba(34,211,238,0.14)',
+  },
+  personal: {
+    label: 'Personal',
+    color: '#f472b6',
+    background: 'rgba(244,114,182,0.14)',
+  },
+}
+
 const getSyncContext = () => {
   const workspaceId = useWorkspaceStore.getState().workspaceId
   const userId = useAuthStore.getState().user?.id ?? null
@@ -45,6 +63,7 @@ const toProgramRow = (program, workspaceId, userId) => ({
   workspace_id: workspaceId,
   name: program.name,
   color: program.color,
+  scope: program.scope ?? 'professional',
   description: program.description ?? '',
   status: program.status ?? 'planning',
   start_date: program.startDate ?? null,
@@ -58,6 +77,7 @@ const fromProgramRow = (row) => ({
   id: row.id,
   name: row.name ?? 'Untitled Program',
   color: row.color ?? PROJECT_COLORS[0],
+  scope: row.scope ?? 'professional',
   description: row.description ?? '',
   status: row.status ?? 'planning',
   startDate: row.start_date ?? null,
@@ -97,6 +117,7 @@ const fromProjectRow = (row) => ({
 const toMilestoneRow = (milestone) => ({
   id: milestone.id,
   project_id: milestone.projectId,
+  task_id: milestone.taskId ?? null,
   name: milestone.name,
   description: milestone.description ?? '',
   due_date: milestone.dueDate ?? null,
@@ -108,6 +129,7 @@ const toMilestoneRow = (milestone) => ({
 const fromMilestoneRow = (row) => ({
   id: row.id,
   projectId: row.project_id,
+  taskId: row.task_id ?? null,
   name: row.name ?? 'Untitled Milestone',
   dueDate: row.due_date ?? null,
   description: row.description ?? '',
@@ -125,6 +147,14 @@ const getProjectSyncErrorMessage = (error) => {
 
   if (normalized.includes('project_id')) {
     return 'Milestone sync is blocked because the linked project is not available in Supabase yet. Refresh once and try again.'
+  }
+
+  if (normalized.includes('task_id')) {
+    return 'Milestone sync is blocked because the milestone-to-task link column is missing. Please run the latest scripts/supabase_schema.sql in Supabase SQL Editor.'
+  }
+
+  if (normalized.includes('scope')) {
+    return 'Program type sync is blocked because the programs.scope column is missing. Please run the latest scripts/supabase_schema.sql in Supabase SQL Editor.'
   }
 
   return rawMessage
@@ -206,6 +236,14 @@ async function persistMilestoneWithParents(milestone, workspaceId, userId, getSt
   await persistMilestoneRow(milestone)
 }
 
+export const findMilestoneForTask = (milestones = [], task) => {
+  if (!task) return null
+  return milestones.find((milestone) => milestone.taskId === task.id)
+    ?? (task.projectId
+      ? milestones.find((milestone) => !milestone.taskId && milestone.projectId === task.projectId && milestone.name === task.title)
+      : null)
+}
+
 async function fetchWorkspaceProjectData(workspaceId) {
   const [programRes, projectRes] = await Promise.all([
     supabase
@@ -264,6 +302,7 @@ const useProjectStore = create(
             id: nanoid(),
             name: data.name ?? 'New Program',
             color: data.color ?? PROJECT_COLORS[s.programs.length % PROJECT_COLORS.length],
+            scope: data.scope ?? 'professional',
             description: data.description ?? '',
             status: data.status ?? 'planning',
             startDate: data.startDate ?? null,
@@ -476,6 +515,7 @@ const useProjectStore = create(
           created = {
             id: nanoid(),
             projectId: data.projectId,
+            taskId: data.taskId ?? null,
             name: data.name ?? 'New Milestone',
             dueDate: data.dueDate ?? null,
             description: data.description ?? '',
@@ -568,6 +608,43 @@ const useProjectStore = create(
               reportProjectSyncError(set, error, 'toggle milestone')
             })
         }
+      },
+
+      markTaskAsMilestone: (task) => {
+        if (!task?.projectId) return null
+
+        const linked = findMilestoneForTask(get().milestones ?? [], task)
+        const nextData = {
+          projectId: task.projectId,
+          taskId: task.id,
+          name: task.title ?? 'Untitled task',
+          dueDate: task.dueDate ?? null,
+          description: task.description ?? '',
+        }
+
+        if (linked) {
+          get().updateMilestone(linked.id, nextData)
+          return { ...linked, ...nextData }
+        }
+
+        return get().addMilestone(nextData)
+      },
+
+      syncMilestoneFromTask: (task) => {
+        if (!task?.id) return
+        const linked = findMilestoneForTask(get().milestones ?? [], task)
+        if (!linked) return
+
+        const updates = {
+          taskId: task.id,
+          name: task.title ?? linked.name,
+          dueDate: task.dueDate ?? linked.dueDate ?? null,
+          description: task.description ?? linked.description ?? '',
+        }
+
+        if (task.projectId) updates.projectId = task.projectId
+
+        get().updateMilestone(linked.id, updates)
       },
 
       // ── Supabase sync ─────────────────────────────────────────────────────
@@ -667,7 +744,7 @@ const useProjectStore = create(
     {
       name: 'taskflow-projects',
       storage: createJSONStorage(() => localStorage),
-      version: 5,
+      version: 6,
       migrate: (state, version) => {
         let s = state
         if (version < 2) {
@@ -698,6 +775,19 @@ const useProjectStore = create(
         }
         if (version < 4) {
           s = { ...s, programs: [], projects: [], milestones: [] }
+        }
+        if (version < 6) {
+          s = {
+            ...s,
+            programs: (s.programs ?? []).map((program) => ({
+              ...program,
+              scope: program.scope ?? 'professional',
+            })),
+            milestones: (s.milestones ?? []).map((milestone) => ({
+              ...milestone,
+              taskId: milestone.taskId ?? null,
+            })),
+          }
         }
         return s
       },

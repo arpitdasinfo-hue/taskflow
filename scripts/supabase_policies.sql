@@ -119,8 +119,28 @@ create policy "share_links owner insert" on share_links for insert
     created_by = auth.uid()
     and access_mode = 'view'
     and (
-      workspace_id is null
-      or workspace_id in (select workspace_id from workspace_members where user_id = auth.uid())
+      (resource_type = 'workspace' and workspace_id in (select workspace_id from workspace_members where user_id = auth.uid()))
+      or (
+        resource_type = 'program'
+        and exists (
+          select 1
+          from programs p
+          where p.id = resource_id
+            and p.workspace_id in (select workspace_id from workspace_members where user_id = auth.uid())
+            and coalesce(p.scope, 'professional') <> 'personal'
+        )
+      )
+      or (
+        resource_type = 'project'
+        and exists (
+          select 1
+          from projects p
+          left join programs pg on pg.id = p.program_id
+          where p.id = resource_id
+            and p.workspace_id in (select workspace_id from workspace_members where user_id = auth.uid())
+            and (pg.id is null or coalesce(pg.scope, 'professional') <> 'personal')
+        )
+      )
     )
   );
 
@@ -131,8 +151,28 @@ create policy "share_links owner update" on share_links for update
     created_by = auth.uid()
     and access_mode = 'view'
     and (
-      workspace_id is null
-      or workspace_id in (select workspace_id from workspace_members where user_id = auth.uid())
+      (resource_type = 'workspace' and workspace_id in (select workspace_id from workspace_members where user_id = auth.uid()))
+      or (
+        resource_type = 'program'
+        and exists (
+          select 1
+          from programs p
+          where p.id = resource_id
+            and p.workspace_id in (select workspace_id from workspace_members where user_id = auth.uid())
+            and coalesce(p.scope, 'professional') <> 'personal'
+        )
+      )
+      or (
+        resource_type = 'project'
+        and exists (
+          select 1
+          from projects p
+          left join programs pg on pg.id = p.program_id
+          where p.id = resource_id
+            and p.workspace_id in (select workspace_id from workspace_members where user_id = auth.uid())
+            and (pg.id is null or coalesce(pg.scope, 'professional') <> 'personal')
+        )
+      )
     )
   );
 
@@ -159,6 +199,8 @@ create policy "share_view_events owner read" on share_view_events for select
 drop policy if exists "programs shared read" on programs;
 create policy "programs shared read" on programs for select
   using (
+    coalesce(programs.scope, 'professional') <> 'personal'
+    and
     exists (
       select 1
       from share_links sl
@@ -176,6 +218,16 @@ create policy "programs shared read" on programs for select
 drop policy if exists "projects shared read" on projects;
 create policy "projects shared read" on projects for select
   using (
+    (
+      projects.program_id is null
+      or exists (
+        select 1
+        from programs p
+        where p.id = projects.program_id
+          and coalesce(p.scope, 'professional') <> 'personal'
+      )
+    )
+    and
     exists (
       select 1
       from share_links sl
@@ -194,6 +246,26 @@ create policy "projects shared read" on projects for select
 drop policy if exists "tasks shared read" on tasks;
 create policy "tasks shared read" on tasks for select
   using (
+    (
+      tasks.program_id is null
+      or exists (
+        select 1
+        from programs pg
+        where pg.id = tasks.program_id
+          and coalesce(pg.scope, 'professional') <> 'personal'
+      )
+    )
+    and (
+      tasks.project_id is null
+      or exists (
+        select 1
+        from projects p
+        left join programs pg on pg.id = p.program_id
+        where p.id = tasks.project_id
+          and (pg.id is null or coalesce(pg.scope, 'professional') <> 'personal')
+      )
+    )
+    and
     exists (
       select 1
       from share_links sl
@@ -224,12 +296,14 @@ create policy "milestones shared read" on milestones for select
     exists (
       select 1
       from projects p
+      left join programs pg on pg.id = p.program_id
       join share_links sl on (
         (sl.resource_type = 'project' and sl.resource_id = p.id)
         or (sl.resource_type = 'program' and sl.resource_id = p.program_id)
         or (sl.resource_type = 'workspace' and sl.workspace_id = p.workspace_id)
       )
       where p.id = milestones.project_id
+        and (pg.id is null or coalesce(pg.scope, 'professional') <> 'personal')
         and sl.access_mode = 'view'
         and coalesce(sl.disabled, false) = false
         and sl.revoked_at is null

@@ -107,6 +107,11 @@ const MilestoneRow = memo(function MilestoneRow({ milestone, projectColor }) {
             {milestone.description}
           </span>
         )}
+        {milestone.taskId && (
+          <span className="text-[10px] inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full" style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--text-secondary)' }}>
+            Linked task
+          </span>
+        )}
       </div>
 
       {/* Due date */}

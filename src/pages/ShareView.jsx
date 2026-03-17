@@ -77,6 +77,7 @@ const mapProgram = (row) => ({
   workspaceId: row.workspace_id,
   name: row.name,
   color: row.color || '#22d3ee',
+  scope: row.scope ?? 'professional',
   description: row.description || '',
   status: row.status || 'planning',
   startDate: row.start_date || '',
@@ -114,12 +115,15 @@ const mapTask = (row) => ({
 const mapMilestone = (row) => ({
   id: row.id,
   projectId: row.project_id || null,
+  taskId: row.task_id || null,
   name: row.name,
   description: row.description || '',
   dueDate: row.due_date || '',
   status: row.status || 'pending',
   completed: Boolean(row.completed),
 })
+
+const isPersonalProgramRow = (row) => (row?.scope ?? 'professional') === 'personal'
 
 const StatCard = ({ label, value, color }) => (
   <div
@@ -651,6 +655,13 @@ export default function ShareView({ token }) {
           }
           return
         }
+        if (isPersonalProgramRow(program)) {
+          if (!cancelled) {
+            setError('Personal programs stay private and cannot be opened through shared links.')
+            setLoading(false)
+          }
+          return
+        }
         programRows = [program]
         const projectRes = await supabase.from('projects').select('*').eq('program_id', program.id)
         if (projectRes.error) {
@@ -695,7 +706,16 @@ export default function ShareView({ token }) {
 
         if (project.program_id) {
           const programRes = await supabase.from('programs').select('*').eq('id', project.program_id).maybeSingle()
-          if (!programRes.error && programRes.data) programRows = [programRes.data]
+          if (!programRes.error && programRes.data) {
+            if (isPersonalProgramRow(programRes.data)) {
+              if (!cancelled) {
+                setError('Projects inside personal programs stay private and cannot be opened through shared links.')
+                setLoading(false)
+              }
+              return
+            }
+            programRows = [programRes.data]
+          }
         }
 
         const workspaceRes = await supabase
@@ -740,9 +760,23 @@ export default function ShareView({ token }) {
         return
       }
 
-      const mappedPrograms = programRows.map(mapProgram)
-      const mappedProjects = projectRows.map(mapProject)
-      const mappedTasks = taskRows.map(mapTask)
+      const mappedPrograms = programRows
+        .map(mapProgram)
+        .filter((program) => program.scope !== 'personal')
+      const visibleProgramIds = new Set(mappedPrograms.map((program) => program.id))
+
+      const mappedProjects = projectRows
+        .map(mapProject)
+        .filter((project) => !project.programId || visibleProgramIds.has(project.programId))
+      const visibleProjectIds = new Set(mappedProjects.map((project) => project.id))
+
+      const mappedTasks = taskRows
+        .map(mapTask)
+        .filter((task) => {
+          if (task.programId && !visibleProgramIds.has(task.programId)) return false
+          if (task.projectId && !visibleProjectIds.has(task.projectId)) return false
+          return true
+        })
 
       if (config.modules.milestones) {
         const projectIds = mappedProjects.map((project) => project.id)

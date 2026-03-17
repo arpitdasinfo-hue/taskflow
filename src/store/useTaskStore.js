@@ -342,6 +342,7 @@ const useTaskStore = create(
         })
 
         const updated = get().tasks.find((t) => t.id === id)
+        if (updated) useProjectStore.getState().syncMilestoneFromTask(updated)
         const { workspaceId, userId } = getSyncContext()
         if (workspaceId && updated) {
           const patch = buildTaskPatchFromUpdates(updated, updates)
@@ -384,6 +385,7 @@ const useTaskStore = create(
         })
 
         const updated = get().tasks.find((t) => t.id === id)
+        if (updated) useProjectStore.getState().syncMilestoneFromTask(updated)
         const { workspaceId, userId } = getSyncContext()
         if (workspaceId && updated) {
           const patch = buildTaskPatchFromUpdates(updated, { projectId: updated.projectId, programId: updated.programId })
@@ -471,6 +473,7 @@ const useTaskStore = create(
         const { workspaceId, userId } = getSyncContext()
         if (workspaceId) {
           const updatedTasks = get().tasks.filter((task) => ids.includes(task.id))
+          updatedTasks.forEach((task) => useProjectStore.getState().syncMilestoneFromTask(task))
           if (updatedTasks.length > 0) {
             void Promise.all(
               updatedTasks.map((task) =>
