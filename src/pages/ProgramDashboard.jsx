@@ -7,11 +7,10 @@ import InfoTooltip from '../components/common/InfoTooltip'
 import MilestoneTimeline from '../components/common/MilestoneTimeline'
 import PageHero from '../components/common/PageHero'
 import ScopeBar from '../components/common/ScopeBar'
-import useTaskStore from '../store/useTaskStore'
 import useTimelineIntelligence from '../hooks/useTimelineIntelligence'
 import { useAllProgramStats } from '../hooks/useProgramStats'
-import useProjectStore from '../store/useProjectStore'
 import useSettingsStore from '../store/useSettingsStore'
+import useWorkspaceScopedData from '../hooks/useWorkspaceScopedData'
 
 // ── Stat pill ─────────────────────────────────────────────────────────────────
 const Stat = memo(function Stat({ label, value, color, icon: Icon }) {
@@ -216,16 +215,13 @@ const ProgramCard = memo(function ProgramCard({ program, stats }) {
 
 // ── Program Dashboard page ────────────────────────────────────────────────────
 const ProgramDashboard = memo(function ProgramDashboard() {
-  const programs  = useProjectStore((s) => s.programs)
-  const projects  = useProjectStore((s) => s.projects)
-  const milestones = useProjectStore((s) => s.milestones)
-  const tasks     = useTaskStore((s) => s.tasks)
+  const { programs, projects, milestones, tasks } = useWorkspaceScopedData()
   const setPage   = useSettingsStore((s) => s.setPage)
   const selectTask = useSettingsStore((s) => s.selectTask)
   const setActiveProgram = useSettingsStore((s) => s.setActiveProgram)
   const setActiveProject = useSettingsStore((s) => s.setActiveProject)
   const setGanttConfig = useSettingsStore((s) => s.setGanttConfig)
-  const allStats  = useAllProgramStats()
+  const allStats  = useAllProgramStats({ programs, projects, milestones, tasks })
   const [selectedProgramId, setSelectedProgramId] = useState('')
   const [selectedProjectId, setSelectedProjectId] = useState('')
   const [activeInsight, setActiveInsight] = useState('launch')

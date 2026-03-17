@@ -18,6 +18,7 @@ import useTaskStore from '../store/useTaskStore'
 import useSettingsStore from '../store/useSettingsStore'
 import { sortTasksByStartDate } from '../lib/taskSort'
 import { taskMatchesProgram } from '../lib/taskScope'
+import useWorkspaceScopedData from '../hooks/useWorkspaceScopedData'
 
 const PRIORITY_COLOR = { critical: '#ef4444', high: '#f97316', medium: '#f59e0b', low: '#94a3b8' }
 const STATUS_LABEL = { todo: 'To Do', 'in-progress': 'Active', review: 'Review', done: 'Done', blocked: 'Blocked' }
@@ -603,15 +604,12 @@ const KANBAN_COLS = [
 ]
 
 const ProjectPanel = memo(function ProjectPanel({ project, depth = 0 }) {
-  const tasks = useTaskStore((state) => state.tasks)
   const moveTask = useTaskStore((state) => state.moveTask)
   const updateProject = useProjectStore((state) => state.updateProject)
   const moveProject = useProjectStore((state) => state.moveProject)
   const deleteProject = useProjectStore((state) => state.deleteProject)
   const addProject = useProjectStore((state) => state.addProject)
-  const programs = useProjectStore((state) => state.programs)
-  const milestones = useProjectStore((state) => state.milestones ?? [])
-  const allProjects = useProjectStore((state) => state.projects)
+  const { tasks, programs, milestones, projects: allProjects } = useWorkspaceScopedData()
   const activeProjectId = useSettingsStore((state) => state.activeProjectId)
   const setActiveProject = useSettingsStore((state) => state.setActiveProject)
 
@@ -1023,8 +1021,7 @@ const ProgramSection = memo(function ProgramSection({ program, projects }) {
   const deleteProgram = useProjectStore((state) => state.deleteProgram)
   const addProject = useProjectStore((state) => state.addProject)
   const moveProject = useProjectStore((state) => state.moveProject)
-  const milestones = useProjectStore((state) => state.milestones ?? [])
-  const tasks = useTaskStore((state) => state.tasks)
+  const { milestones, tasks } = useWorkspaceScopedData()
   const activeProgramId = useSettingsStore((state) => state.activeProgramId)
   const activeProjectId = useSettingsStore((state) => state.activeProjectId)
 
@@ -1446,7 +1443,8 @@ const NewProgramForm = memo(function NewProgramForm({ onDone }) {
   const [name, setName] = useState('')
   const [color, setColor] = useState(PROJECT_COLORS[0])
   const [desc, setDesc] = useState('')
-  const [scope, setScope] = useState('professional')
+  const workspaceViewScope = useSettingsStore((state) => state.workspaceViewScope)
+  const [scope, setScope] = useState(workspaceViewScope)
   const addProgram = useProjectStore((state) => state.addProgram)
 
   const submit = () => {
@@ -1511,9 +1509,7 @@ const NewProgramForm = memo(function NewProgramForm({ onDone }) {
 })
 
 const Projects = memo(function Projects() {
-  const programs = useProjectStore((state) => state.programs)
-  const projects = useProjectStore((state) => state.projects)
-  const tasks = useTaskStore((state) => state.tasks)
+  const { programs, projects, tasks } = useWorkspaceScopedData()
   const activeProjectId = useSettingsStore((state) => state.activeProjectId)
   const activeProgramId = useSettingsStore((state) => state.activeProgramId)
   const setActiveProgram = useSettingsStore((state) => state.setActiveProgram)

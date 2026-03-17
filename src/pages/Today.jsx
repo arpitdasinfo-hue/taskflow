@@ -17,8 +17,8 @@ import InfoTooltip from '../components/common/InfoTooltip'
 import CommitTaskMenu from '../components/planning/CommitTaskMenu'
 import useSettingsStore from '../store/useSettingsStore'
 import useTaskStore from '../store/useTaskStore'
-import useProjectStore from '../store/useProjectStore'
 import usePlanningStore from '../store/usePlanningStore'
+import useWorkspaceScopedData from '../hooks/useWorkspaceScopedData'
 import {
   PLANNING_BUCKET_COLORS,
   PLANNING_BUCKET_LABELS,
@@ -391,17 +391,14 @@ const Today = memo(function Today() {
   const carryForwardPeriod = usePlanningStore((state) => state.carryForwardPeriod)
   const syncScheduledCommitments = usePlanningStore((state) => state.syncScheduledCommitments)
   const selectTask = useSettingsStore((state) => state.selectTask)
-  const programs = useProjectStore((state) => state.programs)
-  const projects = useProjectStore((state) => state.projects)
+  const { programs, projects, tasks: scopedTasks, programById, projectById } = useWorkspaceScopedData()
 
   const todayBounds = getPeriodBounds('day')
   const weekBounds = getPeriodBounds('week')
   const monthBounds = getPeriodBounds('month')
   const previousWeekBounds = getPreviousPeriodBounds('week')
   const previousMonthBounds = getPreviousPeriodBounds('month')
-  const projectById = useMemo(() => new Map(projects.map((project) => [project.id, project])), [projects])
-  const programById = useMemo(() => new Map(programs.map((program) => [program.id, program])), [programs])
-  const taskById = useMemo(() => new Map(tasks.filter((task) => !task.deletedAt).map((task) => [task.id, task])), [tasks])
+  const taskById = useMemo(() => new Map(scopedTasks.filter((task) => !task.deletedAt).map((task) => [task.id, task])), [scopedTasks])
 
   useEffect(() => {
     syncScheduledCommitments()
@@ -487,7 +484,7 @@ const Today = memo(function Today() {
 
   const candidateTasks = useMemo(() => {
     const normalizedQuery = candidateQuery.trim().toLowerCase()
-    const activeTasks = tasks.filter((task) => !task.deletedAt && task.status !== 'done')
+    const activeTasks = scopedTasks.filter((task) => !task.deletedAt && task.status !== 'done')
 
     const filtered = activeTasks.filter((task) => {
       if (!normalizedQuery) return true
@@ -512,7 +509,7 @@ const Today = memo(function Today() {
         task,
         context: resolveTaskContext(task, projectById, programById),
       }))
-  }, [candidateQuery, tasks, projectById, programById])
+  }, [candidateQuery, scopedTasks, projectById, programById])
 
   const summary = useMemo(() => {
     const dayCount = entriesByDroppable['day:focus'].length
@@ -536,9 +533,9 @@ const Today = memo(function Today() {
         return task?.status === 'done'
       }).length,
       monthCommitted: monthEntries.length,
-      overdueOpen: tasks.filter((task) => !task.deletedAt && task.status !== 'done' && task.dueDate && differenceInCalendarDays(new Date(task.dueDate), new Date()) < 0).length,
+      overdueOpen: scopedTasks.filter((task) => !task.deletedAt && task.status !== 'done' && task.dueDate && differenceInCalendarDays(new Date(task.dueDate), new Date()) < 0).length,
     }
-  }, [entriesByDroppable, periodMatchedCommitments, taskById, tasks])
+  }, [entriesByDroppable, periodMatchedCommitments, taskById, scopedTasks])
 
   const carryForwardState = useMemo(() => {
     const currentWeekTasks = new Set(

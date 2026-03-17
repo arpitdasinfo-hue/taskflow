@@ -12,6 +12,7 @@ import useTaskStore from '../store/useTaskStore'
 import useSettingsStore from '../store/useSettingsStore'
 import useTimelineScale from '../hooks/useTimelineScale'
 import useTimelineRows from '../hooks/useTimelineRows'
+import useWorkspaceScopedData from '../hooks/useWorkspaceScopedData'
 
 const NOTICE_TIMEOUT_MS = 6000
 
@@ -42,11 +43,8 @@ const configsMatch = (left = {}, right = {}) => {
 }
 
 const Timeline = memo(function Timeline() {
-  const programs = useProjectStore((s) => s.programs)
-  const projects = useProjectStore((s) => s.projects)
-  const milestones = useProjectStore((s) => s.milestones)
+  const { programs, projects, milestones, tasks } = useWorkspaceScopedData()
   const updateProject = useProjectStore((s) => s.updateProject)
-  const tasks = useTaskStore((s) => s.tasks)
   const addTask = useTaskStore((s) => s.addTask)
   const updateTask = useTaskStore((s) => s.updateTask)
   const selectTask = useSettingsStore((s) => s.selectTask)
@@ -194,6 +192,11 @@ const Timeline = memo(function Timeline() {
     () => [...filteredProgramIds][0] ?? '',
     [filteredProgramIds]
   )
+
+  useEffect(() => {
+    const nextProgramIds = [...filteredProgramIds].filter((id) => programs.some((program) => program.id === id))
+    if (nextProgramIds.length !== filteredProgramIds.size) setFilteredProgramIds(new Set(nextProgramIds))
+  }, [filteredProgramIds, programs])
 
   const visibleProjects = useMemo(
     () => projects.filter((project) => !project.parentId && (!selectedProgramId || project.programId === selectedProgramId)),

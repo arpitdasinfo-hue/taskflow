@@ -3,7 +3,7 @@ import { ArchiveX, Clock3, Folder, RotateCcw, Search, Trash2 } from 'lucide-reac
 import Header from '../components/layout/Header'
 import EmptyState from '../components/common/EmptyState'
 import useTaskStore from '../store/useTaskStore'
-import useProjectStore from '../store/useProjectStore'
+import useWorkspaceScopedData from '../hooks/useWorkspaceScopedData'
 import { getTaskProgram } from '../lib/taskScope'
 
 const PRIORITY_COLORS = {
@@ -128,8 +128,7 @@ const Trash = memo(function Trash() {
   const restoreTask = useTaskStore((state) => state.restoreTask)
   const purgeTask = useTaskStore((state) => state.purgeTask)
   const emptyTrash = useTaskStore((state) => state.emptyTrash)
-  const projects = useProjectStore((state) => state.projects)
-  const programs = useProjectStore((state) => state.programs)
+  const { projects, programs, trashTasks: scopedTrashTasks } = useWorkspaceScopedData()
 
   const projectsById = useMemo(
     () => new Map(projects.map((project) => [project.id, project])),
@@ -138,9 +137,9 @@ const Trash = memo(function Trash() {
 
   const filteredTasks = useMemo(() => {
     const normalized = query.trim().toLowerCase()
-    if (!normalized) return trashTasks
+    if (!normalized) return scopedTrashTasks
 
-    return trashTasks.filter((task) => {
+    return scopedTrashTasks.filter((task) => {
       const project = task.projectId ? projectsById.get(task.projectId) : null
       const program = getTaskProgram(task, programs, projectsById)
       return [
@@ -152,7 +151,7 @@ const Trash = memo(function Trash() {
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(normalized))
     })
-  }, [trashTasks, query, projectsById, programs])
+  }, [scopedTrashTasks, query, projectsById, programs])
 
   const groupedTasks = useMemo(() => {
     const groups = new Map()
@@ -167,7 +166,7 @@ const Trash = memo(function Trash() {
     return [...groups.entries()]
   }, [filteredTasks])
 
-  const lastDeleted = trashTasks[0]?.deletedAt ? formatDateTime(trashTasks[0].deletedAt) : '—'
+  const lastDeleted = scopedTrashTasks[0]?.deletedAt ? formatDateTime(scopedTrashTasks[0].deletedAt) : '—'
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
@@ -197,7 +196,7 @@ const Trash = memo(function Trash() {
               In Trash
             </p>
             <p className="text-2xl font-semibold mt-1" style={{ color: 'var(--text-primary)' }}>
-              {trashTasks.length}
+              {scopedTrashTasks.length}
             </p>
           </div>
 
@@ -231,7 +230,7 @@ const Trash = memo(function Trash() {
               </p>
             </div>
 
-            {trashTasks.length > 0 && (
+            {scopedTrashTasks.length > 0 && (
               confirmEmpty ? (
                 <div className="flex items-center gap-2">
                   <span className="text-xs" style={{ color: '#fca5a5' }}>Delete all permanently?</span>

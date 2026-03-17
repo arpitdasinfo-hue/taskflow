@@ -1,7 +1,7 @@
 import { memo } from 'react'
 import { X } from 'lucide-react'
 import useSettingsStore from '../../store/useSettingsStore'
-import useProjectStore from '../../store/useProjectStore'
+import useWorkspaceScopedData from '../../hooks/useWorkspaceScopedData'
 
 const STATUSES   = ['todo', 'in-progress', 'review', 'done', 'blocked']
 const PRIORITIES = ['critical', 'high', 'medium', 'low']
@@ -27,7 +27,7 @@ const FilterBar = memo(function FilterBar({ onClose }) {
   const clearFilters     = useSettingsStore((s) => s.clearFilters)
   const setSortBy        = useSettingsStore((s) => s.setSortBy)
   const setActiveProgram = useSettingsStore((s) => s.setActiveProgram)
-  const programs         = useProjectStore((s) => s.programs)
+  const { programs }     = useWorkspaceScopedData()
 
   const hasActive = filters.status.length + filters.priority.length > 0 || !!activeProgramId
 

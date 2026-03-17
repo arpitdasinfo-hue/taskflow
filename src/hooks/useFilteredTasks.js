@@ -3,6 +3,7 @@ import useTaskStore from '../store/useTaskStore'
 import useSettingsStore from '../store/useSettingsStore'
 import useProjectStore from '../store/useProjectStore'
 import { taskMatchesProgram } from '../lib/taskScope'
+import { filterTasksByWorkspaceScope } from '../lib/workspaceScope'
 
 const PRIORITY_ORDER = { critical: 0, high: 1, medium: 2, low: 3 }
 
@@ -16,10 +17,13 @@ export function useFilteredTasks() {
   const sortBy          = useSettingsStore((s) => s.sortBy)
   const activeProjectId = useSettingsStore((s) => s.activeProjectId)
   const activeProgramId = useSettingsStore((s) => s.activeProgramId)
+  const workspaceViewScope = useSettingsStore((s) => s.workspaceViewScope)
   const projects        = useProjectStore((s) => s.projects)
+  const programs        = useProjectStore((s) => s.programs)
 
   return useMemo(() => {
-    let result = tasks.filter((task) => !task.deletedAt)
+    let result = filterTasksByWorkspaceScope(tasks, programs, projects, workspaceViewScope)
+      .filter((task) => !task.deletedAt)
 
     // Program filter (takes all projects in that program)
     if (activeProgramId) {
@@ -50,7 +54,7 @@ export function useFilteredTasks() {
     })
 
     return result
-  }, [tasks, filters, sortBy, activeProjectId, activeProgramId, projects])
+  }, [tasks, filters, sortBy, activeProjectId, activeProgramId, projects, programs, workspaceViewScope])
 }
 
 /** Returns tasks grouped by status for Board view */
@@ -74,10 +78,14 @@ export function useTasksByStatus() {
 /** Returns tasks due today + overdue */
 export function useTodayTasks() {
   const tasks = useTaskStore((s) => s.tasks)
+  const projects = useProjectStore((s) => s.projects)
+  const programs = useProjectStore((s) => s.programs)
+  const workspaceViewScope = useSettingsStore((s) => s.workspaceViewScope)
   return useMemo(() => {
     const todayStart = new Date(); todayStart.setHours(0,0,0,0)
     const todayEnd   = new Date(); todayEnd.setHours(23,59,59,999)
-    const activeTasks = tasks.filter((task) => !task.deletedAt)
+    const activeTasks = filterTasksByWorkspaceScope(tasks, programs, projects, workspaceViewScope)
+      .filter((task) => !task.deletedAt)
     const overdue = activeTasks.filter(
       (t) => t.dueDate && new Date(t.dueDate) < todayStart && t.status !== 'done'
     )
@@ -85,14 +93,18 @@ export function useTodayTasks() {
       (t) => t.dueDate && new Date(t.dueDate) >= todayStart && new Date(t.dueDate) <= todayEnd
     )
     return { today, overdue }
-  }, [tasks])
+  }, [tasks, programs, projects, workspaceViewScope])
 }
 
 /** Dashboard stats */
 export function useTaskStats() {
   const tasks = useTaskStore((s) => s.tasks)
+  const projects = useProjectStore((s) => s.projects)
+  const programs = useProjectStore((s) => s.programs)
+  const workspaceViewScope = useSettingsStore((s) => s.workspaceViewScope)
   return useMemo(() => {
-    const activeTasks  = tasks.filter((task) => !task.deletedAt)
+    const activeTasks  = filterTasksByWorkspaceScope(tasks, programs, projects, workspaceViewScope)
+      .filter((task) => !task.deletedAt)
     const total        = activeTasks.length
     const inProgress   = activeTasks.filter((t) => t.status === 'in-progress').length
     const done         = activeTasks.filter((t) => t.status === 'done').length
@@ -102,5 +114,5 @@ export function useTaskStats() {
     const critical     = activeTasks.filter((t) => t.priority === 'critical' && t.status !== 'done').length
     const completion   = total ? Math.round((done / total) * 100) : 0
     return { total, inProgress, done, blocked, overdue, critical, completion }
-  }, [tasks])
+  }, [tasks, programs, projects, workspaceViewScope])
 }

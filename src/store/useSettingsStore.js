@@ -113,6 +113,7 @@ const useSettingsStore = create(
       filters: { status: [], priority: [], tags: [] },
       activeProjectId: null,
       activeProgramId: null,
+      workspaceViewScope: 'professional',
       projectsViewMode: 'portfolio',
       selectedTaskIds: [],
       sortBy: 'createdAt',
@@ -289,6 +290,21 @@ const useSettingsStore = create(
 
       setSortBy: (v) => set((s) => { s.sortBy = v }),
 
+      setWorkspaceViewScope: (scope) => set((s) => {
+        s.workspaceViewScope = scope === 'personal' ? 'personal' : 'professional'
+        s.activeProgramId = null
+        s.activeProjectId = null
+        s.selectedTaskId = null
+        s.selectedTaskIds = []
+        s.ganttConfig = {
+          ...s.ganttConfig,
+          filteredProgramIds: [],
+          filteredProjectIds: [],
+          filteredSubProjectIds: [],
+          expandedProjectIds: [],
+        }
+      }),
+
       // ── Project filter ────────────────────────────────────────────────
       setActiveProject: (id) => set((s) => {
         s.activeProjectId = id
@@ -325,7 +341,7 @@ const useSettingsStore = create(
     {
       name: 'taskflow-settings',
       storage: createJSONStorage(() => localStorage),
-      version: 9,
+      version: 10,
       partialize: (state) => {
         const { selectedTaskId: _s1, selectedTaskIds: _s2, ...rest } = state
         return rest
@@ -370,6 +386,12 @@ const useSettingsStore = create(
           s = {
             ...s,
             view: ['list', 'table', 'board'].includes(s?.view) ? s.view : 'list',
+          }
+        }
+        if (version < 10) {
+          s = {
+            ...s,
+            workspaceViewScope: s?.workspaceViewScope === 'personal' ? 'personal' : 'professional',
           }
         }
         if (version < 6) {

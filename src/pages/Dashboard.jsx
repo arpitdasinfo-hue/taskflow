@@ -5,11 +5,10 @@ import PageHero from '../components/common/PageHero'
 import InfoTooltip from '../components/common/InfoTooltip'
 import MilestoneTimeline from '../components/common/MilestoneTimeline'
 import useSettingsStore from '../store/useSettingsStore'
-import useProjectStore from '../store/useProjectStore'
-import useTaskStore from '../store/useTaskStore'
 import usePlanningStore from '../store/usePlanningStore'
 import { useAllProgramStats } from '../hooks/useProgramStats'
 import { getPeriodBounds } from '../lib/planning'
+import useWorkspaceScopedData from '../hooks/useWorkspaceScopedData'
 
 const formatShortDate = (value) => {
   if (!value) return 'No date'
@@ -133,12 +132,9 @@ const Dashboard = memo(function Dashboard() {
   const setActiveProgram = useSettingsStore((state) => state.setActiveProgram)
   const setActiveProject = useSettingsStore((state) => state.setActiveProject)
   const selectTask = useSettingsStore((state) => state.selectTask)
-  const programs = useProjectStore((state) => state.programs)
-  const projects = useProjectStore((state) => state.projects)
-  const milestones = useProjectStore((state) => state.milestones)
-  const tasks = useTaskStore((state) => state.tasks)
+  const { programs, projects, milestones, tasks } = useWorkspaceScopedData()
   const commitments = usePlanningStore((state) => state.commitments)
-  const allStats = useAllProgramStats()
+  const allStats = useAllProgramStats({ programs, projects, milestones, tasks })
 
   const activeTasks = useMemo(() => tasks.filter((task) => !task.deletedAt), [tasks])
   const openTasks = useMemo(() => activeTasks.filter((task) => task.status !== 'done'), [activeTasks])

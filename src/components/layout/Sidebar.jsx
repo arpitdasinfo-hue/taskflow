@@ -1,14 +1,14 @@
 import { memo, useEffect, useState } from 'react'
 import {
   LayoutDashboard, ListTodo, CalendarClock, Settings2, FolderKanban,
-  Zap, ChevronLeft, ChevronRight, Folder, ChevronDown, BarChart3, GanttChart, LogOut, Trash2,
+  Zap, ChevronLeft, ChevronRight, Folder, ChevronDown, BarChart3, GanttChart, LogOut, Trash2, BriefcaseBusiness, House,
 } from 'lucide-react'
 import useSettingsStore from '../../store/useSettingsStore'
-import useProjectStore from '../../store/useProjectStore'
-import useTaskStore from '../../store/useTaskStore'
 import useAuthStore from '../../store/useAuthStore'
 import { useTaskStats } from '../../hooks/useFilteredTasks'
+import useWorkspaceScopedData from '../../hooks/useWorkspaceScopedData'
 import InfoTooltip from '../common/InfoTooltip'
+import { WORKSPACE_VIEW_OPTIONS } from '../../lib/workspaceScope'
 
 const NAV_ITEMS = [
   { id: 'dashboard',         label: 'Dashboard',  icon: LayoutDashboard },
@@ -28,16 +28,53 @@ const PROGRAM_STATUS_COLORS = {
   completed: '#10b981',
 }
 
+const WORKSPACE_SCOPE_ICON = {
+  professional: BriefcaseBusiness,
+  personal: House,
+}
+
+const WorkspaceScopeSwitch = memo(function WorkspaceScopeSwitch({ collapsed }) {
+  const workspaceViewScope = useSettingsStore((state) => state.workspaceViewScope)
+  const setWorkspaceViewScope = useSettingsStore((state) => state.setWorkspaceViewScope)
+
+  return (
+    <div className={`px-2 mb-3 ${collapsed ? '' : ''}`}>
+      <div
+        className={`rounded-2xl ${collapsed ? 'p-1 flex flex-col gap-1 items-center' : 'p-1 flex items-center gap-1'}`}
+        style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
+      >
+        {WORKSPACE_VIEW_OPTIONS.map((option) => {
+          const active = workspaceViewScope === option.id
+          const Icon = WORKSPACE_SCOPE_ICON[option.id]
+          return (
+            <button
+              key={option.id}
+              type="button"
+              onClick={() => setWorkspaceViewScope(option.id)}
+              className={`flex items-center gap-2 rounded-xl text-xs font-semibold transition-colors ${collapsed ? 'w-9 h-9 justify-center' : 'flex-1 px-2.5 py-2 justify-center'}`}
+              style={active
+                ? { background: 'rgba(var(--accent-rgb),0.2)', color: 'var(--accent)', border: '1px solid rgba(var(--accent-rgb),0.28)' }
+                : { color: 'var(--text-secondary)', border: '1px solid transparent' }}
+              title={collapsed ? option.label : undefined}
+            >
+              <Icon size={13} />
+              {!collapsed && <span>{option.id === 'professional' ? 'Professional' : 'Personal'}</span>}
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+})
+
 // ── Program group with nested projects ───────────────────────────────────────
-const ProgramGroup = memo(function ProgramGroup({ program, projects, collapsed }) {
+const ProgramGroup = memo(function ProgramGroup({ program, projects, tasks, allProjects, collapsed }) {
   const activeProgramId      = useSettingsStore((s) => s.activeProgramId)
   const activeProjectId      = useSettingsStore((s) => s.activeProjectId)
   const setActiveProject     = useSettingsStore((s) => s.setActiveProject)
   const setActiveProgram     = useSettingsStore((s) => s.setActiveProgram)
   const setPage              = useSettingsStore((s) => s.setPage)
   const [open, setOpen]      = useState(() => activeProgramId === program.id || projects.some((project) => project.id === activeProjectId))
-  const tasks                = useTaskStore((s) => s.tasks)
-  const allProjects          = useProjectStore((s) => s.projects)
   const taskCount = (pid) => tasks.filter((t) => t.projectId === pid && t.status !== 'done').length
   const statusColor = PROGRAM_STATUS_COLORS[program.status] || '#94a3b8'
   const topLevel = projects.filter((p) => !p.parentId)
@@ -181,14 +218,12 @@ const Sidebar = memo(function Sidebar() {
   const sidebarCollapsed  = useSettingsStore((s) => s.sidebarCollapsed)
   const activeProjectId   = useSettingsStore((s) => s.activeProjectId)
   const activeProgramId   = useSettingsStore((s) => s.activeProgramId)
+  const workspaceViewScope = useSettingsStore((s) => s.workspaceViewScope)
   const setPage           = useSettingsStore((s) => s.setPage)
   const toggleSidebar     = useSettingsStore((s) => s.toggleSidebar)
   const setActiveProject  = useSettingsStore((s) => s.setActiveProject)
   const setActiveProgram  = useSettingsStore((s) => s.setActiveProgram)
-  const programs          = useProjectStore((s) => s.programs)
-  const projects          = useProjectStore((s) => s.projects)
-  const tasks             = useTaskStore((s) => s.tasks)
-  const trashTasks        = useTaskStore((s) => s.trashTasks)
+  const { programs, projects, tasks, trashTasks } = useWorkspaceScopedData()
   const { overdue, inProgress } = useTaskStats()
   const user              = useAuthStore((s) => s.user)
   const signOut           = useAuthStore((s) => s.signOut)
@@ -218,6 +253,8 @@ const Sidebar = memo(function Sidebar() {
           </span>
         )}
       </div>
+
+      <WorkspaceScopeSwitch collapsed={sidebarCollapsed} />
 
       {/* Main nav */}
       <nav className="px-2 space-y-0.5 mb-2">
@@ -280,6 +317,8 @@ const Sidebar = memo(function Sidebar() {
             key={program.id}
             program={program}
             projects={projects.filter((p) => p.programId === program.id)}
+            tasks={tasks}
+            allProjects={projects}
             collapsed={sidebarCollapsed}
           />
         ))}
@@ -357,6 +396,9 @@ const Sidebar = memo(function Sidebar() {
                 </p>
                 <p className="text-[10px] truncate" style={{ color: 'var(--text-secondary)' }}>
                   {user.email}
+                </p>
+                <p className="text-[10px] truncate mt-0.5" style={{ color: 'var(--text-secondary)' }}>
+                  {workspaceViewScope === 'personal' ? 'Personal workspace' : 'Professional workspace'}
                 </p>
               </div>
               {/* Sign out */}

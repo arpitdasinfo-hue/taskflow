@@ -10,9 +10,10 @@ import PageHero from '../components/common/PageHero'
 import { InlineDateChip, InlinePriorityChip, InlineStatusChip } from '../components/common/InlineFieldChips'
 import Header from '../components/layout/Header'
 import useSettingsStore from '../store/useSettingsStore'
-import useTaskStore from '../store/useTaskStore'
 import useProjectStore from '../store/useProjectStore'
+import useTaskStore from '../store/useTaskStore'
 import { useFilteredTasks } from '../hooks/useFilteredTasks'
+import useWorkspaceScopedData from '../hooks/useWorkspaceScopedData'
 import { sortTasksByStartDate } from '../lib/taskSort'
 import { getTaskProgram, getTaskProgramId } from '../lib/taskScope'
 
@@ -447,11 +448,9 @@ const Tasks = memo(function Tasks() {
   const view = useSettingsStore((state) => state.view)
   const selectedTaskIds = useSettingsStore((state) => state.selectedTaskIds)
   const clearTaskSelection = useSettingsStore((state) => state.clearTaskSelection)
+  const workspaceViewScope = useSettingsStore((state) => state.workspaceViewScope)
   const tasks = useFilteredTasks()
-  const programs = useProjectStore((state) => state.programs)
-  const projects = useProjectStore((state) => state.projects)
-  const projectById = useMemo(() => new Map(projects.map((project) => [project.id, project])), [projects])
-  const programById = useMemo(() => new Map(programs.map((program) => [program.id, program])), [programs])
+  const { programs, projects, projectById, programById } = useWorkspaceScopedData()
 
   const visibleProjects = useMemo(() => {
     if (!filterProgramId) return projects
@@ -459,12 +458,20 @@ const Tasks = memo(function Tasks() {
   }, [projects, filterProgramId])
 
   useEffect(() => {
+    if (!filterProgramId) return
+    if (!programById.has(filterProgramId)) {
+      setFilterProgramId('')
+      setFilterProjectId('')
+    }
+  }, [filterProgramId, programById, workspaceViewScope])
+
+  useEffect(() => {
     if (!filterProjectId) return
     const project = projectById.get(filterProjectId)
     if (!project || (filterProgramId && project.programId !== filterProgramId)) {
       setFilterProjectId('')
     }
-  }, [projectById, filterProgramId, filterProjectId])
+  }, [projectById, filterProgramId, filterProjectId, workspaceViewScope])
 
   const filteredTasks = useMemo(() => {
     const scopedTasks = !filterProgramId && !filterProjectId

@@ -4,6 +4,7 @@ import useTaskStore from '../../store/useTaskStore'
 import useProjectStore, { PROJECT_COLORS, PROGRAM_SCOPE_OPTIONS } from '../../store/useProjectStore'
 import useSettingsStore from '../../store/useSettingsStore'
 import usePlanningStore from '../../store/usePlanningStore'
+import useWorkspaceScopedData from '../../hooks/useWorkspaceScopedData'
 import { PriorityBadge } from '../common/Badge'
 import ColorPalettePicker from '../common/ColorPalettePicker'
 
@@ -41,9 +42,9 @@ const QuickAdd = memo(function QuickAdd() {
   const commitTask = usePlanningStore((s) => s.commitTask)
   const addProgram = useProjectStore((s) => s.addProgram)
   const addProject = useProjectStore((s) => s.addProject)
-  const programs = useProjectStore((s) => s.programs)
-  const projects = useProjectStore((s) => s.projects)
   const activeProjectId = useSettingsStore((s) => s.activeProjectId)
+  const workspaceViewScope = useSettingsStore((s) => s.workspaceViewScope)
+  const { programs, projects } = useWorkspaceScopedData()
   const inputRef = useRef()
 
   const deriveTaskSelection = useCallback((projectId) => {
@@ -96,7 +97,8 @@ const QuickAdd = memo(function QuickAdd() {
     setSelectedProjectId(nextProjectId)
     setSelectedSubProjectId(nextSubProjectId)
     setFilterProgramId(nextProgramId)
-  }, [open, activeProjectId, deriveTaskSelection])
+    setProgramScope(workspaceViewScope)
+  }, [open, activeProjectId, deriveTaskSelection, workspaceViewScope])
 
   useEffect(() => {
     if (!open) return
@@ -165,7 +167,7 @@ const QuickAdd = memo(function QuickAdd() {
       setName('')
       setDesc('')
       setColor(null)
-      setProgramScope('professional')
+      setProgramScope(workspaceViewScope)
       setPriority('medium')
       setStartDate('')
       setDueDate('')
@@ -184,7 +186,7 @@ const QuickAdd = memo(function QuickAdd() {
 
     window.addEventListener('taskflow:quick-add', onQuickAddRequest)
     return () => window.removeEventListener('taskflow:quick-add', onQuickAddRequest)
-  }, [deriveTaskSelection])
+  }, [deriveTaskSelection, workspaceViewScope])
 
   const handleSubmit = useCallback(() => {
     if (!name.trim()) return
