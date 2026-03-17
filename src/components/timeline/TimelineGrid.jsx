@@ -29,6 +29,7 @@ const TimelineGrid = memo(function TimelineGrid({
   compact = false,
 }) {
   const leftColumnWidth = compact ? 268 : LEFT_COLUMN_WIDTH
+  const viewportHeight = compact || readOnly ? 'min(58vh, 720px)' : 'min(70vh, 920px)'
   const dependencyLayer = useMemo(() => {
     const rowOffsets = new Map()
     let totalHeight = 0
@@ -121,7 +122,14 @@ const TimelineGrid = memo(function TimelineGrid({
   }, [days, startDate, cellWidth])
 
   return (
-    <div className="overflow-x-auto overflow-y-visible min-h-[360px]" style={{ scrollbarWidth: 'thin' }}>
+    <div
+      className="overflow-auto min-h-[360px]"
+      style={{
+        scrollbarWidth: 'thin',
+        maxHeight: viewportHeight,
+        overscrollBehavior: 'contain',
+      }}
+    >
       <div style={{ minWidth: leftColumnWidth + days * cellWidth }}>
         <TimelineHeader
           startDate={startDate}

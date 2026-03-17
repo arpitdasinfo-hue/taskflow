@@ -250,6 +250,35 @@ const fromSubtaskRow = (row) => ({
   createdAt: row.created_at ?? now(),
 })
 
+async function persistSubtask(taskId, subtask, get) {
+  const { workspaceId, userId } = getSyncContext()
+  if (!workspaceId || !subtask) return
+
+  const parentTask = get().getTaskById(taskId)
+  if (!parentTask) throw new Error('Parent task missing while syncing subtask.')
+
+  const { error: taskError } = await supabase
+    .from('tasks')
+    .upsert(toTaskRow(parentTask, workspaceId, userId))
+
+  if (taskError) throw taskError
+
+  const { error } = await supabase
+    .from('subtasks')
+    .upsert(toSubtaskRow(taskId, subtask))
+
+  if (error) throw error
+}
+
+async function deleteSubtaskRow(subtaskId) {
+  const { error } = await supabase
+    .from('subtasks')
+    .delete()
+    .eq('id', subtaskId)
+
+  if (error) throw error
+}
+
 const toNoteRow = (taskId, note, userId) => ({
   id: note.id,
   task_id: taskId,
@@ -609,53 +638,104 @@ const useTaskStore = create(
         })
 
         if (created) {
-          void supabase.from('subtasks').upsert(toSubtaskRow(taskId, created))
+          void persistSubtask(taskId, created, get)
+            .then(() => markTaskSyncSuccess(set))
+            .catch((error) => {
+              set((state) => {
+                const task = state.tasks.find((entry) => entry.id === taskId)
+                if (!task) return
+                task.subtasks = task.subtasks.filter((subtask) => subtask.id !== created.id)
+                task.updatedAt = now()
+              })
+              reportTaskSyncError(set, error, 'create subtask')
+            })
         }
       },
 
       toggleSubtask: (taskId, subtaskId) => {
         let updatedSubtask
+        let previousCompleted = false
         set((state) => {
           const task = state.tasks.find((t) => t.id === taskId)
           if (!task) return
           const subtask = task.subtasks.find((s) => s.id === subtaskId)
           if (!subtask) return
+          previousCompleted = !!subtask.completed
           subtask.completed = !subtask.completed
           task.updatedAt = now()
           updatedSubtask = { ...subtask }
         })
 
         if (updatedSubtask) {
-          void supabase.from('subtasks').upsert(toSubtaskRow(taskId, updatedSubtask))
+          void persistSubtask(taskId, updatedSubtask, get)
+            .then(() => markTaskSyncSuccess(set))
+            .catch((error) => {
+              set((state) => {
+                const task = state.tasks.find((entry) => entry.id === taskId)
+                if (!task) return
+                const subtask = task.subtasks.find((entry) => entry.id === subtaskId)
+                if (!subtask) return
+                subtask.completed = previousCompleted
+                task.updatedAt = now()
+              })
+              reportTaskSyncError(set, error, 'toggle subtask')
+            })
         }
       },
 
       updateSubtask: (taskId, subtaskId, title) => {
         let updatedSubtask
+        let previousTitle = ''
         set((state) => {
           const task = state.tasks.find((t) => t.id === taskId)
           if (!task) return
           const subtask = task.subtasks.find((s) => s.id === subtaskId)
           if (!subtask) return
+          previousTitle = subtask.title
           subtask.title = title
           task.updatedAt = now()
           updatedSubtask = { ...subtask }
         })
 
         if (updatedSubtask) {
-          void supabase.from('subtasks').upsert(toSubtaskRow(taskId, updatedSubtask))
+          void persistSubtask(taskId, updatedSubtask, get)
+            .then(() => markTaskSyncSuccess(set))
+            .catch((error) => {
+              set((state) => {
+                const task = state.tasks.find((entry) => entry.id === taskId)
+                if (!task) return
+                const subtask = task.subtasks.find((entry) => entry.id === subtaskId)
+                if (!subtask) return
+                subtask.title = previousTitle
+                task.updatedAt = now()
+              })
+              reportTaskSyncError(set, error, 'update subtask')
+            })
         }
       },
 
       deleteSubtask: (taskId, subtaskId) => {
+        let removedSubtask = null
         set((state) => {
           const task = state.tasks.find((t) => t.id === taskId)
           if (!task) return
+          removedSubtask = task.subtasks.find((subtask) => subtask.id === subtaskId) ?? null
           task.subtasks = task.subtasks.filter((s) => s.id !== subtaskId)
           task.updatedAt = now()
         })
 
-        void supabase.from('subtasks').delete().eq('id', subtaskId)
+        void deleteSubtaskRow(subtaskId)
+          .then(() => markTaskSyncSuccess(set))
+          .catch((error) => {
+            set((state) => {
+              const task = state.tasks.find((entry) => entry.id === taskId)
+              if (!task || !removedSubtask) return
+              task.subtasks.push(removedSubtask)
+              task.subtasks.sort((left, right) => new Date(left.createdAt) - new Date(right.createdAt))
+              task.updatedAt = now()
+            })
+            reportTaskSyncError(set, error, 'delete subtask')
+          })
       },
 
       // ── Note CRUD ───────────────────────────────────────────────────────────

@@ -130,14 +130,14 @@ const scoreTaskForPlanning = (task) => {
   return score
 }
 
-const SummaryCard = memo(function SummaryCard({ label, value, hint, accent }) {
+const SummaryCard = memo(function SummaryCard({ label, value, hint, accent, compact = false }) {
   return (
-    <GlassCard padding="px-4 py-4" className="min-h-[104px]">
+    <GlassCard padding={compact ? 'px-3 py-3' : 'px-4 py-4'} className={compact ? 'min-h-[82px]' : 'min-h-[104px]'}>
       <div className="text-[10px] font-semibold uppercase tracking-[0.24em]" style={{ color: 'var(--text-secondary)' }}>
         {label}
       </div>
-      <div className="mt-3 flex items-end gap-2">
-        <span className="text-3xl font-bold" style={{ color: accent ?? 'var(--text-primary)' }}>
+      <div className={`${compact ? 'mt-2' : 'mt-3'} flex items-end gap-2`}>
+        <span className={compact ? 'text-2xl font-bold' : 'text-3xl font-bold'} style={{ color: accent ?? 'var(--text-primary)' }}>
           {value}
         </span>
         {hint ? (
@@ -147,18 +147,6 @@ const SummaryCard = memo(function SummaryCard({ label, value, hint, accent }) {
         ) : null}
       </div>
     </GlassCard>
-  )
-})
-
-const InlineInfoTitle = memo(function InlineInfoTitle({ title, info, badge = null, className = '' }) {
-  return (
-    <div className={`flex items-center gap-2 flex-wrap ${className}`}>
-      <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>
-        {title}
-      </span>
-      <InfoTooltip text={info} widthClassName="w-64" />
-      {badge}
-    </div>
   )
 })
 
@@ -302,12 +290,13 @@ const PlanningBucket = memo(function PlanningBucket({
   onStatusChange,
   emptyTitle,
   emptyDescription,
+  compact = false,
 }) {
   return (
     <Droppable droppableId={droppableId}>
       {(provided, snapshot) => (
         <GlassCard
-          padding="p-4"
+          padding={compact ? 'p-3' : 'p-4'}
           className="h-full"
           style={{
             background: snapshot.isDraggingOver ? 'rgba(255,255,255,0.08)' : undefined,
@@ -329,16 +318,16 @@ const PlanningBucket = memo(function PlanningBucket({
             </span>
           </div>
 
-          <div ref={provided.innerRef} {...provided.droppableProps} className="mt-4 space-y-3 min-h-[96px]">
+          <div ref={provided.innerRef} {...provided.droppableProps} className={`${compact ? 'mt-3 space-y-2.5 min-h-[80px]' : 'mt-4 space-y-3 min-h-[96px]'}`}>
             {entries.length === 0 ? (
               <div
-                className="rounded-2xl px-3 py-4 text-center"
+                className={`rounded-2xl ${compact ? 'px-3 py-3' : 'px-3 py-4'} text-center`}
                 style={{ border: '1px dashed rgba(255,255,255,0.12)', color: 'var(--text-secondary)' }}
               >
-                <div className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+                <div className={compact ? 'text-xs font-medium' : 'text-sm font-medium'} style={{ color: 'var(--text-primary)' }}>
                   {emptyTitle}
                 </div>
-                <div className="mt-1 text-xs">
+                <div className={`${compact ? 'mt-1 text-[11px]' : 'mt-1 text-xs'}`}>
                   {emptyDescription}
                 </div>
               </div>
@@ -380,6 +369,7 @@ const Today = memo(function Today() {
   const [captureTarget, setCaptureTarget] = useState('day')
   const [captureStartDate, setCaptureStartDate] = useState('')
   const [captureDueDate, setCaptureDueDate] = useState('')
+  const [activePeriod, setActivePeriod] = useState('day')
 
   const tasks = useTaskStore((state) => state.tasks)
   const addTask = useTaskStore((state) => state.addTask)
@@ -468,6 +458,17 @@ const Today = memo(function Today() {
       'month:stretch': toEntries('month', 'stretch'),
     }
   }, [commitmentEntries])
+
+  const activePeriodMeta = PERIOD_META[activePeriod]
+  const activePeriodBounds = activePeriod === 'day' ? todayBounds : activePeriod === 'week' ? weekBounds : monthBounds
+  const periodCommitmentCount = useMemo(
+    () => ({
+      day: entriesByDroppable['day:focus'].length,
+      week: ['must', 'should', 'stretch'].reduce((total, bucket) => total + (entriesByDroppable[`week:${bucket}`]?.length ?? 0), 0),
+      month: ['must', 'should', 'stretch'].reduce((total, bucket) => total + (entriesByDroppable[`month:${bucket}`]?.length ?? 0), 0),
+    }),
+    [entriesByDroppable]
+  )
 
   const currentTargetState = useMemo(() => {
     const state = new Map()
@@ -683,307 +684,242 @@ const Today = memo(function Today() {
       <Header />
 
       <div className="flex-1 overflow-y-auto px-4 md:px-6 pb-24 md:pb-8">
-        <GlassCard padding="px-5 py-5" className="mb-5">
-          <div className="flex flex-col gap-5 lg:flex-row lg:items-end">
+        <GlassCard padding="p-4 md:p-5" className="mb-4">
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
             <div className="flex-1 min-w-0">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.24em]" style={{ color: 'var(--text-secondary)' }}>
-                Planning Workspace
-              </div>
-              <div className="mt-2 flex items-center gap-2 flex-wrap">
-                <h1 className="text-2xl md:text-3xl font-bold" style={{ color: 'var(--text-primary)' }}>
-                  Plan the work you will actually move
-                </h1>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[11px] font-semibold uppercase tracking-[0.24em]" style={{ color: 'var(--text-secondary)' }}>
+                  Planner cadence
+                </span>
                 <InfoTooltip
-                  text="Build a daily focus list, commit the week, and keep the month visible without cluttering the rest of the app."
+                  text="Auto-scheduled tasks flow into Week and Month from their start date. Pull only the work you want to move today into Today."
                   widthClassName="w-72"
                 />
               </div>
+
+              <div className="mt-3 grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_auto]">
+                <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_auto]">
+                  <input
+                    value={captureTitle}
+                    onChange={(event) => setCaptureTitle(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') handleCaptureTask()
+                    }}
+                    placeholder="Capture a task directly into Today, Week, or Month"
+                    className="w-full text-sm px-4 py-3 rounded-2xl"
+                    style={{
+                      background: 'rgba(255,255,255,0.06)',
+                      border: '1px solid rgba(255,255,255,0.1)',
+                      color: 'var(--text-primary)',
+                    }}
+                  />
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    {TARGET_ORDER.map((target) => (
+                      <button
+                        key={target}
+                        type="button"
+                        onClick={() => setCaptureTarget(target)}
+                        className="px-3 py-2 rounded-xl text-xs font-semibold transition-colors"
+                        style={captureTarget === target
+                          ? { background: 'rgba(var(--accent-rgb),0.16)', color: 'var(--accent)', border: '1px solid rgba(var(--accent-rgb),0.26)' }
+                          : { background: 'rgba(255,255,255,0.04)', color: 'var(--text-secondary)', border: '1px solid rgba(255,255,255,0.08)' }
+                        }
+                      >
+                        {TARGET_LABELS[target]}
+                      </button>
+                    ))}
+                    <button type="button" onClick={handleCaptureTask} className="btn-accent px-4 py-2.5">
+                      Add
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 xl:w-[280px]">
+                  <input
+                    type="date"
+                    value={captureStartDate}
+                    onChange={(event) => setCaptureStartDate(event.target.value)}
+                    className="w-full text-sm px-3 py-2.5 rounded-xl"
+                    style={{
+                      background: 'rgba(255,255,255,0.06)',
+                      border: '1px solid rgba(255,255,255,0.1)',
+                      color: 'var(--text-primary)',
+                      colorScheme: 'dark',
+                    }}
+                  />
+                  <input
+                    type="date"
+                    value={captureDueDate}
+                    onChange={(event) => setCaptureDueDate(event.target.value)}
+                    className="w-full text-sm px-3 py-2.5 rounded-xl"
+                    style={{
+                      background: 'rgba(255,255,255,0.06)',
+                      border: '1px solid rgba(255,255,255,0.1)',
+                      color: 'var(--text-primary)',
+                      colorScheme: 'dark',
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleCarryForward('week')}
+                  disabled={carryForwardState.weekCarryCount === 0}
+                  className="inline-flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-medium disabled:opacity-50"
+                  style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: 'var(--text-secondary)' }}
+                >
+                  <RefreshCcw size={13} />
+                  Carry week
+                  <span style={{ color: '#10b981' }}>{carryForwardState.weekCarryCount}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleCarryForward('month')}
+                  disabled={carryForwardState.monthCarryCount === 0}
+                  className="inline-flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-medium disabled:opacity-50"
+                  style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: 'var(--text-secondary)' }}
+                >
+                  <RefreshCcw size={13} />
+                  Carry month
+                  <span style={{ color: '#a78bfa' }}>{carryForwardState.monthCarryCount}</span>
+                </button>
+                <div className="hidden md:flex items-center gap-2 text-xs" style={{ color: 'var(--text-secondary)' }}>
+                  <Sparkles size={13} />
+                  {format(new Date(), 'EEEE, MMM d')}
+                </div>
+              </div>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 lg:w-[520px]">
-              <SummaryCard label="Focus Today" value={summary.focus} accent="#22d3ee" />
-              <SummaryCard label="Week Committed" value={summary.weekCommitted} accent="#10b981" />
-              <SummaryCard label="Week Done" value={summary.weekDone} accent="#84cc16" />
-              <SummaryCard label="Open Overdue" value={summary.overdueOpen} accent="#f97316" />
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 xl:w-[420px]">
+              <SummaryCard compact label="Today" value={summary.focus} accent="#22d3ee" />
+              <SummaryCard compact label="Week" value={summary.weekCommitted} accent="#10b981" />
+              <SummaryCard compact label="Done" value={summary.weekDone} accent="#84cc16" />
+              <SummaryCard compact label="Overdue" value={summary.overdueOpen} accent="#f97316" />
             </div>
           </div>
         </GlassCard>
 
-        <div className="grid grid-cols-1 xl:grid-cols-[1.15fr_0.85fr] gap-5 mb-5">
-          <GlassCard padding="p-5">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <div className="text-[11px] font-semibold uppercase tracking-[0.24em]" style={{ color: 'var(--text-secondary)' }}>
-                  Quick Capture
-                </div>
-                <InlineInfoTitle
-                  title="Add work straight into the plan"
-                  info="Capture standalone tasks here, then commit them to Today, Week, or Month in one step."
-                  className="mt-2 text-lg"
-                />
-              </div>
-
-              <div className="hidden md:flex items-center gap-2 text-xs" style={{ color: 'var(--text-secondary)' }}>
-                <Sparkles size={14} />
-                {format(new Date(), 'EEEE, MMM d')}
-              </div>
-            </div>
-
-            <div className="mt-4 flex flex-col gap-3 md:flex-row">
-              <input
-                value={captureTitle}
-                onChange={(event) => setCaptureTitle(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') handleCaptureTask()
-                }}
-                placeholder="Capture a task you want to act on..."
-                className="flex-1 text-sm px-4 py-3 rounded-2xl"
-                style={{
-                  background: 'rgba(255,255,255,0.06)',
-                  border: '1px solid rgba(255,255,255,0.1)',
-                  color: 'var(--text-primary)',
-                }}
-              />
-
-              <div className="flex items-center gap-2">
-                {TARGET_ORDER.map((target) => (
-                  <button
-                    key={target}
-                    type="button"
-                    onClick={() => setCaptureTarget(target)}
-                    className="px-3 py-3 rounded-2xl text-xs font-semibold transition-colors"
-                    style={captureTarget === target
-                      ? { background: 'rgba(var(--accent-rgb),0.16)', color: 'var(--accent)', border: '1px solid rgba(var(--accent-rgb),0.26)' }
-                      : { background: 'rgba(255,255,255,0.04)', color: 'var(--text-secondary)', border: '1px solid rgba(255,255,255,0.08)' }
-                    }
-                  >
-                    {TARGET_LABELS[target]}
-                  </button>
-                ))}
-                <button type="button" onClick={handleCaptureTask} className="btn-accent px-4 py-3">
-                  Add
+        <GlassCard padding="p-3 md:p-4" className="mb-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex items-center gap-1 p-1 rounded-2xl" style={{ background: 'rgba(255,255,255,0.04)' }}>
+              {Object.entries(PERIOD_META).map(([periodType, meta]) => (
+                <button
+                  key={periodType}
+                  type="button"
+                  onClick={() => setActivePeriod(periodType)}
+                  className="px-3 py-2 rounded-xl text-xs font-semibold transition-colors"
+                  style={activePeriod === periodType
+                    ? { background: 'var(--accent)', color: '#fff', boxShadow: '0 8px 20px rgba(var(--accent-rgb),0.25)' }
+                    : { color: 'var(--text-secondary)' }
+                  }
+                >
+                  {meta.title}
+                  <span className="ml-2 opacity-80">{periodCommitmentCount[periodType]}</span>
                 </button>
-              </div>
+              ))}
             </div>
 
-            <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
-              <label className="flex flex-col gap-1">
-                <span className="text-[11px] font-semibold uppercase tracking-[0.2em]" style={{ color: 'var(--text-secondary)' }}>
-                  Start Date
-                </span>
-                <input
-                  type="date"
-                  value={captureStartDate}
-                  onChange={(event) => setCaptureStartDate(event.target.value)}
-                  className="w-full text-sm px-4 py-3 rounded-2xl"
-                  style={{
-                    background: 'rgba(255,255,255,0.06)',
-                    border: '1px solid rgba(255,255,255,0.1)',
-                    color: 'var(--text-primary)',
-                    colorScheme: 'dark',
-                  }}
-                />
-              </label>
-
-              <label className="flex flex-col gap-1">
-                <span className="text-[11px] font-semibold uppercase tracking-[0.2em]" style={{ color: 'var(--text-secondary)' }}>
-                  Due Date
-                </span>
-                <input
-                  type="date"
-                  value={captureDueDate}
-                  onChange={(event) => setCaptureDueDate(event.target.value)}
-                  className="w-full text-sm px-4 py-3 rounded-2xl"
-                  style={{
-                    background: 'rgba(255,255,255,0.06)',
-                    border: '1px solid rgba(255,255,255,0.1)',
-                    color: 'var(--text-primary)',
-                    colorScheme: 'dark',
-                  }}
-                />
-              </label>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs px-3 py-1.5 rounded-full" style={{ background: 'rgba(255,255,255,0.04)', color: 'var(--text-secondary)' }}>
+                {activePeriodBounds.label}
+              </span>
+              <InfoTooltip
+                text="Today stays deliberate. Week and Month auto-fill from task start dates, and tasks remain there until marked done."
+                widthClassName="w-72"
+              />
             </div>
-          </GlassCard>
-
-          <GlassCard padding="p-5">
-            <div className="flex items-start gap-3">
-              <div
-                className="w-11 h-11 rounded-2xl flex items-center justify-center"
-                style={{ background: 'rgba(34,211,238,0.12)', border: '1px solid rgba(34,211,238,0.22)' }}
-              >
-                <Target size={18} style={{ color: '#22d3ee' }} />
-              </div>
-              <div className="flex-1">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.24em]" style={{ color: 'var(--text-secondary)' }}>
-                  Carry Forward
-                </div>
-                <InlineInfoTitle
-                  title="Pull unfinished commitments into the live plan"
-                  info="Keep the plan honest instead of rebuilding it from memory every week or month."
-                  className="mt-2 text-lg"
-                />
-              </div>
-            </div>
-
-            <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
-              <button
-                type="button"
-                onClick={() => handleCarryForward('week')}
-                disabled={carryForwardState.weekCarryCount === 0}
-                className="text-left rounded-2xl px-4 py-4 transition-colors disabled:opacity-50"
-                style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Last Week</span>
-                  <RefreshCcw size={14} style={{ color: 'var(--text-secondary)' }} />
-                </div>
-                <div className="mt-3 text-2xl font-bold" style={{ color: '#10b981' }}>
-                  {carryForwardState.weekCarryCount}
-                </div>
-                <div className="mt-1 text-xs" style={{ color: 'var(--text-secondary)' }}>
-                  unfinished tasks ready to carry into this week
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleCarryForward('month')}
-                disabled={carryForwardState.monthCarryCount === 0}
-                className="text-left rounded-2xl px-4 py-4 transition-colors disabled:opacity-50"
-                style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Last Month</span>
-                  <RefreshCcw size={14} style={{ color: 'var(--text-secondary)' }} />
-                </div>
-                <div className="mt-3 text-2xl font-bold" style={{ color: '#a78bfa' }}>
-                  {carryForwardState.monthCarryCount}
-                </div>
-                <div className="mt-1 text-xs" style={{ color: 'var(--text-secondary)' }}>
-                  unfinished tasks ready to carry into this month
-                </div>
-              </button>
-            </div>
-          </GlassCard>
-        </div>
+          </div>
+        </GlassCard>
 
         <DragDropContext onDragEnd={onDragEnd}>
-          <div className="space-y-5">
-            {Object.entries(PERIOD_META).map(([periodType, meta]) => {
-              const Icon = meta.icon
-              const isSingleBucket = meta.buckets.length === 1
-              const bounds = periodType === 'day' ? todayBounds : periodType === 'week' ? weekBounds : monthBounds
+          <div className="grid grid-cols-1 gap-4">
+            <div className={activePeriodMeta.buckets.length === 1 ? 'grid grid-cols-1' : 'grid grid-cols-1 xl:grid-cols-3 gap-3'}>
+              {activePeriodMeta.buckets.map((bucket) => {
+                const droppableId = `${activePeriod}:${bucket}`
+                const color = PLANNING_BUCKET_COLORS[bucket]
 
-              return (
-                <div key={periodType}>
-                  <div className="flex items-center gap-3 mb-3">
-                    <div
-                      className="w-10 h-10 rounded-2xl flex items-center justify-center"
-                      style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}
-                    >
-                      <Icon size={16} style={{ color: 'var(--accent)' }} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <InlineInfoTitle
-                        title={meta.title}
-                        info={meta.description}
-                        className="text-lg"
-                        badge={(
-                          <span className="text-[11px] px-2 py-1 rounded-full" style={{ background: 'rgba(255,255,255,0.04)', color: 'var(--text-secondary)' }}>
-                            {bounds.label}
-                          </span>
-                        )}
-                      />
-                    </div>
-                  </div>
+                return (
+                  <PlanningBucket
+                    key={droppableId}
+                    droppableId={droppableId}
+                    title={PLANNING_BUCKET_LABELS[bucket]}
+                    hint={activePeriod === 'day' ? 'Drag to reorder priority inside Today.' : 'Drag within this lane to sequence the work.'}
+                    color={color}
+                    entries={entriesByDroppable[droppableId] ?? []}
+                    onOpenTask={handleOpenTask}
+                    onRemoveCommitment={removeCommitment}
+                    onStatusChange={handleStatusChange}
+                    emptyTitle={activePeriodMeta.emptyTitle}
+                    emptyDescription={activePeriodMeta.emptyDescription}
+                    compact
+                  />
+                )
+              })}
+            </div>
 
-                  <div className={isSingleBucket ? 'grid grid-cols-1' : 'grid grid-cols-1 xl:grid-cols-3 gap-4'}>
-                    {meta.buckets.map((bucket) => {
-                      const droppableId = `${periodType}:${bucket}`
-                      const color = PLANNING_BUCKET_COLORS[bucket]
-
-                      return (
-                        <PlanningBucket
-                          key={droppableId}
-                          droppableId={droppableId}
-                          title={PLANNING_BUCKET_LABELS[bucket]}
-                          hint={periodType === 'day' ? 'Drag to reorder priority inside today focus.' : 'Drag within this period to rebalance the plan.'}
-                          color={color}
-                          entries={entriesByDroppable[droppableId] ?? []}
-                          onOpenTask={handleOpenTask}
-                          onRemoveCommitment={removeCommitment}
-                          onStatusChange={handleStatusChange}
-                          emptyTitle={meta.emptyTitle}
-                          emptyDescription={meta.emptyDescription}
-                        />
-                      )
-                    })}
-                  </div>
+            <GlassCard padding="p-4">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.24em]" style={{ color: 'var(--text-secondary)' }}>
+                    Candidate pool
+                  </span>
+                  <InfoTooltip
+                    text="Recommended tasks are scored by urgency, priority, and current progress. Commit them into Today, Week, or Month without duplicating the task."
+                    widthClassName="w-72"
+                  />
                 </div>
-              )
-            })}
+
+                <div className="relative w-full lg:w-[340px]">
+                  <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-secondary)' }} />
+                  <input
+                    value={candidateQuery}
+                    onChange={(event) => setCandidateQuery(event.target.value)}
+                    placeholder="Search any task, program, or project"
+                    className="w-full text-sm pl-10 pr-3 py-2.5 rounded-2xl"
+                    style={{
+                      background: 'rgba(255,255,255,0.06)',
+                      border: '1px solid rgba(255,255,255,0.08)',
+                      color: 'var(--text-primary)',
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div className="mt-3 space-y-2.5">
+                {candidateTasks.length === 0 ? (
+                  <EmptyState
+                    icon={Sparkles}
+                    title="Nothing left to queue"
+                    description="All open work is already committed or completed."
+                  />
+                ) : candidateTasks.map(({ task, context }) => (
+                  <PlanningTaskRow
+                    key={task.id}
+                    task={task}
+                    context={context}
+                    isCandidate
+                    onOpen={() => handleOpenTask(task.id)}
+                    onStatusChange={handleStatusChange}
+                    targetState={currentTargetState.get(task.id) ?? { day: false, week: false, month: false }}
+                    onAssign={handleAssignTask}
+                  />
+                ))}
+              </div>
+
+              <div className="mt-3 flex items-center gap-2 text-xs" style={{ color: 'var(--text-secondary)' }}>
+                <CircleDot size={13} />
+                <span>Tasks only</span>
+                <InfoTooltip
+                  text="Programs, projects, and sub-projects remain context only. Planner commits tasks, not structure rows."
+                  widthClassName="w-72"
+                />
+              </div>
+            </GlassCard>
           </div>
         </DragDropContext>
-
-        <GlassCard padding="p-5" className="mt-5">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <div className="text-[11px] font-semibold uppercase tracking-[0.24em]" style={{ color: 'var(--text-secondary)' }}>
-                Candidate Pool
-              </div>
-              <InlineInfoTitle
-                title="Pull the next best work into the plan"
-                info="Recommended tasks are scored by urgency, priority, and current progress. Search if you want something specific."
-                className="mt-2 text-lg"
-              />
-            </div>
-
-            <div className="relative w-full lg:w-[360px]">
-              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-secondary)' }} />
-              <input
-                value={candidateQuery}
-                onChange={(event) => setCandidateQuery(event.target.value)}
-                placeholder="Search any task, program, or project"
-                className="w-full text-sm pl-10 pr-3 py-3 rounded-2xl"
-                style={{
-                  background: 'rgba(255,255,255,0.06)',
-                  border: '1px solid rgba(255,255,255,0.08)',
-                  color: 'var(--text-primary)',
-                }}
-              />
-            </div>
-          </div>
-
-          <div className="mt-4 space-y-3">
-            {candidateTasks.length === 0 ? (
-              <EmptyState
-                icon={Sparkles}
-                title="Nothing left to queue"
-                description="All open work is already committed or completed."
-              />
-            ) : candidateTasks.map(({ task, context }) => (
-              <PlanningTaskRow
-                key={task.id}
-                task={task}
-                context={context}
-                isCandidate
-                onOpen={() => handleOpenTask(task.id)}
-                onStatusChange={handleStatusChange}
-                targetState={currentTargetState.get(task.id) ?? { day: false, week: false, month: false }}
-                onAssign={handleAssignTask}
-              />
-            ))}
-          </div>
-
-          <div className="mt-4 flex items-center gap-2 text-xs" style={{ color: 'var(--text-secondary)' }}>
-            <CircleDot size={13} />
-            <span>Tasks only</span>
-            <InfoTooltip
-              text="Candidates stay task-based only. Programs, projects, and sub-projects remain context, not separate rows here. Use the plan buttons to commit a task to Today, Week, or Month without duplicating it."
-              widthClassName="w-72"
-            />
-          </div>
-        </GlassCard>
       </div>
     </div>
   )
