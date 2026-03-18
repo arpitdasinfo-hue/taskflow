@@ -6,6 +6,8 @@ import {
   ChevronRight,
   ChevronUpSquare,
   Filter,
+  Maximize2,
+  Minimize2,
   Search,
   Target,
 } from 'lucide-react'
@@ -84,6 +86,8 @@ const TimelineToolbar = memo(function TimelineToolbar({
   onExpandAll,
   onCollapseAll,
   onToggleFilterPanel,
+  onToggleFullscreen,
+  isFullscreen = false,
 }) {
   const currentView = TIMELINE_VIEW_MODES[viewMode] ?? TIMELINE_VIEW_MODES.roadmap
   const [customPickerOpen, setCustomPickerOpen] = useState(false)
@@ -331,6 +335,20 @@ const TimelineToolbar = memo(function TimelineToolbar({
                 </span>
               )}
             </button>
+
+            {onToggleFullscreen && (
+              <button
+                onClick={onToggleFullscreen}
+                className={toggleButtonClass}
+                style={isFullscreen
+                  ? { background: 'rgba(var(--accent-rgb),0.15)', color: 'var(--accent)', border: '1px solid rgba(var(--accent-rgb),0.45)' }
+                  : { background: 'rgba(255,255,255,0.04)', color: 'var(--text-secondary)', border: '1px solid rgba(255,255,255,0.1)' }}
+                title={isFullscreen ? 'Exit fullscreen' : 'Open fullscreen'}
+              >
+                {isFullscreen ? <Minimize2 size={12} /> : <Maximize2 size={12} />}
+                {isFullscreen ? 'Exit full' : 'Fullscreen'}
+              </button>
+            )}
           </div>
         </div>
 

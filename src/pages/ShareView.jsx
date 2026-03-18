@@ -26,6 +26,7 @@ import TimelineGrid from '../components/timeline/TimelineGrid'
 import TimelineLegend from '../components/timeline/TimelineLegend'
 import useTimelineScale from '../hooks/useTimelineScale'
 import useTimelineRows from '../hooks/useTimelineRows'
+import useElementFullscreen from '../hooks/useElementFullscreen'
 import { TIMELINE_VIEW_MODES } from '../components/timeline/timelineConfig'
 import { getTaskProgramId } from '../lib/taskScope'
 import { sortTasksByStartDate } from '../lib/taskSort'
@@ -256,6 +257,7 @@ const ScopeFilterBar = ({
 )
 
 const ManagerGantt = ({ programs, projects, tasks, milestones }) => {
+  const { targetRef: fullscreenRef, isFullscreen, toggleFullscreen } = useElementFullscreen()
   const [filteredProgramIds, setFilteredProgramIds] = useState(() => new Set())
   const [filteredProjectIds, setFilteredProjectIds] = useState(() => new Set())
   const [filteredSubProjectIds, setFilteredSubProjectIds] = useState(() => new Set())
@@ -430,7 +432,7 @@ const ManagerGantt = ({ programs, projects, tasks, milestones }) => {
   }
 
   return (
-    <div className="space-y-2.5">
+    <div ref={fullscreenRef} className={`gantt-fullscreen-shell space-y-2.5 ${isFullscreen ? 'is-fullscreen' : ''}`}>
       <TimelineToolbar
         zoom={zoom}
         rangeLabel={rangeLabel}
@@ -453,6 +455,8 @@ const ManagerGantt = ({ programs, projects, tasks, milestones }) => {
         readOnly
         compact
         hideScopeControls
+        isFullscreen={isFullscreen}
+        onToggleFullscreen={toggleFullscreen}
         onChangeProgram={setProgramScope}
         onChangeProject={setProjectScope}
         onChangeSubProject={setSubProjectScope}

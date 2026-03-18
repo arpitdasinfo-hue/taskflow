@@ -13,6 +13,7 @@ import useSettingsStore from '../store/useSettingsStore'
 import useTimelineScale from '../hooks/useTimelineScale'
 import useTimelineRows from '../hooks/useTimelineRows'
 import useWorkspaceScopedData from '../hooks/useWorkspaceScopedData'
+import useElementFullscreen from '../hooks/useElementFullscreen'
 
 const NOTICE_TIMEOUT_MS = 6000
 
@@ -67,6 +68,7 @@ const Timeline = memo(function Timeline() {
   const [showDependencies, setShowDependencies] = useState(ganttConfig.showDependencies ?? true)
   const [showFilterPanel, setShowFilterPanel] = useState(false)
   const [scheduleNotice, setScheduleNotice] = useState(null)
+  const { targetRef: fullscreenRef, isFullscreen, toggleFullscreen } = useElementFullscreen()
 
   const initializedExpandedRef = useRef((ganttConfig.expandedProjectIds ?? []).length > 0)
   const restoredScaleRef = useRef(false)
@@ -502,95 +504,98 @@ const Timeline = memo(function Timeline() {
   return (
     <div className="flex-1 flex flex-col min-h-0 overflow-y-auto">
       <Header />
-
-      <TimelineToolbar
-        zoom={zoom}
-        rangeLabel={rangeLabel}
-        stats={stats}
-        selectedProgramId={selectedProgramId}
-        selectedProjectId={selectedProjectId}
-        selectedSubProjectId={selectedSubProjectId}
-        visiblePrograms={programs}
-        visibleProjects={visibleProjects}
-        visibleSubProjects={visibleSubProjects}
-        viewMode={viewMode}
-        searchQuery={searchQuery}
-        isCustomRange={isCustomRange}
-        customRangeStart={customStartInput}
-        customRangeEnd={customEndInput}
-        visibleCounts={visibleCounts}
-        expandableProjectCount={expandableProjectIds.length}
-        activeFilterCount={activeFilterCount}
-        filterPanelOpen={showFilterPanel}
-        onChangeProgram={setProgramScope}
-        onChangeProject={setProjectScope}
-        onChangeSubProject={setSubProjectScope}
-        onChangeViewMode={applyViewMode}
-        onSearchChange={setSearchQuery}
-        onChangeZoom={changeZoom}
-        onChangeCustomRangeStart={setCustomStartInput}
-        onChangeCustomRangeEnd={setCustomEndInput}
-        onApplyCustomRange={applyCustomTimelineRange}
-        onShiftRange={shiftRange}
-        onResetToToday={resetToToday}
-        onExpandAll={expandAllProjects}
-        onCollapseAll={collapseAllProjects}
-        onToggleFilterPanel={() => setShowFilterPanel((value) => !value)}
-      />
-
-      <TimelinePlanningPanel
-        savedViews={savedGanttViews}
-        activeSavedViewId={activeSavedViewId}
-        onApplySavedView={applySavedView}
-        onSaveCurrentView={saveCurrentView}
-        onDeleteSavedView={deleteGanttView}
-        showInsights={false}
-      />
-
-      {showFilterPanel && (
-        <TimelineFilterBar
-          onlyDelayed={onlyDelayed}
-          onlyCritical={onlyCritical}
-          onlyDependencyRisk={onlyDependencyRisk}
-          showDependencies={showDependencies}
-          onToggleOnlyDelayed={() => setOnlyDelayed((value) => !value)}
-          onToggleOnlyCritical={() => setOnlyCritical((value) => !value)}
-          onToggleOnlyDependencyRisk={() => setOnlyDependencyRisk((value) => !value)}
-          onToggleShowDependencies={() => setShowDependencies((value) => !value)}
-          onClear={clearFilters}
-          onClose={() => setShowFilterPanel(false)}
+      <div ref={fullscreenRef} className={`gantt-fullscreen-shell ${isFullscreen ? 'is-fullscreen' : ''}`}>
+        <TimelineToolbar
+          zoom={zoom}
+          rangeLabel={rangeLabel}
+          stats={stats}
+          selectedProgramId={selectedProgramId}
+          selectedProjectId={selectedProjectId}
+          selectedSubProjectId={selectedSubProjectId}
+          visiblePrograms={programs}
+          visibleProjects={visibleProjects}
+          visibleSubProjects={visibleSubProjects}
+          viewMode={viewMode}
+          searchQuery={searchQuery}
+          isCustomRange={isCustomRange}
+          customRangeStart={customStartInput}
+          customRangeEnd={customEndInput}
+          visibleCounts={visibleCounts}
+          expandableProjectCount={expandableProjectIds.length}
+          activeFilterCount={activeFilterCount}
+          filterPanelOpen={showFilterPanel}
+          isFullscreen={isFullscreen}
+          onToggleFullscreen={toggleFullscreen}
+          onChangeProgram={setProgramScope}
+          onChangeProject={setProjectScope}
+          onChangeSubProject={setSubProjectScope}
+          onChangeViewMode={applyViewMode}
+          onSearchChange={setSearchQuery}
+          onChangeZoom={changeZoom}
+          onChangeCustomRangeStart={setCustomStartInput}
+          onChangeCustomRangeEnd={setCustomEndInput}
+          onApplyCustomRange={applyCustomTimelineRange}
+          onShiftRange={shiftRange}
+          onResetToToday={resetToToday}
+          onExpandAll={expandAllProjects}
+          onCollapseAll={collapseAllProjects}
+          onToggleFilterPanel={() => setShowFilterPanel((value) => !value)}
         />
-      )}
 
-      <TimelineLegend />
+        <TimelinePlanningPanel
+          savedViews={savedGanttViews}
+          activeSavedViewId={activeSavedViewId}
+          onApplySavedView={applySavedView}
+          onSaveCurrentView={saveCurrentView}
+          onDeleteSavedView={deleteGanttView}
+          showInsights={false}
+        />
 
-      <div className="px-4 md:px-6 pb-6">
-        <div
-          className="rounded-[24px] overflow-hidden"
-          style={{
-            background: 'linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0.018))',
-            border: '1px solid rgba(255,255,255,0.08)',
-            boxShadow: '0 22px 48px rgba(0,0,0,0.18)',
-          }}
-        >
-          {rows.length === 0 ? (
-            <TimelineEmptyState filtered={filtered} />
-          ) : (
-            <TimelineGrid
-              rows={rows}
-              startDate={startDate}
-              days={config.days}
-              cellWidth={config.cellWidth}
-              zoom={zoom}
-              onToggleProject={toggleExpandedProject}
-              onSelectTask={selectTask}
-              onUpdateTaskSchedule={handleTaskScheduleUpdate}
-              onUpdateProjectSchedule={handleProjectScheduleUpdate}
-              onCreateTaskInRange={createTaskInRange}
-              showDependencies={showDependencies}
-              onlyDependencyRisk={onlyDependencyRisk}
-            />
-          )}
+        {showFilterPanel && (
+          <TimelineFilterBar
+            onlyDelayed={onlyDelayed}
+            onlyCritical={onlyCritical}
+            onlyDependencyRisk={onlyDependencyRisk}
+            showDependencies={showDependencies}
+            onToggleOnlyDelayed={() => setOnlyDelayed((value) => !value)}
+            onToggleOnlyCritical={() => setOnlyCritical((value) => !value)}
+            onToggleOnlyDependencyRisk={() => setOnlyDependencyRisk((value) => !value)}
+            onToggleShowDependencies={() => setShowDependencies((value) => !value)}
+            onClear={clearFilters}
+            onClose={() => setShowFilterPanel(false)}
+          />
+        )}
+
+        <TimelineLegend />
+
+        <div className="px-4 md:px-6 pb-6">
+          <div
+            className="rounded-[24px] overflow-hidden"
+            style={{
+              background: 'linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0.018))',
+              border: '1px solid rgba(255,255,255,0.08)',
+              boxShadow: '0 22px 48px rgba(0,0,0,0.18)',
+            }}
+          >
+            {rows.length === 0 ? (
+              <TimelineEmptyState filtered={filtered} />
+            ) : (
+              <TimelineGrid
+                rows={rows}
+                startDate={startDate}
+                days={config.days}
+                cellWidth={config.cellWidth}
+                zoom={zoom}
+                onToggleProject={toggleExpandedProject}
+                onSelectTask={selectTask}
+                onUpdateTaskSchedule={handleTaskScheduleUpdate}
+                onUpdateProjectSchedule={handleProjectScheduleUpdate}
+                onCreateTaskInRange={createTaskInRange}
+                showDependencies={showDependencies}
+                onlyDependencyRisk={onlyDependencyRisk}
+              />
+            )}
+          </div>
         </div>
       </div>
 
