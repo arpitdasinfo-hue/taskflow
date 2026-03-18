@@ -521,7 +521,6 @@ const Timeline = memo(function Timeline() {
           customRangeStart={customStartInput}
           customRangeEnd={customEndInput}
           visibleCounts={visibleCounts}
-          expandableProjectCount={expandableProjectIds.length}
           activeFilterCount={activeFilterCount}
           filterPanelOpen={showFilterPanel}
           isFullscreen={isFullscreen}
@@ -537,8 +536,6 @@ const Timeline = memo(function Timeline() {
           onApplyCustomRange={applyCustomTimelineRange}
           onShiftRange={shiftRange}
           onResetToToday={resetToToday}
-          onExpandAll={expandAllProjects}
-          onCollapseAll={collapseAllProjects}
           onToggleFilterPanel={() => setShowFilterPanel((value) => !value)}
         />
 

@@ -1,10 +1,8 @@
 import { memo, useEffect, useState } from 'react'
 import {
   CalendarRange,
-  ChevronDownSquare,
   ChevronLeft,
   ChevronRight,
-  ChevronUpSquare,
   Filter,
   Maximize2,
   Minimize2,
@@ -65,7 +63,6 @@ const TimelineToolbar = memo(function TimelineToolbar({
   filterPanelOpen,
   searchQuery = '',
   visibleCounts = { programs: 0, projects: 0, tasks: 0 },
-  expandableProjectCount = 0,
   readOnly = false,
   compact = false,
   hideScopeControls = false,
@@ -83,8 +80,6 @@ const TimelineToolbar = memo(function TimelineToolbar({
   onApplyCustomRange,
   onShiftRange,
   onResetToToday,
-  onExpandAll,
-  onCollapseAll,
   onToggleFilterPanel,
   onToggleFullscreen,
   isFullscreen = false,
@@ -297,28 +292,6 @@ const TimelineToolbar = memo(function TimelineToolbar({
               <Target size={12} />
               Today
             </button>
-
-            <div className="flex items-center gap-2">
-              <button
-                onClick={onExpandAll}
-                disabled={expandableProjectCount === 0}
-                className={secondaryButtonClass}
-                style={{ background: 'rgba(255,255,255,0.04)', color: 'var(--text-secondary)', border: '1px solid rgba(255,255,255,0.08)' }}
-              >
-                <ChevronDownSquare size={13} />
-                Expand
-              </button>
-
-              <button
-                onClick={onCollapseAll}
-                disabled={expandableProjectCount === 0}
-                className={secondaryButtonClass}
-                style={{ background: 'rgba(255,255,255,0.04)', color: 'var(--text-secondary)', border: '1px solid rgba(255,255,255,0.08)' }}
-              >
-                <ChevronUpSquare size={13} />
-                Collapse
-              </button>
-            </div>
 
             <button
               onClick={onToggleFilterPanel}
