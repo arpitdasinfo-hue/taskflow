@@ -170,6 +170,8 @@ export default function App() {
   const taskSyncError = useTaskStore((s) => s.syncError)
   const clearTaskSyncError = useTaskStore((s) => s.clearSyncError)
   const loadPlanningFromSupabase = usePlanningStore((s) => s.loadFromSupabase)
+  const planningSyncError = usePlanningStore((s) => s.syncError)
+  const clearPlanningSyncError = usePlanningStore((s) => s.clearSyncError)
   const resetPlanning = usePlanningStore((s) => s.reset)
   const [syncReady, setSyncReady] = useState(false)
   const [needRefresh, setNeedRefresh] = useState(false)
@@ -206,7 +208,7 @@ export default function App() {
   const shareToken = window.location.pathname.startsWith('/share/')
     ? window.location.pathname.split('/share/')[1]
     : ''
-  const syncIssueMessage = workspaceError || taskSyncError || projectSyncError
+  const syncIssueMessage = workspaceError || taskSyncError || projectSyncError || planningSyncError
 
   useEffect(() => { init() }, [init])
 
@@ -475,6 +477,7 @@ export default function App() {
           useWorkspaceStore.setState({ error: '' })
           clearTaskSyncError()
           clearProjectSyncError()
+          clearPlanningSyncError()
         }}
       />
 

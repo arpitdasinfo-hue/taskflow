@@ -113,6 +113,8 @@ const useSettingsStore = create(
       filters: { status: [], priority: [], tags: [] },
       activeProjectId: null,
       activeProgramId: null,
+      taskDrilldown: null,
+      analyticsInsight: null,
       workspaceViewScope: 'professional',
       projectsViewMode: 'portfolio',
       selectedTaskIds: [],
@@ -260,6 +262,8 @@ const useSettingsStore = create(
         s.activePage = page
         s.selectedTaskId = null
         s.selectedTaskIds = []
+        if (page !== 'tasks') s.taskDrilldown = null
+        if (page !== 'program-dashboard') s.analyticsInsight = null
       }),
 
       // ── Task selection ─────────────────────────────────────────────────
@@ -294,6 +298,8 @@ const useSettingsStore = create(
         s.workspaceViewScope = scope === 'personal' ? 'personal' : 'professional'
         s.activeProgramId = null
         s.activeProjectId = null
+        s.taskDrilldown = null
+        s.analyticsInsight = null
         s.selectedTaskId = null
         s.selectedTaskIds = []
         s.ganttConfig = {
@@ -303,6 +309,22 @@ const useSettingsStore = create(
           filteredSubProjectIds: [],
           expandedProjectIds: [],
         }
+      }),
+
+      setTaskDrilldown: (value) => set((s) => {
+        s.taskDrilldown = value ?? null
+      }),
+
+      clearTaskDrilldown: () => set((s) => {
+        s.taskDrilldown = null
+      }),
+
+      setAnalyticsInsight: (value) => set((s) => {
+        s.analyticsInsight = value ?? null
+      }),
+
+      clearAnalyticsInsight: () => set((s) => {
+        s.analyticsInsight = null
       }),
 
       // ── Project filter ────────────────────────────────────────────────
@@ -341,9 +363,15 @@ const useSettingsStore = create(
     {
       name: 'taskflow-settings',
       storage: createJSONStorage(() => localStorage),
-      version: 10,
+      version: 11,
       partialize: (state) => {
-        const { selectedTaskId: _s1, selectedTaskIds: _s2, ...rest } = state
+        const {
+          selectedTaskId: _s1,
+          selectedTaskIds: _s2,
+          taskDrilldown: _s3,
+          analyticsInsight: _s4,
+          ...rest
+        } = state
         return rest
       },
       migrate: (state, version) => {
@@ -392,6 +420,13 @@ const useSettingsStore = create(
           s = {
             ...s,
             workspaceViewScope: s?.workspaceViewScope === 'personal' ? 'personal' : 'professional',
+          }
+        }
+        if (version < 11) {
+          s = {
+            ...s,
+            taskDrilldown: null,
+            analyticsInsight: null,
           }
         }
         if (version < 6) {

@@ -138,7 +138,10 @@ create policy "share_links owner insert" on share_links for insert
           left join programs pg on pg.id = p.program_id
           where p.id = resource_id
             and p.workspace_id in (select workspace_id from workspace_members where user_id = auth.uid())
-            and (pg.id is null or coalesce(pg.scope, 'professional') <> 'personal')
+            and (
+              (pg.id is not null and coalesce(pg.scope, 'professional') <> 'personal')
+              or (pg.id is null and coalesce(p.scope, 'professional') <> 'personal')
+            )
         )
       )
     )
@@ -170,7 +173,10 @@ create policy "share_links owner update" on share_links for update
           left join programs pg on pg.id = p.program_id
           where p.id = resource_id
             and p.workspace_id in (select workspace_id from workspace_members where user_id = auth.uid())
-            and (pg.id is null or coalesce(pg.scope, 'professional') <> 'personal')
+            and (
+              (pg.id is not null and coalesce(pg.scope, 'professional') <> 'personal')
+              or (pg.id is null and coalesce(p.scope, 'professional') <> 'personal')
+            )
         )
       )
     )
@@ -219,7 +225,10 @@ drop policy if exists "projects shared read" on projects;
 create policy "projects shared read" on projects for select
   using (
     (
-      projects.program_id is null
+      (
+        projects.program_id is null
+        and coalesce(projects.scope, 'professional') <> 'personal'
+      )
       or exists (
         select 1
         from programs p
@@ -268,7 +277,10 @@ create policy "tasks shared read" on tasks for select
         from projects p
         left join programs pg on pg.id = p.program_id
         where p.id = tasks.project_id
-          and (pg.id is null or coalesce(pg.scope, 'professional') <> 'personal')
+          and (
+            (pg.id is not null and coalesce(pg.scope, 'professional') <> 'personal')
+            or (pg.id is null and coalesce(p.scope, 'professional') <> 'personal')
+          )
       )
     )
     and
@@ -309,7 +321,10 @@ create policy "milestones shared read" on milestones for select
         or (sl.resource_type = 'workspace' and sl.workspace_id = p.workspace_id)
       )
       where p.id = milestones.project_id
-        and (pg.id is null or coalesce(pg.scope, 'professional') <> 'personal')
+        and (
+          (pg.id is not null and coalesce(pg.scope, 'professional') <> 'personal')
+          or (pg.id is null and coalesce(p.scope, 'professional') <> 'personal')
+        )
         and sl.access_mode = 'view'
         and coalesce(sl.disabled, false) = false
         and sl.revoked_at is null

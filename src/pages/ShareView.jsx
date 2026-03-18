@@ -13,11 +13,10 @@ import GlassCard from '../components/common/GlassCard'
 import InfoTooltip from '../components/common/InfoTooltip'
 import MilestoneTimeline from '../components/common/MilestoneTimeline'
 import ScopeBar from '../components/common/ScopeBar'
+import TaskDataTable, { TaskContextChip } from '../components/tasks/TaskDataTable'
 import { supabase } from '../lib/supabase'
 import {
   DEFAULT_SHARE_CONFIG,
-  TASK_PRIORITY_OPTIONS,
-  TASK_STATUS_OPTIONS,
   isShareLinkActive,
   normalizeShareConfig,
 } from '../lib/share'
@@ -29,21 +28,7 @@ import useTimelineScale from '../hooks/useTimelineScale'
 import useTimelineRows from '../hooks/useTimelineRows'
 import { TIMELINE_VIEW_MODES } from '../components/timeline/timelineConfig'
 import { getTaskProgramId } from '../lib/taskScope'
-
-const PRIORITY_COLOR = {
-  critical: '#ef4444',
-  high: '#f97316',
-  medium: '#f59e0b',
-  low: '#94a3b8',
-}
-
-const STATUS_COLOR = {
-  todo: '#94a3b8',
-  'in-progress': '#22d3ee',
-  review: '#f59e0b',
-  blocked: '#ef4444',
-  done: '#10b981',
-}
+import { sortTasksByStartDate } from '../lib/taskSort'
 
 const isValidDate = (value) => {
   if (!value) return false
@@ -1409,73 +1394,35 @@ export default function ShareView({ token }) {
                     {filteredTasks.length === 0 ? (
                       <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>No tasks in this shared scope.</p>
                     ) : (
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-xs min-w-[920px]">
-                          <thead>
-                            <tr style={{ color: 'var(--text-secondary)' }}>
-                              <th className="text-left py-2">Task</th>
-                              <th className="text-left py-2">Project</th>
-                              <th className="text-left py-2">Status</th>
-                              <th className="text-left py-2">Priority</th>
-                              <th className="text-left py-2">Start</th>
-                              <th className="text-left py-2">Due</th>
-                              {shareConfig.modules.dependencies && <th className="text-left py-2">Dependencies</th>}
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {filteredTasks
-                              .slice()
-                              .sort((a, b) => {
-                                if (!a.dueDate && !b.dueDate) return 0
-                                if (!a.dueDate) return 1
-                                if (!b.dueDate) return -1
-                                return startOfDayTs(a.dueDate) - startOfDayTs(b.dueDate)
-                              })
-                              .map((task) => {
-                                const project = task.projectId ? projectById.get(task.projectId) : null
-                                const program = getTaskProgramId(task, projects)
-                                  ? programById.get(getTaskProgramId(task, projects))
-                                  : null
-                                return (
-                                  <tr key={task.id} style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-                                    <td className="py-3">
-                                      <p className="text-[12px] font-medium" style={{ color: 'var(--text-primary)' }}>{task.title}</p>
-                                      {shareConfig.modules.details && task.description && (
-                                        <p className="text-[10px] line-clamp-2 mt-1" style={{ color: 'var(--text-secondary)' }}>
-                                          {task.description}
-                                        </p>
-                                      )}
-                                    </td>
-                                    <td className="py-3" style={{ color: 'var(--text-secondary)' }}>
-                                      {project?.name || (program ? `${program.name} · Program` : '—')}
-                                    </td>
-                                    <td className="py-3">
-                                      <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: `${STATUS_COLOR[task.status] || '#94a3b8'}22`, color: STATUS_COLOR[task.status] || '#94a3b8' }}>
-                                        {TASK_STATUS_OPTIONS.find((item) => item.key === task.status)?.label || task.status}
-                                      </span>
-                                    </td>
-                                    <td className="py-3">
-                                      <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: `${PRIORITY_COLOR[task.priority] || '#94a3b8'}22`, color: PRIORITY_COLOR[task.priority] || '#94a3b8' }}>
-                                        {TASK_PRIORITY_OPTIONS.find((item) => item.key === task.priority)?.label || task.priority}
-                                      </span>
-                                    </td>
-                                    <td className="py-3" style={{ color: 'var(--text-secondary)' }}>{fmtDate(task.startDate)}</td>
-                                    <td className="py-3" style={{ color: 'var(--text-secondary)' }}>{fmtDate(task.dueDate)}</td>
-                                    {shareConfig.modules.dependencies && (
-                                      <td className="py-3" style={{ color: 'var(--text-secondary)' }}>
-                                        {task.dependsOn?.length
-                                          ? task.dependsOn
-                                              .map((dependencyId) => taskById.get(dependencyId)?.title || 'Unavailable task')
-                                              .join(', ')
-                                          : '—'}
-                                      </td>
-                                    )}
-                                  </tr>
-                                )
-                              })}
-                          </tbody>
-                        </table>
-                      </div>
+                      <TaskDataTable
+                        items={filteredTasks.slice().sort(sortTasksByStartDate)}
+                        getContextContent={(task) => {
+                          const project = task.projectId ? projectById.get(task.projectId) : null
+                          const programId = getTaskProgramId(task, projects)
+                          const program = programId ? programById.get(programId) : null
+                          const label = program?.name || 'Standalone'
+                          const color = program?.color || project?.color || '#94a3b8'
+                          return <TaskContextChip label={label} color={color} />
+                        }}
+                        getProjectContent={(task) => {
+                          const project = task.projectId ? projectById.get(task.projectId) : null
+                          const programId = getTaskProgramId(task, projects)
+                          const program = programId ? programById.get(programId) : null
+                          return project?.name || (program ? 'Program task' : 'Standalone')
+                        }}
+                        extraColumns={shareConfig.modules.dependencies ? [{
+                          key: 'dependencies',
+                          label: 'Dependencies',
+                          render: (task) => (
+                            task.dependsOn?.length
+                              ? task.dependsOn
+                                  .map((dependencyId) => taskById.get(dependencyId)?.title || 'Unavailable task')
+                                  .join(', ')
+                              : '—'
+                          ),
+                        }] : []}
+                        minWidthClassName={shareConfig.modules.dependencies ? 'min-w-[1040px]' : 'min-w-[920px]'}
+                      />
                     )}
                   </Section>
                 )}

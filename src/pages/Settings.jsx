@@ -92,6 +92,9 @@ const Settings = memo(function Settings() {
   const clearProjectSyncError = useProjectStore((s) => s.clearSyncError)
   const projectLastSyncedAt = useProjectStore((s) => s.lastSyncedAt)
   const planningSyncing = usePlanningStore((s) => s.syncing)
+  const planningSyncError = usePlanningStore((s) => s.syncError)
+  const clearPlanningSyncError = usePlanningStore((s) => s.clearSyncError)
+  const planningLastSyncedAt = usePlanningStore((s) => s.lastSyncedAt)
   const [showExport, setShowExport] = useState(false)
 
   const [openSections, setOpenSections] = useState({
@@ -146,22 +149,22 @@ const Settings = memo(function Settings() {
                 <div
                   className="rounded-2xl px-4 py-3"
                   style={{
-                    background: taskSyncError || workspaceError ? 'rgba(239,68,68,0.08)' : 'rgba(16,185,129,0.08)',
-                    border: taskSyncError || workspaceError ? '1px solid rgba(239,68,68,0.16)' : '1px solid rgba(16,185,129,0.16)',
+                    background: taskSyncError || projectSyncError || planningSyncError || workspaceError ? 'rgba(239,68,68,0.08)' : 'rgba(16,185,129,0.08)',
+                    border: taskSyncError || projectSyncError || planningSyncError || workspaceError ? '1px solid rgba(239,68,68,0.16)' : '1px solid rgba(16,185,129,0.16)',
                   }}
                 >
                   <div className="flex items-center gap-2">
-                    {taskSyncError || workspaceError ? (
+                    {taskSyncError || projectSyncError || planningSyncError || workspaceError ? (
                       <AlertTriangle size={14} style={{ color: '#fca5a5' }} />
                     ) : (
                       <CheckCircle2 size={14} style={{ color: '#10b981' }} />
                     )}
                     <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-                    {taskSyncError || projectSyncError || workspaceError ? 'Cloud sync needs attention' : 'Cloud sync healthy'}
+                    {taskSyncError || projectSyncError || planningSyncError || workspaceError ? 'Cloud sync needs attention' : 'Cloud sync healthy'}
                   </span>
                 </div>
                 <p className="mt-2 text-xs leading-6" style={{ color: 'var(--text-secondary)' }}>
-                    {workspaceError || taskSyncError || projectSyncError || 'Workspace is connected and task writes are reaching Supabase.'}
+                    {workspaceError || taskSyncError || projectSyncError || planningSyncError || 'Workspace is connected and writes are reaching Supabase.'}
                   </p>
                 </div>
 
@@ -173,7 +176,8 @@ const Settings = memo(function Settings() {
                     { label: 'Last task sync', value: formatLastSeen(taskLastSyncedAt) },
                     { label: 'Project / milestone sync', value: projectSyncing ? 'Syncing now' : projectSyncError ? 'Issue detected' : 'Healthy' },
                     { label: 'Last project sync', value: formatLastSeen(projectLastSyncedAt) },
-                    { label: 'Planner sync', value: planningSyncing ? 'Syncing now' : 'Idle' },
+                    { label: 'Planner sync', value: planningSyncing ? 'Syncing now' : planningSyncError ? 'Issue detected' : 'Healthy' },
+                    { label: 'Last planner sync', value: formatLastSeen(planningLastSyncedAt) },
                   ].map(({ label, value }) => (
                     <div
                       key={label}
@@ -190,7 +194,7 @@ const Settings = memo(function Settings() {
                   ))}
                 </div>
 
-                {(taskSyncError || projectSyncError) && (
+                {(taskSyncError || projectSyncError || planningSyncError) && (
                   <div className="flex items-center justify-between gap-3 rounded-2xl px-4 py-3" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
                     <div className="flex items-center gap-2 min-w-0">
                       <RefreshCw size={14} style={{ color: 'var(--accent)' }} />
@@ -203,6 +207,7 @@ const Settings = memo(function Settings() {
                       onClick={() => {
                         clearTaskSyncError()
                         clearProjectSyncError()
+                        clearPlanningSyncError()
                       }}
                       className="px-3 py-2 rounded-xl text-xs font-medium"
                       style={{ background: 'rgba(var(--accent-rgb),0.12)', color: 'var(--accent)', border: '1px solid rgba(var(--accent-rgb),0.24)' }}

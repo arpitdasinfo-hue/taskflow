@@ -174,6 +174,10 @@ const Dashboard = memo(function Dashboard() {
   const setActiveProgram = useSettingsStore((state) => state.setActiveProgram)
   const setActiveProject = useSettingsStore((state) => state.setActiveProject)
   const selectTask = useSettingsStore((state) => state.selectTask)
+  const setTaskDrilldown = useSettingsStore((state) => state.setTaskDrilldown)
+  const clearTaskDrilldown = useSettingsStore((state) => state.clearTaskDrilldown)
+  const setAnalyticsInsight = useSettingsStore((state) => state.setAnalyticsInsight)
+  const clearAnalyticsInsight = useSettingsStore((state) => state.clearAnalyticsInsight)
   const { programs, projects, milestones, tasks } = useWorkspaceScopedData()
   const commitments = usePlanningStore((state) => state.commitments)
   const allStats = useAllProgramStats({ programs, projects, milestones, tasks })
@@ -258,6 +262,31 @@ const Dashboard = memo(function Dashboard() {
     return 'Standalone task'
   }
 
+  const openTasksView = (drilldown = null) => {
+    clearAnalyticsInsight()
+    if (drilldown) setTaskDrilldown(drilldown)
+    else clearTaskDrilldown()
+    setPage('tasks')
+  }
+
+  const openPlanner = () => {
+    clearTaskDrilldown()
+    clearAnalyticsInsight()
+    setPage('today')
+  }
+
+  const openPrograms = () => {
+    clearTaskDrilldown()
+    clearAnalyticsInsight()
+    setPage('projects')
+  }
+
+  const openAnalytics = (insight) => {
+    clearTaskDrilldown()
+    setAnalyticsInsight(insight)
+    setPage('program-dashboard')
+  }
+
   if (programs.length === 0 && activeTasks.length === 0) {
     return (
       <div className="flex-1 overflow-y-auto px-4 md:px-6 pb-24 md:pb-8">
@@ -269,7 +298,7 @@ const Dashboard = memo(function Dashboard() {
           <p className="mt-2 text-sm" style={{ color: 'var(--text-secondary)' }}>
             The dashboard becomes useful once the first program, project, and tasks exist.
           </p>
-          <button type="button" onClick={() => setPage('projects')} className="btn-accent mt-5 px-4 py-2 text-sm">
+          <button type="button" onClick={openPrograms} className="btn-accent mt-5 px-4 py-2 text-sm">
             Create program
           </button>
         </GlassCard>
@@ -293,23 +322,27 @@ const Dashboard = memo(function Dashboard() {
               Review delivery pressure, launches, and next actions from one clean surface.
             </p>
             <div className="mt-4 flex flex-wrap items-center gap-2">
-              <button type="button" onClick={() => setPage('today')} className="btn-accent px-3 py-2 text-xs">
+              <button type="button" onClick={openPlanner} className="btn-accent px-3 py-2 text-xs">
                 Open planner
               </button>
-              <button type="button" onClick={() => setPage('tasks')} className="btn-ghost px-3 py-2 text-xs">
+              <button type="button" onClick={() => openTasksView('open')} className="btn-ghost px-3 py-2 text-xs">
                 Open all tasks
               </button>
-              <button type="button" onClick={() => setPage('timeline')} className="btn-ghost px-3 py-2 text-xs">
+              <button type="button" onClick={() => {
+                clearTaskDrilldown()
+                clearAnalyticsInsight()
+                setPage('timeline')
+              }} className="btn-ghost px-3 py-2 text-xs">
                 Open gantt
               </button>
             </div>
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2 xl:w-[500px]">
-            <StatPill label="Open work" value={openTasks.length} tone="accent" onClick={() => setPage('tasks')} />
-            <StatPill label="This week" value={weekCommitments.length} tone="default" onClick={() => setPage('today')} />
-            <StatPill label="Next launch" value={nextMilestone ? formatShortDate(nextMilestone.dueDate) : 'None'} tone={nextMilestone ? 'success' : 'neutral'} onClick={() => setPage('program-dashboard')} />
-            <StatPill label="Risk" value={flaggedPrograms.length > 0 ? `${flaggedPrograms.length} flagged` : 'Stable'} tone={flaggedPrograms.length > 0 ? 'danger' : 'success'} onClick={() => setPage('program-dashboard')} />
+            <StatPill label="Open work" value={openTasks.length} tone="accent" onClick={() => openTasksView('open')} />
+            <StatPill label="This week" value={weekCommitments.length} tone="default" onClick={openPlanner} />
+            <StatPill label="Next launch" value={nextMilestone ? formatShortDate(nextMilestone.dueDate) : 'None'} tone={nextMilestone ? 'success' : 'neutral'} onClick={() => openAnalytics('launch')} />
+            <StatPill label="Risk" value={flaggedPrograms.length > 0 ? `${flaggedPrograms.length} flagged` : 'Stable'} tone={flaggedPrograms.length > 0 ? 'danger' : 'success'} onClick={() => openAnalytics('flagged')} />
           </div>
         </div>
       </GlassCard>
@@ -321,7 +354,7 @@ const Dashboard = memo(function Dashboard() {
           detail={overdueTasks.length > 0 ? 'Deadlines already slipped.' : 'No overdue work.'}
           tone={overdueTasks.length > 0 ? 'danger' : 'success'}
           icon={AlertTriangle}
-          onClick={() => setPage('tasks')}
+          onClick={() => openTasksView('overdue')}
         />
         <SignalCard
           title="Blocked"
@@ -329,7 +362,7 @@ const Dashboard = memo(function Dashboard() {
           detail={blockedTasks.length > 0 ? 'Work waiting on unblock.' : 'Nothing blocked.'}
           tone={blockedTasks.length > 0 ? 'warning' : 'success'}
           icon={Clock3}
-          onClick={() => setPage('tasks')}
+          onClick={() => openTasksView('blocked')}
         />
         <SignalCard
           title="Unscheduled"
@@ -337,7 +370,7 @@ const Dashboard = memo(function Dashboard() {
           detail={unscheduledTasks.length > 0 ? 'Missing start or due date.' : 'Scheduling is filled in.'}
           tone={unscheduledTasks.length > 0 ? 'warning' : 'neutral'}
           icon={CalendarClock}
-          onClick={() => setPage('timeline')}
+          onClick={() => openTasksView('unscheduled')}
         />
         <SignalCard
           title="Critical"
@@ -345,7 +378,7 @@ const Dashboard = memo(function Dashboard() {
           detail={criticalTasks.length > 0 ? 'High-risk tasks still open.' : 'No critical work right now.'}
           tone={criticalTasks.length > 0 ? 'danger' : 'success'}
           icon={Target}
-          onClick={() => setPage('tasks')}
+          onClick={() => openTasksView('critical')}
         />
       </div>
 
@@ -360,7 +393,7 @@ const Dashboard = memo(function Dashboard() {
                 Upcoming milestones
               </p>
             </div>
-            <button type="button" onClick={() => setPage('program-dashboard')} className="text-xs font-medium" style={{ color: 'var(--accent)' }}>
+            <button type="button" onClick={() => openAnalytics('launch')} className="text-xs font-medium" style={{ color: 'var(--accent)' }}>
               Open analytics
             </button>
           </div>
@@ -394,21 +427,21 @@ const Dashboard = memo(function Dashboard() {
                 Work already committed
               </p>
             </div>
-            <button type="button" onClick={() => setPage('today')} className="text-xs font-medium" style={{ color: 'var(--accent)' }}>
+            <button type="button" onClick={openPlanner} className="text-xs font-medium" style={{ color: 'var(--accent)' }}>
               Open planner
             </button>
           </div>
 
           <div className="grid grid-cols-3 gap-2 mb-3">
-            <StatPill label="Today" value={todayCommitments.length} tone="accent" onClick={() => setPage('today')} />
-            <StatPill label="Week" value={weekCommitments.length} tone="success" onClick={() => setPage('today')} />
-            <StatPill label="Programs" value={programs.length} tone="neutral" onClick={() => setPage('projects')} />
+            <StatPill label="Today" value={todayCommitments.length} tone="accent" onClick={openPlanner} />
+            <StatPill label="Week" value={weekCommitments.length} tone="success" onClick={openPlanner} />
+            <StatPill label="Programs" value={programs.length} tone="neutral" onClick={openPrograms} />
           </div>
 
           <div className="space-y-2">
             <button
               type="button"
-              onClick={() => setPage('today')}
+              onClick={openPlanner}
               className="w-full rounded-2xl px-3 py-3 text-left transition-colors hover:bg-white/4"
               style={{ border: '1px solid rgba(255,255,255,0.06)' }}
             >
@@ -424,7 +457,7 @@ const Dashboard = memo(function Dashboard() {
             </button>
             <button
               type="button"
-              onClick={() => setPage('today')}
+              onClick={openPlanner}
               className="w-full rounded-2xl px-3 py-3 text-left transition-colors hover:bg-white/4"
               style={{ border: '1px solid rgba(255,255,255,0.06)' }}
             >
@@ -453,7 +486,7 @@ const Dashboard = memo(function Dashboard() {
                 Which programs need attention
               </p>
             </div>
-            <button type="button" onClick={() => setPage('program-dashboard')} className="text-xs font-medium" style={{ color: 'var(--accent)' }}>
+            <button type="button" onClick={() => openAnalytics('flagged')} className="text-xs font-medium" style={{ color: 'var(--accent)' }}>
               Open analytics
             </button>
           </div>
@@ -483,7 +516,7 @@ const Dashboard = memo(function Dashboard() {
                 Open work most likely to move this week
               </p>
             </div>
-            <button type="button" onClick={() => setPage('tasks')} className="text-xs font-medium" style={{ color: 'var(--accent)' }}>
+            <button type="button" onClick={() => openTasksView('open')} className="text-xs font-medium" style={{ color: 'var(--accent)' }}>
               Open all tasks
             </button>
           </div>
@@ -497,7 +530,7 @@ const Dashboard = memo(function Dashboard() {
                 onOpen={() => {
                   if (task.projectId) setActiveProject(task.projectId)
                   else if (task.programId) setActiveProgram(task.programId)
-                  setPage('tasks')
+                  openTasksView('open')
                   selectTask(task.id)
                 }}
               />

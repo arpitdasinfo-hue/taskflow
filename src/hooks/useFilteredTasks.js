@@ -17,6 +17,7 @@ export function useFilteredTasks() {
   const sortBy          = useSettingsStore((s) => s.sortBy)
   const activeProjectId = useSettingsStore((s) => s.activeProjectId)
   const activeProgramId = useSettingsStore((s) => s.activeProgramId)
+  const taskDrilldown   = useSettingsStore((s) => s.taskDrilldown)
   const workspaceViewScope = useSettingsStore((s) => s.workspaceViewScope)
   const projects        = useProjectStore((s) => s.projects)
   const programs        = useProjectStore((s) => s.programs)
@@ -39,6 +40,20 @@ export function useFilteredTasks() {
     if (filters.tags.length)
       result = result.filter((t) => t.tags.some((tag) => filters.tags.includes(tag)))
 
+    const todayStart = new Date()
+    todayStart.setHours(0, 0, 0, 0)
+    if (taskDrilldown === 'open') {
+      result = result.filter((task) => task.status !== 'done')
+    } else if (taskDrilldown === 'overdue') {
+      result = result.filter((task) => task.dueDate && new Date(task.dueDate) < todayStart && task.status !== 'done')
+    } else if (taskDrilldown === 'blocked') {
+      result = result.filter((task) => task.status === 'blocked')
+    } else if (taskDrilldown === 'critical') {
+      result = result.filter((task) => task.priority === 'critical' && task.status !== 'done')
+    } else if (taskDrilldown === 'unscheduled') {
+      result = result.filter((task) => (!task.startDate || !task.dueDate) && task.status !== 'done')
+    }
+
     result.sort((a, b) => {
       if (sortBy === 'priority')
         return (PRIORITY_ORDER[a.priority] ?? 9) - (PRIORITY_ORDER[b.priority] ?? 9)
@@ -54,7 +69,7 @@ export function useFilteredTasks() {
     })
 
     return result
-  }, [tasks, filters, sortBy, activeProjectId, activeProgramId, projects, programs, workspaceViewScope])
+  }, [tasks, filters, sortBy, activeProjectId, activeProgramId, taskDrilldown, projects, programs, workspaceViewScope])
 }
 
 /** Returns tasks grouped by status for Board view */

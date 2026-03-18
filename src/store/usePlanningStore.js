@@ -141,6 +141,57 @@ const fromCommitmentRow = (row) =>
     updatedAt: row.updated_at ?? row.created_at ?? now(),
   })
 
+const cloneCommitments = (commitments = []) => commitments.map((commitment) => ({ ...commitment }))
+
+const getPlanningSyncErrorMessage = (error) => {
+  const rawMessage = error?.message || 'Unable to sync planner changes to Supabase.'
+  const normalized = rawMessage.toLowerCase()
+
+  if (normalized.includes('task_commitments')) {
+    return 'Planner sync is blocked. Please confirm the task_commitments table and policies are updated in Supabase.'
+  }
+
+  if (normalized.includes('row-level security')) {
+    return 'Planner sync is blocked by Supabase RLS. Please run the latest scripts/supabase_policies.sql in Supabase SQL Editor.'
+  }
+
+  return rawMessage
+}
+
+const reportPlanningSyncError = (set, error, action) => {
+  const message = getPlanningSyncErrorMessage(error)
+  console.error(`[sync] Failed to ${action}:`, error)
+  set((state) => {
+    state.syncError = message
+  })
+}
+
+const clearPlanningSyncError = (set) => {
+  set((state) => {
+    state.syncError = ''
+  })
+}
+
+const markPlanningSyncSuccess = (set) => {
+  set((state) => {
+    state.syncError = ''
+    state.lastSyncedAt = now()
+  })
+}
+
+async function persistCommitmentRows(commitments, workspaceId, userId) {
+  if (!workspaceId || !commitments.length) return
+  const { error } = await supabase.from('task_commitments').upsert(
+    commitments.map((commitment) => toCommitmentRow(commitment, workspaceId, userId))
+  )
+  if (error) throw error
+}
+
+async function deleteCommitmentRow(id) {
+  const { error } = await supabase.from('task_commitments').delete().eq('id', id)
+  if (error) throw error
+}
+
 async function fetchWorkspaceCommitments(workspaceId) {
   const { data, error } = await supabase
     .from('task_commitments')
@@ -158,11 +209,17 @@ const usePlanningStore = create(
     immer((set, get) => ({
       commitments: [],
       syncing: false,
+      syncError: '',
+      lastSyncedAt: null,
+
+      clearSyncError: () => clearPlanningSyncError(set),
 
       reset: () =>
         set((state) => {
           state.commitments = []
           state.syncing = false
+          state.syncError = ''
+          state.lastSyncedAt = null
         }),
 
       commitTask: ({ taskId, periodType = 'week', bucket = null, periodStart = null, periodEnd = null }) => {
@@ -172,6 +229,7 @@ const usePlanningStore = create(
         const normalizedPeriodType = normalizePeriodType(periodType)
         const bounds = buildPeriodBounds(normalizedPeriodType, periodStart, periodEnd)
         const nextBucket = normalizeBucket(normalizedPeriodType, bucket)
+        const previousCommitments = cloneCommitments(get().commitments)
         let savedCommitment = null
 
         set((state) => {
@@ -209,13 +267,21 @@ const usePlanningStore = create(
 
         const { workspaceId, userId } = getSyncContext()
         if (workspaceId && savedCommitment) {
-          void supabase.from('task_commitments').upsert(toCommitmentRow(savedCommitment, workspaceId, userId))
+          void persistCommitmentRows([savedCommitment], workspaceId, userId)
+            .then(() => markPlanningSyncSuccess(set))
+            .catch((error) => {
+              set((state) => {
+                state.commitments = sanitizeCommitments(previousCommitments)
+              })
+              reportPlanningSyncError(set, error, 'commit task into planner')
+            })
         }
 
         return savedCommitment
       },
 
       updateCommitment: (id, updates) => {
+        const previousCommitments = cloneCommitments(get().commitments)
         let updatedCommitment = null
 
         set((state) => {
@@ -245,12 +311,20 @@ const usePlanningStore = create(
 
         const { workspaceId, userId } = getSyncContext()
         if (workspaceId && updatedCommitment) {
-          void supabase.from('task_commitments').upsert(toCommitmentRow(updatedCommitment, workspaceId, userId))
+          void persistCommitmentRows([updatedCommitment], workspaceId, userId)
+            .then(() => markPlanningSyncSuccess(set))
+            .catch((error) => {
+              set((state) => {
+                state.commitments = sanitizeCommitments(previousCommitments)
+              })
+              reportPlanningSyncError(set, error, 'update planner commitment')
+            })
         }
       },
 
       setCommitmentLayout: (entries = []) => {
         if (!entries.length) return
+        const previousCommitments = cloneCommitments(get().commitments)
         const changedCommitments = []
 
         set((state) => {
@@ -283,20 +357,33 @@ const usePlanningStore = create(
 
         const { workspaceId, userId } = getSyncContext()
         if (workspaceId && changedCommitments.length > 0) {
-          void supabase.from('task_commitments').upsert(
-            changedCommitments.map((commitment) => toCommitmentRow(commitment, workspaceId, userId))
-          )
+          void persistCommitmentRows(changedCommitments, workspaceId, userId)
+            .then(() => markPlanningSyncSuccess(set))
+            .catch((error) => {
+              set((state) => {
+                state.commitments = sanitizeCommitments(previousCommitments)
+              })
+              reportPlanningSyncError(set, error, 'reorder planner commitments')
+            })
         }
       },
 
       removeCommitment: (id) => {
+        const previousCommitments = cloneCommitments(get().commitments)
         set((state) => {
           state.commitments = state.commitments.filter((commitment) => commitment.id !== id)
         })
 
         const { workspaceId } = getSyncContext()
         if (workspaceId) {
-          void supabase.from('task_commitments').delete().eq('id', id)
+          void deleteCommitmentRow(id)
+            .then(() => markPlanningSyncSuccess(set))
+            .catch((error) => {
+              set((state) => {
+                state.commitments = sanitizeCommitments(previousCommitments)
+              })
+              reportPlanningSyncError(set, error, 'remove planner commitment')
+            })
         }
       },
 
@@ -306,6 +393,7 @@ const usePlanningStore = create(
         const targetBounds = buildPeriodBounds(normalizedPeriodType, toPeriodStart, null)
         const taskMap = new Map(useTaskStore.getState().tasks.map((task) => [task.id, task]))
         const state = get()
+        const previousCommitments = cloneCommitments(state.commitments)
 
         const existingKeys = new Set(
           state.commitments
@@ -354,9 +442,14 @@ const usePlanningStore = create(
 
         const { workspaceId, userId } = getSyncContext()
         if (workspaceId && created.length > 0) {
-          void supabase.from('task_commitments').upsert(
-            created.map((commitment) => toCommitmentRow(commitment, workspaceId, userId))
-          )
+          void persistCommitmentRows(created, workspaceId, userId)
+            .then(() => markPlanningSyncSuccess(set))
+            .catch((error) => {
+              set((draft) => {
+                draft.commitments = sanitizeCommitments(previousCommitments)
+              })
+              reportPlanningSyncError(set, error, 'carry forward planner commitments')
+            })
         }
 
         return created.length
@@ -364,6 +457,7 @@ const usePlanningStore = create(
 
       syncScheduledCommitments: (referenceDate = new Date()) => {
         const taskMap = useTaskStore.getState().tasks ?? []
+        const previousCommitments = cloneCommitments(get().commitments)
         const currentPeriods = {
           week: getPeriodBounds('week', referenceDate),
           month: getPeriodBounds('month', referenceDate),
@@ -411,9 +505,14 @@ const usePlanningStore = create(
 
         const { workspaceId, userId } = getSyncContext()
         if (workspaceId && created.length > 0) {
-          void supabase.from('task_commitments').upsert(
-            created.map((commitment) => toCommitmentRow(commitment, workspaceId, userId))
-          )
+          void persistCommitmentRows(created, workspaceId, userId)
+            .then(() => markPlanningSyncSuccess(set))
+            .catch((error) => {
+              set((state) => {
+                state.commitments = sanitizeCommitments(previousCommitments)
+              })
+              reportPlanningSyncError(set, error, 'auto-commit scheduled tasks')
+            })
         }
 
         return created.length
@@ -452,6 +551,9 @@ const usePlanningStore = create(
           set((state) => {
             state.commitments = sanitizeCommitments(rows.map(fromCommitmentRow))
           })
+          markPlanningSyncSuccess(set)
+        } catch (error) {
+          reportPlanningSyncError(set, error, 'load planner from Supabase')
         } finally {
           set((state) => {
             state.syncing = false
@@ -476,9 +578,12 @@ const usePlanningStore = create(
     {
       name: 'taskflow-planning',
       storage: createJSONStorage(() => localStorage),
-      version: 1,
+      version: 2,
       migrate: (state) => ({
         commitments: sanitizeCommitments(state?.commitments ?? []),
+        syncing: false,
+        syncError: '',
+        lastSyncedAt: state?.lastSyncedAt ?? null,
       }),
     }
   )

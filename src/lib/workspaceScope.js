@@ -25,7 +25,7 @@ export const programMatchesWorkspaceScope = (program, scope) =>
   getProgramWorkspaceScope(program) === normalizeWorkspaceViewScope(scope)
 
 export const getProjectWorkspaceScope = (project, programsOrMap = []) => {
-  if (!project?.programId) return 'professional'
+  if (!project?.programId) return normalizeWorkspaceViewScope(project?.scope)
   return getProgramWorkspaceScope(toProgramMap(programsOrMap).get(project.programId))
 }
 
@@ -55,7 +55,7 @@ export const filterMilestonesByWorkspaceScope = (milestones = [], projectsOrMap 
   const projectMap = toProjectMap(projectsOrMap)
   return (milestones ?? []).filter((milestone) => {
     const project = milestone?.projectId ? projectMap.get(milestone.projectId) : null
-    if (!project) return normalizeWorkspaceViewScope(scope) === 'professional'
+    if (!project) return false
     return projectMatchesWorkspaceScope(project, programsOrMap, scope)
   })
 }

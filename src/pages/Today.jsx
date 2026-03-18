@@ -11,11 +11,10 @@ import {
 } from 'lucide-react'
 import { differenceInCalendarDays, format } from 'date-fns'
 import Header from '../components/layout/Header'
-import EmptyState from '../components/common/EmptyState'
 import GlassCard from '../components/common/GlassCard'
 import InfoTooltip from '../components/common/InfoTooltip'
-import { InlineDateChip, InlinePriorityChip, InlineStatusChip } from '../components/common/InlineFieldChips'
 import CommitTaskMenu from '../components/planning/CommitTaskMenu'
+import TaskDataTable, { TaskContextChip } from '../components/tasks/TaskDataTable'
 import useSettingsStore from '../store/useSettingsStore'
 import useTaskStore from '../store/useTaskStore'
 import usePlanningStore from '../store/usePlanningStore'
@@ -66,11 +65,6 @@ const PERIOD_META = {
 const TARGET_ORDER = ['day', 'week', 'month']
 const TARGET_LABELS = { day: 'Today', week: 'Week', month: 'Month' }
 const PRIORITY_SCORE = { critical: 90, high: 60, medium: 30, low: 10 }
-const PRIORITY_COLOR = { critical: '#ef4444', high: '#f97316', medium: '#f59e0b', low: '#64748b' }
-const PRIORITY_LABEL = { critical: 'Critical', high: 'High', medium: 'Medium', low: 'Low' }
-const STATUS_COLOR = { todo: '#94a3b8', 'in-progress': '#22d3ee', review: '#f59e0b', done: '#10b981', blocked: '#ef4444' }
-const STATUS_LABEL = { todo: 'To Do', 'in-progress': 'Active', review: 'Review', done: 'Done', blocked: 'Blocked' }
-
 const resolveTaskContext = (task, projectById, programById) => {
   const project = task.projectId ? projectById.get(task.projectId) ?? null : null
   const parent = project?.parentId ? projectById.get(project.parentId) ?? null : null
@@ -368,19 +362,6 @@ const PlanningBucket = memo(function PlanningBucket({
   )
 })
 
-const PlannerContextChip = memo(function PlannerContextChip({ context }) {
-  return (
-    <span
-      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium max-w-[180px] truncate"
-      style={{ background: `${context.color}16`, color: context.color }}
-      title={context.label}
-    >
-      <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: context.color }} />
-      <span className="truncate">{context.label}</span>
-    </span>
-  )
-})
-
 const PlannerAssignButtons = memo(function PlannerAssignButtons({ taskId, targetState, onAssign }) {
   return (
     <div className="flex items-center justify-end gap-1.5 flex-wrap">
@@ -401,116 +382,6 @@ const PlannerAssignButtons = memo(function PlannerAssignButtons({ taskId, target
           </button>
         )
       })}
-    </div>
-  )
-})
-
-const PlannerCandidateTable = memo(function PlannerCandidateTable({
-  candidates,
-  currentTargetState,
-  onAssign,
-  onOpenTask,
-  onStatusChange,
-  onTaskPatch,
-}) {
-  if (candidates.length === 0) {
-    return (
-      <EmptyState
-        icon={Sparkles}
-        title="Nothing left to queue"
-        description="All open work is already committed or completed."
-      />
-    )
-  }
-
-  return (
-    <div
-      className="rounded-[24px] overflow-hidden"
-      style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)' }}
-    >
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[1040px] border-collapse">
-          <thead>
-            <tr style={{ background: 'rgba(255,255,255,0.035)' }}>
-              <th className="px-3 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>Task</th>
-              <th className="px-3 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>Program</th>
-              <th className="px-3 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>Project</th>
-              <th className="px-3 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>Start</th>
-              <th className="px-3 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>Due</th>
-              <th className="px-3 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>Status</th>
-              <th className="px-3 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>Priority</th>
-              <th className="px-3 py-3 text-right text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>Plan</th>
-            </tr>
-          </thead>
-          <tbody>
-            {candidates.map(({ task, context, projectName }) => {
-              const isOverdue = task.dueDate && new Date(task.dueDate) < new Date() && task.status !== 'done'
-              return (
-                <tr key={task.id} className="transition-colors hover:bg-white/5">
-                  <td className="px-3 py-2.5 border-b align-top" style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
-                    <button type="button" onClick={() => onOpenTask(task.id)} className="min-w-0 text-left bg-transparent border-0 p-0">
-                      <div className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>{task.title}</div>
-                      {task.description && (
-                        <div className="hidden 2xl:block text-[11px] truncate mt-0.5" style={{ color: 'var(--text-secondary)' }}>
-                          {task.description}
-                        </div>
-                      )}
-                    </button>
-                  </td>
-                  <td className="px-3 py-2.5 border-b whitespace-nowrap" style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
-                    <PlannerContextChip context={context} />
-                  </td>
-                  <td className="px-3 py-2.5 border-b whitespace-nowrap text-xs" style={{ borderColor: 'rgba(255,255,255,0.04)', color: 'var(--text-secondary)' }}>
-                    {projectName}
-                  </td>
-                  <td className="px-3 py-2.5 border-b whitespace-nowrap" style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
-                    <InlineDateChip
-                      compact
-                      label="Start"
-                      value={task.startDate}
-                      onChange={(nextValue) => onTaskPatch(task.id, { startDate: nextValue ? new Date(nextValue).toISOString() : null })}
-                    />
-                  </td>
-                  <td className="px-3 py-2.5 border-b whitespace-nowrap" style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
-                    <InlineDateChip
-                      compact
-                      label="Due"
-                      value={task.dueDate}
-                      tone={isOverdue ? 'danger' : 'default'}
-                      onChange={(nextValue) => onTaskPatch(task.id, { dueDate: nextValue ? new Date(nextValue).toISOString() : null })}
-                    />
-                  </td>
-                  <td className="px-3 py-2.5 border-b whitespace-nowrap" style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
-                    <InlineStatusChip
-                      compact
-                      value={task.status}
-                      onChange={(nextStatus) => onStatusChange(task.id, nextStatus)}
-                      labels={STATUS_LABEL}
-                      colors={STATUS_COLOR}
-                    />
-                  </td>
-                  <td className="px-3 py-2.5 border-b whitespace-nowrap" style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
-                    <InlinePriorityChip
-                      compact
-                      value={task.priority}
-                      onChange={(nextPriority) => onTaskPatch(task.id, { priority: nextPriority })}
-                      labels={PRIORITY_LABEL}
-                      colors={PRIORITY_COLOR}
-                    />
-                  </td>
-                  <td className="px-3 py-2.5 border-b whitespace-nowrap text-right" style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
-                    <PlannerAssignButtons
-                      taskId={task.id}
-                      targetState={currentTargetState.get(task.id) ?? { day: false, week: false, month: false }}
-                      onAssign={onAssign}
-                    />
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      </div>
     </div>
   )
 })
@@ -1042,13 +913,31 @@ const Today = memo(function Today() {
               </div>
 
               <div className="mt-3">
-                <PlannerCandidateTable
-                  candidates={candidateTasks}
-                  currentTargetState={currentTargetState}
-                  onAssign={handleAssignTask}
-                  onOpenTask={handleOpenTask}
-                  onStatusChange={handleStatusChange}
-                  onTaskPatch={(taskId, patch) => updateTask(taskId, patch)}
+                <TaskDataTable
+                  items={candidateTasks}
+                  getTask={(item) => item.task}
+                  getContextContent={(item) => (
+                    <TaskContextChip label={item.context.label} color={item.context.color} />
+                  )}
+                  getProjectContent={(item) => item.projectName}
+                  onOpenTask={(taskId) => handleOpenTask(taskId)}
+                  onUpdateDate={(taskId, field, nextValue) => {
+                    updateTask(taskId, {
+                      [field]: nextValue ? new Date(nextValue).toISOString() : null,
+                    })
+                  }}
+                  onUpdateStatus={(taskId, nextStatus) => handleStatusChange(taskId, nextStatus)}
+                  onUpdatePriority={(taskId, nextPriority) => updateTask(taskId, { priority: nextPriority })}
+                  renderActions={(item, task) => (
+                    <PlannerAssignButtons
+                      taskId={task.id}
+                      targetState={currentTargetState.get(task.id) ?? { day: false, week: false, month: false }}
+                      onAssign={handleAssignTask}
+                    />
+                  )}
+                  emptyTitle="Nothing left to queue"
+                  emptyDescription="All open work is already committed or completed."
+                  minWidthClassName="min-w-[1040px]"
                 />
               </div>
 

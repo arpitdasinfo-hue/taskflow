@@ -295,6 +295,31 @@ const fromNoteRow = (row) => ({
   updatedAt: row.updated_at ?? row.created_at ?? now(),
 })
 
+async function persistNote(taskId, note, get) {
+  const { workspaceId, userId } = getSyncContext()
+  if (!workspaceId || !note) return
+
+  const parentTask = get().getTaskById(taskId)
+  if (!parentTask) throw new Error('Parent task missing while syncing note.')
+
+  const { error: taskError } = await supabase
+    .from('tasks')
+    .upsert(toTaskRow(parentTask, workspaceId, userId))
+
+  if (taskError) throw taskError
+
+  const { error } = await supabase
+    .from('notes')
+    .upsert(toNoteRow(taskId, note, userId))
+
+  if (error) throw error
+}
+
+async function deleteNoteRow(noteId) {
+  const { error } = await supabase.from('notes').delete().eq('id', noteId)
+  if (error) throw error
+}
+
 async function fetchWorkspaceTaskData(workspaceId) {
   const tasksRes = await supabase
     .from('tasks')
@@ -740,7 +765,7 @@ const useTaskStore = create(
 
       // ── Note CRUD ───────────────────────────────────────────────────────────
       addNote: (taskId, content) => {
-        let created
+        let created = null
         set((state) => {
           const task = state.tasks.find((t) => t.id === taskId)
           if (!task) return
@@ -750,19 +775,32 @@ const useTaskStore = create(
           task.updatedAt = ts
         })
 
-        const { userId } = getSyncContext()
         if (created) {
-          void supabase.from('notes').upsert(toNoteRow(taskId, created, userId))
+          void persistNote(taskId, created, get)
+            .then(() => markTaskSyncSuccess(set))
+            .catch((error) => {
+              set((state) => {
+                const task = state.tasks.find((entry) => entry.id === taskId)
+                if (!task || !created) return
+                task.notes = task.notes.filter((note) => note.id !== created.id)
+                task.updatedAt = now()
+              })
+              reportTaskSyncError(set, error, 'create note')
+            })
         }
       },
 
       updateNote: (taskId, noteId, content) => {
-        let updatedNote
+        let updatedNote = null
+        let previousContent = ''
+        let previousUpdatedAt = null
         set((state) => {
           const task = state.tasks.find((t) => t.id === taskId)
           if (!task) return
           const note = task.notes.find((n) => n.id === noteId)
           if (!note) return
+          previousContent = note.content
+          previousUpdatedAt = note.updatedAt
           const ts = now()
           note.content = content
           note.updatedAt = ts
@@ -770,21 +808,45 @@ const useTaskStore = create(
           updatedNote = { ...note }
         })
 
-        const { userId } = getSyncContext()
         if (updatedNote) {
-          void supabase.from('notes').upsert(toNoteRow(taskId, updatedNote, userId))
+          void persistNote(taskId, updatedNote, get)
+            .then(() => markTaskSyncSuccess(set))
+            .catch((error) => {
+              set((state) => {
+                const task = state.tasks.find((entry) => entry.id === taskId)
+                const note = task?.notes.find((entry) => entry.id === noteId)
+                if (!task || !note) return
+                note.content = previousContent
+                note.updatedAt = previousUpdatedAt ?? note.createdAt
+                task.updatedAt = now()
+              })
+              reportTaskSyncError(set, error, 'update note')
+            })
         }
       },
 
       deleteNote: (taskId, noteId) => {
+        let removedNote = null
         set((state) => {
           const task = state.tasks.find((t) => t.id === taskId)
           if (!task) return
+          removedNote = task.notes.find((note) => note.id === noteId) ?? null
           task.notes = task.notes.filter((n) => n.id !== noteId)
           task.updatedAt = now()
         })
 
-        void supabase.from('notes').delete().eq('id', noteId)
+        void deleteNoteRow(noteId)
+          .then(() => markTaskSyncSuccess(set))
+          .catch((error) => {
+            set((state) => {
+              const task = state.tasks.find((entry) => entry.id === taskId)
+              if (!task || !removedNote) return
+              task.notes.unshift(removedNote)
+              task.notes.sort((left, right) => new Date(right.createdAt) - new Date(left.createdAt))
+              task.updatedAt = now()
+            })
+            reportTaskSyncError(set, error, 'delete note')
+          })
       },
 
       // ── Supabase sync ─────────────────────────────────────────────────────

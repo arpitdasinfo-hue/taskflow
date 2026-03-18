@@ -58,6 +58,34 @@ const getSyncContext = () => {
   return { workspaceId, userId }
 }
 
+const normalizeScopeValue = (scope) =>
+  scope === 'personal' ? 'personal' : 'professional'
+
+const resolveProjectScope = (project, state) => {
+  if (!project) return 'professional'
+
+  const projectMap = new Map((state.projects ?? []).map((entry) => [entry.id, entry]))
+  const programMap = new Map((state.programs ?? []).map((entry) => [entry.id, entry]))
+
+  const resolveFromTree = (entry, visited = new Set()) => {
+    if (!entry || visited.has(entry.id)) return normalizeScopeValue(entry?.scope)
+    visited.add(entry.id)
+
+    if (entry.programId) {
+      return normalizeScopeValue(programMap.get(entry.programId)?.scope)
+    }
+
+    if (entry.parentId) {
+      const parent = projectMap.get(entry.parentId)
+      return resolveFromTree(parent, visited)
+    }
+
+    return normalizeScopeValue(entry.scope)
+  }
+
+  return resolveFromTree(project)
+}
+
 const toProgramRow = (program, workspaceId, userId) => ({
   id: program.id,
   workspace_id: workspaceId,
@@ -92,6 +120,7 @@ const toProjectRow = (project, workspaceId, userId) => ({
   parent_id: project.parentId ?? null,
   name: project.name,
   color: project.color,
+  scope: normalizeScopeValue(project.scope),
   description: project.description ?? '',
   status: project.status ?? 'active',
   start_date: project.startDate ?? null,
@@ -105,6 +134,7 @@ const fromProjectRow = (row) => ({
   id: row.id,
   name: row.name ?? 'Untitled Project',
   color: row.color ?? PROJECT_COLORS[0],
+  scope: normalizeScopeValue(row.scope),
   description: row.description ?? '',
   programId: row.program_id ?? null,
   parentId: row.parent_id ?? null,
@@ -154,7 +184,7 @@ const getProjectSyncErrorMessage = (error) => {
   }
 
   if (normalized.includes('scope')) {
-    return 'Program type sync is blocked because the programs.scope column is missing. Please run the latest scripts/supabase_schema.sql in Supabase SQL Editor.'
+    return 'Workspace type sync is blocked because programs.scope or projects.scope is missing. Please run the latest scripts/supabase_schema.sql in Supabase SQL Editor.'
   }
 
   return rawMessage
@@ -404,6 +434,7 @@ const useProjectStore = create(
             description: data.description ?? '',
             programId: data.programId ?? null,
             parentId: data.parentId ?? null,
+            scope: resolveProjectScope(data, s),
             status: data.status ?? 'active',
             startDate: data.startDate ?? null,
             dueDate: data.dueDate ?? null,
@@ -429,7 +460,10 @@ const useProjectStore = create(
       updateProject: (id, updates) => {
         set((s) => {
           const project = s.projects.find((p) => p.id === id)
-          if (project) Object.assign(project, updates)
+          if (project) {
+            Object.assign(project, updates)
+            project.scope = resolveProjectScope(project, s)
+          }
         })
 
         const updated = get().projects.find((p) => p.id === id)
@@ -457,6 +491,7 @@ const useProjectStore = create(
           const [project] = s.projects.splice(fromIndex, 1)
           project.programId = nextProgramId
           project.parentId = nextParentId
+          project.scope = resolveProjectScope(project, s)
 
           let insertIndex = s.projects.length
           if (beforeProjectId) {
@@ -744,7 +779,7 @@ const useProjectStore = create(
     {
       name: 'taskflow-projects',
       storage: createJSONStorage(() => localStorage),
-      version: 6,
+      version: 7,
       migrate: (state, version) => {
         let s = state
         if (version < 2) {
@@ -781,12 +816,53 @@ const useProjectStore = create(
             ...s,
             programs: (s.programs ?? []).map((program) => ({
               ...program,
-              scope: program.scope ?? 'professional',
+              scope: normalizeScopeValue(program.scope),
             })),
             milestones: (s.milestones ?? []).map((milestone) => ({
               ...milestone,
               taskId: milestone.taskId ?? null,
             })),
+          }
+        }
+        if (version < 7) {
+          const programs = (s.programs ?? []).map((program) => ({
+            ...program,
+            scope: normalizeScopeValue(program.scope),
+          }))
+          const programScopeById = new Map(programs.map((program) => [program.id, normalizeScopeValue(program.scope)]))
+          const existingProjects = s.projects ?? []
+          const projectById = new Map(existingProjects.map((project) => [project.id, project]))
+          const scopeByProjectId = new Map()
+
+          const resolveMigratedProjectScope = (project, visited = new Set()) => {
+            if (!project || visited.has(project.id)) return normalizeScopeValue(project?.scope)
+            visited.add(project.id)
+
+            if (project.programId) {
+              return programScopeById.get(project.programId) ?? 'professional'
+            }
+
+            if (project.parentId) {
+              const parent = projectById.get(project.parentId)
+              return parent ? resolveMigratedProjectScope(parent, visited) : normalizeScopeValue(project.scope)
+            }
+
+            return normalizeScopeValue(project.scope)
+          }
+
+          const projects = existingProjects.map((project) => {
+            const scope = resolveMigratedProjectScope(project)
+            scopeByProjectId.set(project.id, scope)
+            return {
+              ...project,
+              scope,
+            }
+          })
+
+          s = {
+            ...s,
+            programs,
+            projects,
           }
         }
         return s
