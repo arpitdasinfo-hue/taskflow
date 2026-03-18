@@ -81,13 +81,23 @@ const applyThemeToDom = (theme, { contrastMode = 'standard', uiDensity = 'comfor
 
 const normalizeThemePreferences = (raw) => {
   const candidate = raw && typeof raw === 'object' ? raw : {}
-  const nextThemeIndex = Number(candidate.themeIndex)
   const nextRotationDays = Number(candidate.themeRotationDays)
 
-  return {
-    themeIndex: Number.isFinite(nextThemeIndex)
+  // Prefer stable ID lookup so removed/reordered themes don't silently change
+  let resolvedIndex = 0
+  if (candidate.themeId) {
+    const byId = THEMES.findIndex((t) => t.id === candidate.themeId)
+    resolvedIndex = byId >= 0 ? byId : 0
+  } else {
+    const nextThemeIndex = Number(candidate.themeIndex)
+    resolvedIndex = Number.isFinite(nextThemeIndex)
       ? Math.max(0, Math.min(THEMES.length - 1, Math.round(nextThemeIndex)))
-      : 0,
+      : 0
+  }
+
+  return {
+    themeIndex: resolvedIndex,
+    themeId: THEMES[resolvedIndex].id,
     themeLastChanged: candidate.themeLastChanged || new Date().toISOString(),
     themeMode: candidate.themeMode === 'manual' ? 'manual' : 'auto',
     themeRotationDays: Number.isFinite(nextRotationDays) && nextRotationDays > 0
@@ -102,6 +112,7 @@ const useSettingsStore = create(
   persist(
     immer((set, get) => ({
       themeIndex: 0,
+      themeId: THEMES[0].id,
       themeLastChanged: new Date().toISOString(),
       themeMode: 'auto',
       themeRotationDays: THEME_ROTATION_DAYS,
@@ -177,6 +188,7 @@ const useSettingsStore = create(
       setTheme: (index) =>
         set((state) => {
           state.themeIndex = Math.max(0, Math.min(THEMES.length - 1, index))
+          state.themeId = THEMES[state.themeIndex]?.id ?? THEMES[0].id
           state.themeLastChanged = new Date().toISOString()
           applyThemeToDom(THEMES[state.themeIndex] ?? THEMES[0], {
             contrastMode: state.contrastMode,
