@@ -1,4 +1,4 @@
-import { memo, useState, useCallback, useEffect } from 'react'
+import { memo, useState, useCallback, useEffect, useRef } from 'react'
 import { X, Trash2, Calendar, Tag, ChevronDown, Folder, AlertTriangle, Flag } from 'lucide-react'
 import { format } from 'date-fns'
 import useSettingsStore from '../../store/useSettingsStore'
@@ -10,6 +10,7 @@ import NoteList from './NoteList'
 import DependencyList from './DependencyList'
 import CommitTaskMenu from '../planning/CommitTaskMenu'
 import { useIsBlockedByDependency } from '../../hooks/useBlockedTasks'
+import useToastStore from '../../store/useToastStore'
 
 const STATUSES   = ['todo', 'in-progress', 'review', 'done', 'blocked']
 const PRIORITIES = ['critical', 'high', 'medium', 'low']
@@ -71,6 +72,8 @@ const TaskDetail = memo(function TaskDetail() {
   const [descValue, setDescValue]       = useState('')
   const [tagInput, setTagInput]         = useState('')
   const [milestonePromoted, setMilestonePromoted] = useState(false)
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const confirmTimerRef = useRef(null)
 
   useEffect(() => {
     if (task) {
@@ -111,9 +114,18 @@ const TaskDetail = memo(function TaskDetail() {
   }, [task, updateTask])
 
   const handleDelete = useCallback(() => {
-    if (task?.id) deleteTask(task.id)
+    if (!confirmingDelete) {
+      setConfirmingDelete(true)
+      confirmTimerRef.current = setTimeout(() => setConfirmingDelete(false), 3000)
+      return
+    }
+    clearTimeout(confirmTimerRef.current)
+    if (task?.id) {
+      deleteTask(task.id)
+      useToastStore.getState().addToast({ message: 'Task deleted', type: 'info' })
+    }
     closeTask()
-  }, [task, deleteTask, closeTask])
+  }, [confirmingDelete, task, deleteTask, closeTask])
 
   const projectById = new Map(projects.map((project) => [project.id, project]))
   const selectedProgramId = task?.projectId
@@ -148,15 +160,32 @@ const TaskDetail = memo(function TaskDetail() {
           <StatusBadge status={task.status} size="xs" />
         </div>
         <div className="flex items-center gap-1">
+          {confirmingDelete ? (
+            <div className="flex items-center gap-1.5 px-2 py-1 rounded-xl text-xs animate-fade-in"
+              style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.25)' }}>
+              <span style={{ color: '#fca5a5' }}>Delete?</span>
+              <button
+                onClick={handleDelete}
+                className="px-2 py-0.5 rounded-lg text-[11px] font-semibold transition-colors"
+                style={{ background: 'rgba(239,68,68,0.3)', color: '#fca5a5' }}
+              >Yes</button>
+              <button
+                onClick={() => setConfirmingDelete(false)}
+                className="px-2 py-0.5 rounded-lg text-[11px] transition-colors hover:bg-white/10"
+                style={{ color: 'var(--text-secondary)' }}
+              >No</button>
+            </div>
+          ) : (
           <button
             onClick={handleDelete}
             className="p-2 rounded-xl hover:bg-red-500/10 transition-colors"
             style={{ color: '#ef4444' }}
-            aria-label="Move task to trash"
-            title="Move task to trash"
+            aria-label="Delete task"
+            title="Delete task"
           >
             <Trash2 size={15} />
           </button>
+          )}
           <button
             onClick={closeTask}
             className="p-2 rounded-xl hover:bg-white/5 transition-colors"

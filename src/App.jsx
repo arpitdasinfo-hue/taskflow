@@ -13,6 +13,7 @@ import usePlanningStore from './store/usePlanningStore'
 import { supabase, subscribeToWorkspaceRealtime } from './lib/supabase'
 import { useTheme } from './hooks/useTheme'
 import Auth from './pages/Auth'
+import ToastContainer from './components/common/Toast'
 
 // Lazy-load pages for code-splitting
 const Dashboard        = lazy(() => import('./pages/Dashboard'))
@@ -480,6 +481,8 @@ export default function App() {
           clearPlanningSyncError()
         }}
       />
+
+      <ToastContainer />
 
       <PWAUpdateBanner
         needRefresh={needRefresh}

@@ -19,6 +19,7 @@ import useSettingsStore from '../store/useSettingsStore'
 import useTaskStore from '../store/useTaskStore'
 import usePlanningStore from '../store/usePlanningStore'
 import useWorkspaceScopedData from '../hooks/useWorkspaceScopedData'
+import useToastStore from '../store/useToastStore'
 import {
   PLANNING_BUCKET_COLORS,
   PLANNING_BUCKET_LABELS,
@@ -598,6 +599,11 @@ const Today = memo(function Today() {
     const title = captureTitle.trim()
     if (!title) return
 
+    if (captureStartDate && captureDueDate && new Date(captureStartDate) > new Date(captureDueDate)) {
+      useToastStore.getState().addToast({ message: 'Due date must be on or after the start date.', type: 'error' })
+      return
+    }
+
     const created = addTask({
       title,
       scope: workspaceViewScope,
@@ -649,7 +655,10 @@ const Today = memo(function Today() {
 
     const [sourcePeriodType, sourceBucket] = sourceId.split(':')
     const [destinationPeriodType, destinationBucket] = destinationId.split(':')
-    if (sourcePeriodType !== destinationPeriodType) return
+    if (sourcePeriodType !== destinationPeriodType) {
+      useToastStore.getState().addToast({ message: 'Tasks can only be reordered within the same period (day, week, or month).', type: 'warning' })
+      return
+    }
 
     const boundsByPeriod = {
       day: todayBounds,

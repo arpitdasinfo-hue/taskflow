@@ -60,7 +60,7 @@ const BottomNav = memo(function BottomNav() {
               <div className="relative">
                 <Icon size={18} strokeWidth={isActive ? 2.5 : 1.75} />
                 {showDot && (
-                  <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-red-500 rounded-full border border-black" />
+                  <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-red-500 rounded-full ring-1 ring-red-900" />
                 )}
               </div>
 
