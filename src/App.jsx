@@ -10,6 +10,8 @@ import useWorkspaceStore from './store/useWorkspaceStore'
 import useProjectStore from './store/useProjectStore'
 import useTaskStore from './store/useTaskStore'
 import usePlanningStore from './store/usePlanningStore'
+import useActivityStore from './store/useActivityStore'
+import useTemplateStore from './store/useTemplateStore'
 import { supabase, subscribeToWorkspaceRealtime } from './lib/supabase'
 import { useTheme } from './hooks/useTheme'
 import Auth from './pages/Auth'
@@ -178,6 +180,8 @@ export default function App() {
   const planningSyncError = usePlanningStore((s) => s.syncError)
   const clearPlanningSyncError = usePlanningStore((s) => s.clearSyncError)
   const resetPlanning = usePlanningStore((s) => s.reset)
+  const loadActivityFromSupabase = useActivityStore((s) => s.loadFromSupabase)
+  const loadTemplatesFromSupabase = useTemplateStore((s) => s.loadFromSupabase)
   const [syncReady, setSyncReady] = useState(false)
   const [needRefresh, setNeedRefresh] = useState(false)
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
@@ -362,6 +366,8 @@ export default function App() {
         loadProjectsFromSupabase(workspaceId),
         loadTasksFromSupabase(workspaceId),
         loadPlanningFromSupabase(workspaceId),
+        loadActivityFromSupabase(workspaceId),
+        loadTemplatesFromSupabase(workspaceId),
       ])
 
       if (cancelled) return
@@ -442,6 +448,8 @@ export default function App() {
     loadProjectsFromSupabase,
     loadTasksFromSupabase,
     loadPlanningFromSupabase,
+    loadActivityFromSupabase,
+    loadTemplatesFromSupabase,
     resetWorkspace,
     resetPlanning,
   ])
