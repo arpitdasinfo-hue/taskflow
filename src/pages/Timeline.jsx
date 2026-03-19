@@ -14,6 +14,7 @@ import useTimelineScale from '../hooks/useTimelineScale'
 import useTimelineRows from '../hooks/useTimelineRows'
 import useWorkspaceScopedData from '../hooks/useWorkspaceScopedData'
 import useElementFullscreen from '../hooks/useElementFullscreen'
+import useToastStore from '../store/useToastStore'
 
 const NOTICE_TIMEOUT_MS = 6000
 
@@ -448,10 +449,14 @@ const Timeline = memo(function Timeline() {
   const undoScheduleChange = () => {
     if (!scheduleNotice?.previous) return
 
-    if (scheduleNotice.kind === 'task') {
-      updateTask(scheduleNotice.id, scheduleNotice.previous)
-    } else if (scheduleNotice.kind === 'project') {
-      updateProject(scheduleNotice.id, scheduleNotice.previous)
+    try {
+      if (scheduleNotice.kind === 'task') {
+        updateTask(scheduleNotice.id, scheduleNotice.previous)
+      } else if (scheduleNotice.kind === 'project') {
+        updateProject(scheduleNotice.id, scheduleNotice.previous)
+      }
+    } catch {
+      useToastStore.getState().addToast({ message: 'Undo failed — please try again', type: 'error' })
     }
 
     dismissScheduleNotice()

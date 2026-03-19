@@ -1,4 +1,4 @@
-import { memo, useEffect, useState } from 'react'
+import { memo, useCallback, useEffect, useState } from 'react'
 import {
   CalendarRange,
   ChevronLeft,
@@ -91,10 +91,10 @@ const TimelineToolbar = memo(function TimelineToolbar({
     if (!isCustomRange) setCustomPickerOpen(false)
   }, [isCustomRange])
 
-  const handleZoomChange = (nextZoom) => {
+  const handleZoomChange = useCallback((nextZoom) => {
     onChangeZoom?.(nextZoom)
     setCustomPickerOpen(nextZoom === 'custom')
-  }
+  }, [onChangeZoom])
 
   const handleApplyCustomRange = () => {
     const result = onApplyCustomRange?.()

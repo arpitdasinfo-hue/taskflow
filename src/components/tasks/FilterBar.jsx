@@ -70,6 +70,8 @@ const FilterBar = memo(function FilterBar({ onClose }) {
               return (
                 <button key={prog.id}
                   onClick={() => setActiveProgram(active ? null : prog.id)}
+                  aria-label={`Filter by program: ${prog.name}`}
+                  aria-pressed={active}
                   className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border font-medium transition-all"
                   style={active
                     ? { background: `${prog.color}20`, borderColor: prog.color, color: prog.color }
@@ -95,6 +97,8 @@ const FilterBar = memo(function FilterBar({ onClose }) {
             return (
               <button key={s} onClick={() => toggleFilter('status', s)}
                 className="text-xs px-2.5 py-1 rounded-full border font-medium transition-all"
+                aria-label={`Filter by status: ${STATUS_LABELS[s]}`}
+                aria-pressed={active}
                 style={active
                   ? { background: 'rgba(var(--accent-rgb),0.2)', borderColor: 'var(--accent)', color: 'var(--accent)' }
                   : { background: 'rgba(255,255,255,0.04)', borderColor: 'rgba(255,255,255,0.1)', color: 'var(--text-secondary)' }
@@ -118,6 +122,8 @@ const FilterBar = memo(function FilterBar({ onClose }) {
             return (
               <button key={p} onClick={() => toggleFilter('priority', p)}
                 className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border font-medium transition-all capitalize"
+                aria-label={`Filter by priority: ${p}`}
+                aria-pressed={active}
                 style={active
                   ? { background: `${color}20`, borderColor: color, color }
                   : { background: 'rgba(255,255,255,0.04)', borderColor: 'rgba(255,255,255,0.1)', color: 'var(--text-secondary)' }

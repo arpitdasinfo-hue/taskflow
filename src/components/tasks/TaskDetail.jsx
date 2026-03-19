@@ -1,4 +1,4 @@
-import { memo, useState, useCallback, useEffect, useRef } from 'react'
+import { memo, useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import { X, Trash2, Calendar, Tag, ChevronDown, Folder, AlertTriangle, Flag } from 'lucide-react'
 import { format } from 'date-fns'
 import useSettingsStore from '../../store/useSettingsStore'
@@ -91,7 +91,12 @@ const TaskDetail = memo(function TaskDetail() {
   }, [closeTask])
 
   const saveTitle = useCallback(() => {
-    if (task?.id && titleValue.trim()) updateTask(task.id, { title: titleValue.trim() })
+    if (!titleValue.trim()) {
+      useToastStore.getState().addToast({ message: 'Title cannot be empty', type: 'error' })
+      setEditingTitle(false)
+      return
+    }
+    if (task?.id) updateTask(task.id, { title: titleValue.trim() })
     setEditingTitle(false)
   }, [titleValue, task, updateTask])
 
@@ -127,7 +132,7 @@ const TaskDetail = memo(function TaskDetail() {
     closeTask()
   }, [confirmingDelete, task, deleteTask, closeTask])
 
-  const projectById = new Map(projects.map((project) => [project.id, project]))
+  const projectById = useMemo(() => new Map(projects.map((project) => [project.id, project])), [projects])
   const selectedProgramId = task?.projectId
     ? (projectById.get(task.projectId)?.programId ?? task.programId ?? null)
     : task?.programId ?? null
