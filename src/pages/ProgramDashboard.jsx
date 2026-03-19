@@ -106,6 +106,46 @@ const InsightRow = memo(function InsightRow({ title, meta, tone = 'default', onC
   )
 })
 
+// ── Queue row (shared with Dashboard) ─────────────────────────────────────────
+const QueueRow = memo(function QueueRow({ task, context, onOpen }) {
+  const formatShortDate = (value) => {
+    if (!value) return 'No date'
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return 'No date'
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  }
+  const dueLabel = task.dueDate ? formatShortDate(task.dueDate) : 'No due date'
+
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="w-full flex items-center gap-3 rounded-2xl px-3 py-3 text-left transition-colors hover:bg-white/4"
+      style={{ border: '1px solid rgba(255,255,255,0.06)' }}
+    >
+      <span
+        className="w-2 h-2 rounded-full flex-shrink-0"
+        style={{ background: task.priority === 'critical' ? '#ef4444' : task.priority === 'high' ? '#f97316' : '#38bdf8' }}
+      />
+      <div className="flex-1 min-w-0">
+        <div className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>{task.title}</div>
+        <div className="mt-1 text-[11px] truncate" style={{ color: 'var(--text-secondary)' }}>{context}</div>
+      </div>
+      <div className="text-right flex-shrink-0">
+        <div
+          className="text-[11px] font-medium"
+          style={{ color: task.status === 'blocked' ? '#f59e0b' : task.dueDate && new Date(task.dueDate) < new Date() && task.status !== 'done' ? '#ef4444' : 'var(--text-primary)' }}
+        >
+          {dueLabel}
+        </div>
+        <div className="mt-1 text-[10px]" style={{ color: 'var(--text-secondary)' }}>
+          {task.status === 'in-progress' ? 'Active' : task.status === 'todo' ? 'To Do' : task.status}
+        </div>
+      </div>
+    </button>
+  )
+})
+
 // ── Milestone row ─────────────────────────────────────────────────────────────
 const MilestoneItem = memo(function MilestoneItem({ milestone, projectColor }) {
   const now = new Date()
@@ -591,10 +631,10 @@ const ProgramDashboard = memo(function ProgramDashboard() {
       return {
         title: 'Launch sequence',
         infoText: 'This zoomed-out timeline keeps the next committed checkpoints visible without opening the full Gantt.',
-        actions: nextMilestone ? (
+        actions: nextMilestone?.projectId ? (
           <button
             type="button"
-            onClick={() => nextMilestone?.projectId && openProjectWorkspace(nextMilestone.projectId)}
+            onClick={() => openProjectWorkspace(nextMilestone.projectId)}
             className="px-3 py-2 rounded-xl text-xs font-medium"
             style={{ background: 'rgba(var(--accent-rgb),0.12)', color: 'var(--accent)', border: '1px solid rgba(var(--accent-rgb),0.18)' }}
           >
