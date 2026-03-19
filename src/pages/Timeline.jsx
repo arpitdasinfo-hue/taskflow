@@ -504,70 +504,72 @@ const Timeline = memo(function Timeline() {
   return (
     <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
       <Header />
-      <div ref={fullscreenRef} className={`gantt-fullscreen-shell flex-1 flex flex-col min-h-0 overflow-y-auto ${isFullscreen ? 'is-fullscreen' : ''}`}>
-        <TimelineToolbar
-          zoom={zoom}
-          rangeLabel={rangeLabel}
-          stats={stats}
-          selectedProgramId={selectedProgramId}
-          selectedProjectId={selectedProjectId}
-          selectedSubProjectId={selectedSubProjectId}
-          visiblePrograms={programs}
-          visibleProjects={visibleProjects}
-          visibleSubProjects={visibleSubProjects}
-          viewMode={viewMode}
-          searchQuery={searchQuery}
-          isCustomRange={isCustomRange}
-          customRangeStart={customStartInput}
-          customRangeEnd={customEndInput}
-          visibleCounts={visibleCounts}
-          activeFilterCount={activeFilterCount}
-          filterPanelOpen={showFilterPanel}
-          isFullscreen={isFullscreen}
-          onToggleFullscreen={toggleFullscreen}
-          onChangeProgram={setProgramScope}
-          onChangeProject={setProjectScope}
-          onChangeSubProject={setSubProjectScope}
-          onChangeViewMode={applyViewMode}
-          onSearchChange={setSearchQuery}
-          onChangeZoom={changeZoom}
-          onChangeCustomRangeStart={setCustomStartInput}
-          onChangeCustomRangeEnd={setCustomEndInput}
-          onApplyCustomRange={applyCustomTimelineRange}
-          onShiftRange={shiftRange}
-          onResetToToday={resetToToday}
-          onToggleFilterPanel={() => setShowFilterPanel((value) => !value)}
-        />
-
-        <TimelinePlanningPanel
-          savedViews={savedGanttViews}
-          activeSavedViewId={activeSavedViewId}
-          onApplySavedView={applySavedView}
-          onSaveCurrentView={saveCurrentView}
-          onDeleteSavedView={deleteGanttView}
-          showInsights={false}
-        />
-
-        {showFilterPanel && (
-          <TimelineFilterBar
-            onlyDelayed={onlyDelayed}
-            onlyCritical={onlyCritical}
-            onlyDependencyRisk={onlyDependencyRisk}
-            showDependencies={showDependencies}
-            onToggleOnlyDelayed={() => setOnlyDelayed((value) => !value)}
-            onToggleOnlyCritical={() => setOnlyCritical((value) => !value)}
-            onToggleOnlyDependencyRisk={() => setOnlyDependencyRisk((value) => !value)}
-            onToggleShowDependencies={() => setShowDependencies((value) => !value)}
-            onClear={clearFilters}
-            onClose={() => setShowFilterPanel(false)}
+      <div ref={fullscreenRef} className={`gantt-fullscreen-shell flex-1 flex flex-col min-h-0 ${isFullscreen ? 'is-fullscreen' : ''}`}>
+        <div className="flex-shrink-0">
+          <TimelineToolbar
+            zoom={zoom}
+            rangeLabel={rangeLabel}
+            stats={stats}
+            selectedProgramId={selectedProgramId}
+            selectedProjectId={selectedProjectId}
+            selectedSubProjectId={selectedSubProjectId}
+            visiblePrograms={programs}
+            visibleProjects={visibleProjects}
+            visibleSubProjects={visibleSubProjects}
+            viewMode={viewMode}
+            searchQuery={searchQuery}
+            isCustomRange={isCustomRange}
+            customRangeStart={customStartInput}
+            customRangeEnd={customEndInput}
+            visibleCounts={visibleCounts}
+            activeFilterCount={activeFilterCount}
+            filterPanelOpen={showFilterPanel}
+            isFullscreen={isFullscreen}
+            onToggleFullscreen={toggleFullscreen}
+            onChangeProgram={setProgramScope}
+            onChangeProject={setProjectScope}
+            onChangeSubProject={setSubProjectScope}
+            onChangeViewMode={applyViewMode}
+            onSearchChange={setSearchQuery}
+            onChangeZoom={changeZoom}
+            onChangeCustomRangeStart={setCustomStartInput}
+            onChangeCustomRangeEnd={setCustomEndInput}
+            onApplyCustomRange={applyCustomTimelineRange}
+            onShiftRange={shiftRange}
+            onResetToToday={resetToToday}
+            onToggleFilterPanel={() => setShowFilterPanel((value) => !value)}
           />
-        )}
 
-        <TimelineLegend />
+          <TimelinePlanningPanel
+            savedViews={savedGanttViews}
+            activeSavedViewId={activeSavedViewId}
+            onApplySavedView={applySavedView}
+            onSaveCurrentView={saveCurrentView}
+            onDeleteSavedView={deleteGanttView}
+            showInsights={false}
+          />
 
-        <div className="px-4 md:px-6 pb-6">
+          {showFilterPanel && (
+            <TimelineFilterBar
+              onlyDelayed={onlyDelayed}
+              onlyCritical={onlyCritical}
+              onlyDependencyRisk={onlyDependencyRisk}
+              showDependencies={showDependencies}
+              onToggleOnlyDelayed={() => setOnlyDelayed((value) => !value)}
+              onToggleOnlyCritical={() => setOnlyCritical((value) => !value)}
+              onToggleOnlyDependencyRisk={() => setOnlyDependencyRisk((value) => !value)}
+              onToggleShowDependencies={() => setShowDependencies((value) => !value)}
+              onClear={clearFilters}
+              onClose={() => setShowFilterPanel(false)}
+            />
+          )}
+
+          <TimelineLegend />
+        </div>
+
+        <div className="flex-1 min-h-0 px-4 md:px-6 pb-4">
           <div
-            className="rounded-[24px] overflow-hidden"
+            className="h-full rounded-[24px] overflow-hidden"
             style={{
               background: 'linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0.018))',
               border: '1px solid rgba(255,255,255,0.08)',
@@ -591,6 +593,7 @@ const Timeline = memo(function Timeline() {
                 showDependencies={showDependencies}
                 onlyDependencyRisk={onlyDependencyRisk}
                 isFullscreen={isFullscreen}
+                fillHeight
               />
             )}
           </div>

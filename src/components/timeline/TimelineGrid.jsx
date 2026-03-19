@@ -28,11 +28,14 @@ const TimelineGrid = memo(function TimelineGrid({
   readOnly = false,
   compact = false,
   isFullscreen = false,
+  fillHeight = false,
 }) {
   const leftColumnWidth = compact ? 268 : LEFT_COLUMN_WIDTH
-  const viewportHeight = isFullscreen
-    ? 'calc(100dvh - 160px)'
-    : (compact || readOnly ? 'min(58vh, 720px)' : 'min(70vh, 920px)')
+  const viewportHeight = fillHeight
+    ? '100%'
+    : isFullscreen
+      ? 'calc(100dvh - 160px)'
+      : (compact || readOnly ? 'min(58vh, 720px)' : 'min(70vh, 920px)')
   const dependencyLayer = useMemo(() => {
     const rowOffsets = new Map()
     let totalHeight = 0
@@ -129,7 +132,7 @@ const TimelineGrid = memo(function TimelineGrid({
       className="overflow-auto min-h-[360px]"
       style={{
         scrollbarWidth: 'thin',
-        maxHeight: viewportHeight,
+        ...(fillHeight ? { height: viewportHeight } : { maxHeight: viewportHeight }),
         overscrollBehavior: 'contain',
       }}
     >

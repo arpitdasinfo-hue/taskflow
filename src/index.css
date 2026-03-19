@@ -147,9 +147,8 @@ body {
 .gantt-fullscreen-shell.is-fullscreen {
   width: 100vw;
   height: 100dvh;
-  overflow-y: auto;
-  overflow-x: hidden;
-  padding: 12px 0 28px;
+  overflow: hidden;
+  padding: 0;
   flex: none;
 }
 
