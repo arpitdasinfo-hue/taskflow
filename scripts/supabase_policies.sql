@@ -331,3 +331,13 @@ create policy "milestones shared read" on milestones for select
         and (sl.expires_at is null or sl.expires_at > now())
     )
   );
+
+drop policy if exists "activity_log access" on activity_log;
+create policy "activity_log access" on activity_log for all
+  using (workspace_id in (select workspace_id from workspace_members where user_id = auth.uid()))
+  with check (workspace_id in (select workspace_id from workspace_members where user_id = auth.uid()));
+
+drop policy if exists "templates access" on templates;
+create policy "templates access" on templates for all
+  using (workspace_id in (select workspace_id from workspace_members where user_id = auth.uid()))
+  with check (workspace_id in (select workspace_id from workspace_members where user_id = auth.uid()));
