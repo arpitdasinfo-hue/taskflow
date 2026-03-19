@@ -206,6 +206,7 @@ const QuickAdd = memo(function QuickAdd() {
         description: desc.trim(),
         programId: programId || null,
         color: color || undefined,
+        scope: workspaceViewScope,   // Preserve personal/professional scope
       })
       handleClose()
       return

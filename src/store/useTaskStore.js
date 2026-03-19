@@ -124,9 +124,10 @@ const buildTaskPatchFromUpdates = (task, updates = {}) => {
   if (hasOwn(updates, 'tags')) patch.tags = task.tags ?? []
   if (hasOwn(updates, 'dependsOn')) patch.depends_on = task.dependsOn ?? []
   if (hasOwn(updates, 'deletedAt')) patch.deleted_at = task.deletedAt ?? null
+  if (hasOwn(updates, 'recurrence')) patch.recurrence = task.recurrence ?? null
 
   if (hasOwn(updates, 'projectId') || hasOwn(updates, 'programId') || hasOwn(updates, 'scope')) {
-    const scope = normalizeTaskScope(task)
+    const scope = normalizeTaskScope(task, updates)
     patch.project_id = scope.projectId
     patch.program_id = scope.programId
     patch.scope = scope.scope
@@ -170,6 +171,7 @@ const toTaskRow = (task, workspaceId, userId) => {
     due_date: task.dueDate ?? null,
     tags: task.tags ?? [],
     depends_on: task.dependsOn ?? [],
+    recurrence: task.recurrence ?? null,
     created_by: userId,
     created_at: task.createdAt ?? now(),
     updated_at: task.updatedAt ?? now(),
@@ -190,6 +192,7 @@ const fromTaskRow = (row) => ({
   dueDate: row.due_date ?? null,
   tags: Array.isArray(row.tags) ? row.tags : [],
   dependsOn: Array.isArray(row.depends_on) ? row.depends_on : [],
+  recurrence: row.recurrence ?? null,
   createdAt: row.created_at ?? now(),
   updatedAt: row.updated_at ?? row.created_at ?? now(),
   deletedAt: row.deleted_at ?? null,
