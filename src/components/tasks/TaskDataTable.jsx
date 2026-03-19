@@ -250,7 +250,7 @@ const TaskTableRow = memo(function TaskTableRow({
         </td>
       ))}
 
-      <td className="px-3 py-2.5 border-b whitespace-nowrap text-right" style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
+      <td className="px-3 py-2.5 border-b whitespace-nowrap text-right sticky right-0 z-10" style={{ borderColor: 'rgba(255,255,255,0.04)', background: isSelected ? 'rgba(var(--accent-rgb),0.06)' : 'rgba(0,0,0,0.45)', backdropFilter: 'blur(12px)' }}>
         <div className="inline-flex items-center justify-end gap-2">
           {renderActions ? renderActions(item, task) : null}
           {onOpenTask ? (
@@ -351,7 +351,7 @@ const TaskDataTable = memo(function TaskDataTable({
                   {column.label}
                 </th>
               ))}
-              <th className="px-3 py-3 text-right text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>
+              <th className="px-3 py-3 text-right text-[10px] font-semibold uppercase tracking-[0.22em] sticky right-0 z-10" style={{ color: 'var(--text-secondary)', background: 'rgba(255,255,255,0.035)' }}>
                 {renderActions ? 'Plan' : ''}
               </th>
             </tr>

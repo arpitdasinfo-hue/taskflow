@@ -76,7 +76,7 @@ const applyThemeToDom = (theme, { contrastMode = 'standard', uiDensity = 'comfor
   root.dataset.density = uiDensity
 
   const meta = document.querySelector('meta[name="theme-color"]')
-  if (meta) meta.setAttribute('content', tokens.accentDark)
+  if (meta) meta.setAttribute('content', theme.preview?.[2] ?? tokens.accentDark)
 }
 
 const normalizeThemePreferences = (raw) => {
