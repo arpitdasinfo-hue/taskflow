@@ -14,6 +14,7 @@ import { supabase, subscribeToWorkspaceRealtime } from './lib/supabase'
 import { useTheme } from './hooks/useTheme'
 import Auth from './pages/Auth'
 import ToastContainer from './components/common/Toast'
+import useToastStore from './store/useToastStore'
 
 // Lazy-load pages for code-splitting
 const Dashboard        = lazy(() => import('./pages/Dashboard'))
@@ -296,6 +297,8 @@ export default function App() {
 
       if (!error) {
         lastAppliedRemoteThemeRef.current = themeSyncPayloadJson
+      } else {
+        useToastStore.getState().addToast({ message: 'Settings sync failed — changes saved locally', type: 'warning' })
       }
     }, 450)
 

@@ -39,7 +39,7 @@ const TaskCard = memo(function TaskCard({ task, draggable = false }) {
       onClick={handleClick}
       role="button"
       tabIndex={0}
-      onKeyDown={(e) => e.key === 'Enter' && handleClick()}
+      onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && handleClick()}
       aria-label={`Open task: ${task.title}`}
     >
       {/* Top row: priority + status + project dot */}

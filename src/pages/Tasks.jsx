@@ -22,6 +22,7 @@ import { useFilteredTasks } from '../hooks/useFilteredTasks'
 import useWorkspaceScopedData from '../hooks/useWorkspaceScopedData'
 import { sortTasksByStartDate } from '../lib/taskSort'
 import { getTaskProgramId } from '../lib/taskScope'
+import useToastStore from '../store/useToastStore'
 
 const STATUS_COLUMNS = [
   { id: 'todo', label: 'To Do', color: '#94a3b8' },
@@ -225,14 +226,30 @@ const TaskRow = memo(function TaskRow({ task, selectMode, projectById, programBy
   )
 })
 
-const ListView = memo(function ListView({ tasks, selectMode, projectById, programById }) {
+const ListView = memo(function ListView({ tasks, selectMode, projectById, programById, hasActiveFilters }) {
   const selectAllTasks = useSettingsStore((state) => state.selectAllTasks)
   const clearTaskSelection = useSettingsStore((state) => state.clearTaskSelection)
   const selectedTaskIds = useSettingsStore((state) => state.selectedTaskIds)
+  const clearFilters = useSettingsStore((state) => state.clearFilters)
   const allSelected = tasks.length > 0 && tasks.every((task) => selectedTaskIds.includes(task.id))
 
   if (tasks.length === 0) {
-    return <EmptyState icon={ListTodo} title="No tasks found" description="Try adjusting your filters or create a new task." />
+    return (
+      <EmptyState
+        icon={ListTodo}
+        title={hasActiveFilters ? 'No tasks match your filters' : 'No tasks found'}
+        description={hasActiveFilters ? 'Try removing some filters to see more tasks.' : 'Create your first task using the + button.'}
+        action={hasActiveFilters ? (
+          <button
+            onClick={clearFilters}
+            className="text-xs px-3 py-1.5 rounded-xl transition-colors"
+            style={{ background: 'rgba(var(--accent-rgb),0.15)', color: 'var(--accent)', border: '1px solid rgba(var(--accent-rgb),0.25)' }}
+          >
+            Clear filters
+          </button>
+        ) : undefined}
+      />
+    )
   }
 
   return (
@@ -247,6 +264,7 @@ const ListView = memo(function ListView({ tasks, selectMode, projectById, progra
         >
           <button
             onClick={() => (allSelected ? clearTaskSelection() : selectAllTasks(tasks.map((task) => task.id)))}
+            aria-label={allSelected ? 'Deselect all tasks' : `Select all ${tasks.length} tasks`}
             className="text-xs"
             style={{ color: 'var(--accent)' }}
           >
@@ -269,6 +287,8 @@ const BoardView = memo(function BoardView({ selectMode, tasksByStatus }) {
     const nextStatus = result.destination.droppableId
     if (result.source.droppableId !== nextStatus) {
       updateTask(result.draggableId, { status: nextStatus })
+      const label = STATUS_COLUMNS.find((col) => col.id === nextStatus)?.label ?? nextStatus
+      useToastStore.getState().addToast({ message: `Moved to ${label}`, type: 'info', duration: 2000 })
     }
   }, [updateTask])
 
@@ -294,6 +314,7 @@ const Tasks = memo(function Tasks() {
   const [filterProjectId, setFilterProjectId] = useState('')
 
   const view = useSettingsStore((state) => state.view)
+  const filters = useSettingsStore((state) => state.filters)
   const selectedTaskIds = useSettingsStore((state) => state.selectedTaskIds)
   const clearTaskSelection = useSettingsStore((state) => state.clearTaskSelection)
   const workspaceViewScope = useSettingsStore((state) => state.workspaceViewScope)
@@ -359,6 +380,7 @@ const Tasks = memo(function Tasks() {
   )
 
   const activeFilterCount = Number(Boolean(filterProgramId)) + Number(Boolean(filterProjectId))
+  const hasActiveFilters = activeFilterCount > 0 || filters.status.length > 0 || filters.priority.length > 0 || filters.tags?.length > 0
 
   const toggleSelectMode = () => {
     setSelectMode((current) => {
@@ -482,7 +504,7 @@ const Tasks = memo(function Tasks() {
       </div>
 
       <div className={`flex-1 overflow-y-auto px-4 md:px-6 pb-24 md:pb-8 ${view === 'board' ? 'overflow-x-auto' : ''}`}>
-        {view === 'list' && <ListView tasks={filteredTasks} selectMode={selectMode} projectById={projectById} programById={programById} />}
+        {view === 'list' && <ListView tasks={filteredTasks} selectMode={selectMode} projectById={projectById} programById={programById} hasActiveFilters={hasActiveFilters} />}
 
         {view === 'table' && (
           <TaskDataTable

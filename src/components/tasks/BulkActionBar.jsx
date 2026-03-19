@@ -11,14 +11,18 @@ const PRIORITY_COLORS = { critical: '#ef4444', high: '#f97316', medium: '#f59e0b
 
 const DropdownMenu = memo(function DropdownMenu({ label, options, onSelect, renderOption, disabled = false }) {
   const [open, setOpen] = useState(false)
+  const menuId = label.replace(/\s+/g, '-').toLowerCase()
   return (
-    <div className="relative">
+    <div className="relative" onKeyDown={(e) => { if (e.key === 'Escape') setOpen(false) }}>
       <button
         onClick={() => {
           if (disabled) return
           setOpen((o) => !o)
         }}
         disabled={disabled}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-controls={open ? menuId : undefined}
         className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-colors hover:bg-white/10"
         style={disabled
           ? { color: 'var(--text-secondary)', border: '1px solid rgba(255,255,255,0.08)', opacity: 0.45, cursor: 'not-allowed' }
@@ -31,12 +35,15 @@ const DropdownMenu = memo(function DropdownMenu({ label, options, onSelect, rend
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
           <div
+            id={menuId}
+            role="menu"
             className="absolute bottom-full mb-2 left-0 rounded-xl overflow-hidden z-50 min-w-[140px]"
             style={{ background: '#ffffff', border: '1px solid rgba(15,23,42,0.12)', boxShadow: '0 16px 48px rgba(15,23,42,0.18)' }}
           >
             {options.map((opt) => (
               <button
                 key={typeof opt === 'string' ? opt : opt.id}
+                role="menuitem"
                 onClick={() => { onSelect(typeof opt === 'string' ? opt : opt.id); setOpen(false) }}
                 className="w-full flex items-center gap-2 px-3 py-2 text-xs text-left hover:bg-slate-100 transition-colors"
                 style={{ color: '#0f172a' }}
@@ -98,7 +105,7 @@ const BulkActionBar = memo(function BulkActionBar({ active = false, onExitSelect
       </span>
 
       {!hasSelection && (
-        <span className="hidden md:inline text-xs flex-shrink-0" style={{ color: 'var(--text-secondary)' }}>
+        <span className="sr-only md:not-sr-only md:inline text-xs flex-shrink-0" style={{ color: 'var(--text-secondary)' }}>
           Tap tasks to select them
         </span>
       )}

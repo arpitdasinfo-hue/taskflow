@@ -7,6 +7,7 @@ import usePlanningStore from '../../store/usePlanningStore'
 import useWorkspaceScopedData from '../../hooks/useWorkspaceScopedData'
 import { PriorityBadge } from '../common/Badge'
 import ColorPalettePicker from '../common/ColorPalettePicker'
+import useToastStore from '../../store/useToastStore'
 
 const TYPES = [
   { id: 'program', label: 'Program' },
@@ -208,6 +209,11 @@ const QuickAdd = memo(function QuickAdd() {
       return
     }
 
+    if (startDate && dueDate && new Date(startDate) > new Date(dueDate)) {
+      useToastStore.getState().addToast({ message: 'Due date must be on or after the start date', type: 'error' })
+      return
+    }
+
     const createdTask = addTask({
       title: name.trim(),
       priority,
@@ -266,10 +272,13 @@ const QuickAdd = memo(function QuickAdd() {
               </button>
             </div>
 
-            <div className="grid grid-cols-3 gap-1 p-1 rounded-xl mb-4" style={{ background: 'rgba(255,255,255,0.04)' }}>
+            <div role="tablist" aria-label="Item type" className="grid grid-cols-3 gap-1 p-1 rounded-xl mb-4" style={{ background: 'rgba(255,255,255,0.04)' }}>
               {TYPES.map((tab) => (
                 <button
                   key={tab.id}
+                  role="tab"
+                  aria-selected={type === tab.id}
+                  tabIndex={type === tab.id ? 0 : -1}
                   onClick={() => setType(tab.id)}
                   className="py-1.5 rounded-lg text-xs font-semibold transition-all"
                   style={type === tab.id
