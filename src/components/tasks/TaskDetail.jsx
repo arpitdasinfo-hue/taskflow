@@ -8,9 +8,12 @@ import { PriorityBadge, StatusBadge, TagBadge } from '../common/Badge'
 import SubtaskList from './SubtaskList'
 import NoteList from './NoteList'
 import DependencyList from './DependencyList'
+import RecurrenceSelector from './RecurrenceSelector'
+import ActivityLog from './ActivityLog'
 import CommitTaskMenu from '../planning/CommitTaskMenu'
 import { useIsBlockedByDependency } from '../../hooks/useBlockedTasks'
 import useToastStore from '../../store/useToastStore'
+import useTemplateStore from '../../store/useTemplateStore'
 
 const STATUSES   = ['todo', 'in-progress', 'review', 'done', 'blocked']
 const PRIORITIES = ['critical', 'high', 'medium', 'low']
@@ -73,7 +76,10 @@ const TaskDetail = memo(function TaskDetail() {
   const [tagInput, setTagInput]         = useState('')
   const [milestonePromoted, setMilestonePromoted] = useState(false)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const [savingTemplate, setSavingTemplate] = useState(false)
+  const [templateName, setTemplateName] = useState('')
   const confirmTimerRef = useRef(null)
+  const addTemplate = useTemplateStore((s) => s.addTemplate)
 
   useEffect(() => {
     if (task) {
@@ -388,6 +394,14 @@ const TaskDetail = memo(function TaskDetail() {
           </div>
         </div>
 
+        {/* Recurrence */}
+        <div className="rounded-xl p-3" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+          <RecurrenceSelector
+            value={task.recurrence ?? null}
+            onChange={(rec) => updateTask(task.id, { recurrence: rec })}
+          />
+        </div>
+
         {/* Description */}
         <div>
           <label className="text-[10px] font-semibold uppercase tracking-wide mb-1.5 block" style={{ color: 'var(--text-secondary)' }}>
@@ -455,7 +469,7 @@ const TaskDetail = memo(function TaskDetail() {
             className="flex gap-1 p-1 rounded-xl mb-4"
             style={{ background: 'rgba(255,255,255,0.04)' }}
           >
-            {['subtasks', 'notes', 'deps'].map((t) => (
+            {['subtasks', 'notes', 'deps', 'history'].map((t) => (
               <button
                 key={t}
                 onClick={() => setTab(t)}
@@ -467,7 +481,8 @@ const TaskDetail = memo(function TaskDetail() {
               >
                 {t === 'subtasks' ? `Subtasks (${task.subtasks.length})`
                   : t === 'notes' ? `Notes (${task.notes.length})`
-                  : `Deps (${(task.dependsOn ?? []).length})`}
+                  : t === 'deps' ? `Deps (${(task.dependsOn ?? []).length})`
+                  : 'History'}
               </button>
             ))}
           </div>
@@ -480,6 +495,57 @@ const TaskDetail = memo(function TaskDetail() {
           )}
           {tab === 'deps' && (
             <DependencyList taskId={task.id} />
+          )}
+          {tab === 'history' && (
+            <ActivityLog taskId={task.id} />
+          )}
+        </div>
+
+        {/* Save as template */}
+        <div className="pt-2 pb-1">
+          {savingTemplate ? (
+            <div className="flex items-center gap-2">
+              <input
+                autoFocus
+                type="text"
+                value={templateName}
+                onChange={(e) => setTemplateName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && templateName.trim()) {
+                    addTemplate({ name: templateName.trim(), title: task.title, description: task.description, priority: task.priority, tags: task.tags, projectId: task.projectId, subtasks: task.subtasks })
+                    useToastStore.getState().addToast({ message: 'Template saved', type: 'success' })
+                    setSavingTemplate(false)
+                    setTemplateName('')
+                  }
+                  if (e.key === 'Escape') { setSavingTemplate(false); setTemplateName('') }
+                }}
+                placeholder="Template name…"
+                className="flex-1 text-xs px-2.5 py-1.5 rounded-xl outline-none"
+                style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(var(--accent-rgb),0.3)', color: 'var(--text-primary)' }}
+              />
+              <button
+                onClick={() => {
+                  if (!templateName.trim()) return
+                  addTemplate({ name: templateName.trim(), title: task.title, description: task.description, priority: task.priority, tags: task.tags, projectId: task.projectId, subtasks: task.subtasks })
+                  useToastStore.getState().addToast({ message: 'Template saved', type: 'success' })
+                  setSavingTemplate(false)
+                  setTemplateName('')
+                }}
+                className="px-2.5 py-1.5 rounded-xl text-xs font-semibold"
+                style={{ background: 'rgba(var(--accent-rgb),0.18)', color: 'var(--accent)', border: '1px solid rgba(var(--accent-rgb),0.3)' }}
+              >Save</button>
+              <button onClick={() => { setSavingTemplate(false); setTemplateName('') }} className="p-1.5 rounded-xl hover:bg-white/10" style={{ color: 'var(--text-secondary)' }}>
+                <X size={13} />
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => { setSavingTemplate(true); setTemplateName('') }}
+              className="w-full text-xs py-2 rounded-xl hover:bg-white/5 transition-colors"
+              style={{ color: 'var(--text-secondary)', border: '1px solid rgba(255,255,255,0.07)' }}
+            >
+              Save as template…
+            </button>
           )}
         </div>
       </div>

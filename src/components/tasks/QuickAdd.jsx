@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Calendar, Folder, Layers3, Plus, X } from 'lucide-react'
+import { Calendar, Folder, Layers3, Plus, X, LayoutTemplate } from 'lucide-react'
 import useTaskStore from '../../store/useTaskStore'
 import useProjectStore, { PROJECT_COLORS, PROGRAM_SCOPE_OPTIONS } from '../../store/useProjectStore'
 import useSettingsStore from '../../store/useSettingsStore'
@@ -8,6 +8,7 @@ import useWorkspaceScopedData from '../../hooks/useWorkspaceScopedData'
 import { PriorityBadge } from '../common/Badge'
 import ColorPalettePicker from '../common/ColorPalettePicker'
 import useToastStore from '../../store/useToastStore'
+import TemplatePicker from './TemplatePicker'
 
 const TYPES = [
   { id: 'program', label: 'Program' },
@@ -25,6 +26,7 @@ const PLAN_TARGETS = [
 
 const QuickAdd = memo(function QuickAdd() {
   const [open, setOpen] = useState(false)
+  const [showTemplatePicker, setShowTemplatePicker] = useState(false)
   const [type, setType] = useState('task')
   const [name, setName] = useState('')
   const [desc, setDesc] = useState('')
@@ -267,10 +269,39 @@ const QuickAdd = memo(function QuickAdd() {
               <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
                 Quick Add
               </span>
-              <button onClick={handleClose} className="p-1.5 rounded-lg hover:bg-white/10" style={{ color: 'var(--text-secondary)' }}>
-                <X size={16} />
-              </button>
+              <div className="flex items-center gap-1">
+                {type === 'task' && (
+                  <button
+                    onClick={() => setShowTemplatePicker(true)}
+                    className="p-1.5 rounded-lg hover:bg-white/10 transition-colors"
+                    style={{ color: 'var(--text-secondary)' }}
+                    title="Use template"
+                  >
+                    <LayoutTemplate size={15} />
+                  </button>
+                )}
+                <button onClick={handleClose} className="p-1.5 rounded-lg hover:bg-white/10" style={{ color: 'var(--text-secondary)' }}>
+                  <X size={16} />
+                </button>
+              </div>
             </div>
+
+            {showTemplatePicker && (
+              <TemplatePicker
+                onSelect={(tmpl) => {
+                  setName(tmpl.title || tmpl.name)
+                  setDesc(tmpl.description || '')
+                  setPriority(tmpl.priority || 'medium')
+                  if (tmpl.projectId) {
+                    const derived = deriveTaskSelection(tmpl.projectId)
+                    setProgramId(derived.nextProgramId)
+                    setSelectedProjectId(derived.nextProjectId)
+                    setSelectedSubProjectId(derived.nextSubProjectId)
+                  }
+                }}
+                onClose={() => setShowTemplatePicker(false)}
+              />
+            )}
 
             <div role="tablist" aria-label="Item type" className="grid grid-cols-3 gap-1 p-1 rounded-xl mb-4" style={{ background: 'rgba(255,255,255,0.04)' }}>
               {TYPES.map((tab) => (

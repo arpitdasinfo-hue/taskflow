@@ -133,6 +133,35 @@ const useSettingsStore = create(
       sidebarCollapsed: false,
       ganttConfig: DEFAULT_GANTT_CONFIG,
       savedGanttViews: [],
+      savedTaskViews: [],
+      followSystemTheme: false,
+      lightModeThemeIndex: 0,
+
+      applyEffectiveTheme: () => {
+        const { themeIndex, lightModeThemeIndex, followSystemTheme, contrastMode, uiDensity } = get()
+        let idx = themeIndex
+        if (followSystemTheme) {
+          const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+          idx = isDark ? themeIndex : lightModeThemeIndex
+        }
+        applyThemeToDom(THEMES[idx] ?? THEMES[0], { contrastMode, uiDensity })
+      },
+
+      setFollowSystemTheme: (val) =>
+        set((state) => {
+          state.followSystemTheme = !!val
+          const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+          const idx = (!!val && !isDark) ? state.lightModeThemeIndex : state.themeIndex
+          applyThemeToDom(THEMES[idx] ?? THEMES[0], { contrastMode: state.contrastMode, uiDensity: state.uiDensity })
+        }),
+
+      setLightModeThemeIndex: (idx) =>
+        set((state) => {
+          state.lightModeThemeIndex = Math.max(0, Math.min(THEMES.length - 1, idx))
+          if (state.followSystemTheme && !window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            applyThemeToDom(THEMES[state.lightModeThemeIndex] ?? THEMES[0], { contrastMode: state.contrastMode, uiDensity: state.uiDensity })
+          }
+        }),
 
       applyCurrentTheme: () => {
         const { themeIndex, contrastMode, uiDensity } = get()
@@ -269,6 +298,28 @@ const useSettingsStore = create(
           state.savedGanttViews = state.savedGanttViews.filter((view) => view.id !== id)
         }),
 
+      saveTaskView: ({ id = null, name, filters, sortBy }) => {
+        const normalizedName = String(name || '').trim() || 'Saved view'
+        const nextView = {
+          id: id ?? nanoid(),
+          name: normalizedName,
+          filters: filters ?? { status: [], priority: [], tags: [] },
+          sortBy: sortBy ?? 'createdAt',
+          updatedAt: new Date().toISOString(),
+        }
+        set((state) => {
+          const existingIndex = state.savedTaskViews.findIndex((v) => v.id === nextView.id)
+          if (existingIndex === -1) state.savedTaskViews.unshift(nextView)
+          else state.savedTaskViews[existingIndex] = nextView
+        })
+        return nextView
+      },
+
+      deleteTaskView: (id) =>
+        set((state) => {
+          state.savedTaskViews = state.savedTaskViews.filter((v) => v.id !== id)
+        }),
+
       // ── Navigation ────────────────────────────────────────────────────
       setPage: (page) => set((s) => {
         s.activePage = page
@@ -375,7 +426,7 @@ const useSettingsStore = create(
     {
       name: 'taskflow-settings',
       storage: createJSONStorage(() => localStorage),
-      version: 11,
+      version: 12,
       partialize: (state) => {
         const {
           selectedTaskId: _s1,
@@ -468,6 +519,14 @@ const useSettingsStore = create(
           s = {
             ...s,
             projectsViewMode: s?.projectsViewMode === 'execution' ? 'execution' : 'portfolio',
+          }
+        }
+        if (version < 12) {
+          s = {
+            ...s,
+            savedTaskViews: Array.isArray(s?.savedTaskViews) ? s.savedTaskViews : [],
+            followSystemTheme: s?.followSystemTheme ?? false,
+            lightModeThemeIndex: s?.lightModeThemeIndex ?? 0,
           }
         }
         return s

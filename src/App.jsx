@@ -1,4 +1,4 @@
-import { useEffect, lazy, Suspense, Component, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, lazy, Suspense, Component, useMemo, useRef, useState } from 'react'
 import { registerSW } from 'virtual:pwa-register'
 import Sidebar from './components/layout/Sidebar'
 import BottomNav from './components/layout/BottomNav'
@@ -14,6 +14,7 @@ import { supabase, subscribeToWorkspaceRealtime } from './lib/supabase'
 import { useTheme } from './hooks/useTheme'
 import Auth from './pages/Auth'
 import ToastContainer from './components/common/Toast'
+import CommandPalette from './components/common/CommandPalette'
 import useToastStore from './store/useToastStore'
 
 // Lazy-load pages for code-splitting
@@ -25,6 +26,7 @@ const Projects         = lazy(() => import('./pages/Projects'))
 const ProgramDashboard = lazy(() => import('./pages/ProgramDashboard'))
 const Timeline         = lazy(() => import('./pages/Timeline'))
 const Trash            = lazy(() => import('./pages/Trash'))
+const ActivityPage     = lazy(() => import('./pages/Activity'))
 const ShareView        = lazy(() => import('./pages/ShareView'))
 
 const PageFallback = () => (
@@ -76,6 +78,7 @@ function PageRouter({ page }) {
         {page === 'projects'           && <Projects />}
         {page === 'program-dashboard'  && <ProgramDashboard />}
         {page === 'timeline'           && <Timeline />}
+        {page === 'activity'           && <ActivityPage />}
         {page === 'trash'              && <Trash />}
       </Suspense>
     </ErrorBoundary>
@@ -177,6 +180,7 @@ export default function App() {
   const resetPlanning = usePlanningStore((s) => s.reset)
   const [syncReady, setSyncReady] = useState(false)
   const [needRefresh, setNeedRefresh] = useState(false)
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
   const updateServiceWorkerRef = useRef(() => {})
   const themeSyncTimerRef = useRef(null)
   const lastAppliedRemoteThemeRef = useRef('')
@@ -213,6 +217,18 @@ export default function App() {
   const syncIssueMessage = workspaceError || taskSyncError || projectSyncError || planningSyncError
 
   useEffect(() => { init() }, [init])
+
+  // ⌘K / Ctrl+K → open command palette
+  useEffect(() => {
+    const handler = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault()
+        setCommandPaletteOpen((o) => !o)
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [])
 
   useEffect(() => {
     const updateServiceWorker = registerSW({
@@ -484,6 +500,8 @@ export default function App() {
           clearPlanningSyncError()
         }}
       />
+
+      <CommandPalette open={commandPaletteOpen} onClose={() => setCommandPaletteOpen(false)} />
 
       <ToastContainer />
 

@@ -7,6 +7,8 @@ import useWorkspaceStore from './useWorkspaceStore'
 import useAuthStore from './useAuthStore'
 import useProjectStore from './useProjectStore'
 import { getProgramWorkspaceScope, getTaskWorkspaceScope, normalizeWorkspaceViewScope } from '../lib/workspaceScope'
+import { computeNextOccurrence, shouldSpawnNext } from '../lib/recurrence'
+import useActivityStore from './useActivityStore'
 
 const now = () => new Date().toISOString()
 
@@ -388,6 +390,7 @@ const useTaskStore = create(
             dueDate: data.dueDate ?? null,
             tags: data.tags ?? [],
             dependsOn: data.dependsOn ?? [],
+            recurrence: data.recurrence ?? null,
             createdAt: ts,
             updatedAt: ts,
             deletedAt: null,
@@ -408,10 +411,23 @@ const useTaskStore = create(
             })
         }
 
+        useActivityStore.getState().logActivity({
+          taskId: created.id,
+          entityType: 'task',
+          entityId: created.id,
+          entityTitle: created.title,
+          action: 'created',
+          field: null,
+          newValue: created.title,
+        })
+
         return created
       },
 
       updateTask: (id, updates) => {
+        // Capture the task state BEFORE the update for recurrence check
+        const taskBefore = get().tasks.find((t) => t.id === id)
+
         set((state) => {
           const task = state.tasks.find((t) => t.id === id)
           if (!task) return
@@ -426,6 +442,49 @@ const useTaskStore = create(
           void persistTaskPatch(updated, patch, workspaceId, userId)
             .then(() => markTaskSyncSuccess(set))
             .catch((error) => reportTaskSyncError(set, error, 'update task'))
+        }
+
+        // Log activity for meaningful field changes
+        if (taskBefore && updated) {
+          const LOG_FIELDS = ['status', 'priority', 'title', 'dueDate', 'startDate']
+          for (const field of LOG_FIELDS) {
+            if (updates[field] !== undefined && updates[field] !== taskBefore[field]) {
+              useActivityStore.getState().logActivity({
+                taskId: updated.id,
+                entityType: 'task',
+                entityId: updated.id,
+                entityTitle: updated.title,
+                action: field === 'status' ? 'status_changed' : 'updated',
+                field,
+                oldValue: taskBefore[field],
+                newValue: updates[field],
+              })
+            }
+          }
+        }
+
+        // Spawn next recurrence when task is completed
+        if (updates.status === 'done' && taskBefore?.recurrence && shouldSpawnNext(taskBefore)) {
+          const next = computeNextOccurrence(taskBefore)
+          if (next) {
+            get().addTask({
+              title: taskBefore.title,
+              description: taskBefore.description,
+              priority: taskBefore.priority,
+              projectId: taskBefore.projectId,
+              programId: taskBefore.programId,
+              scope: taskBefore.scope,
+              tags: taskBefore.tags,
+              startDate: next.startDate,
+              dueDate: next.dueDate,
+              status: 'todo',
+              recurrence: {
+                ...taskBefore.recurrence,
+                occurrenceCount: (taskBefore.recurrence.occurrenceCount ?? 0) + 1,
+                parentTaskId: taskBefore.recurrence.parentTaskId ?? taskBefore.id,
+              },
+            })
+          }
         }
       },
 
@@ -494,6 +553,19 @@ const useTaskStore = create(
           void persistTaskPatch(deletedTask, patch, workspaceId, userId)
             .then(() => markTaskSyncSuccess(set))
             .catch((error) => reportTaskSyncError(set, error, 'move task to trash'))
+        }
+
+        if (deletedTask) {
+          useActivityStore.getState().logActivity({
+            taskId: deletedTask.id,
+            entityType: 'task',
+            entityId: deletedTask.id,
+            entityTitle: deletedTask.title,
+            action: 'deleted',
+            field: null,
+            oldValue: deletedTask.title,
+            newValue: null,
+          })
         }
       },
 
