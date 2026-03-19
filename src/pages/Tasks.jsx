@@ -1,8 +1,10 @@
 import { memo, useCallback, useEffect, useMemo, useState } from 'react'
 import { DragDropContext, Draggable, Droppable } from '@hello-pangea/dnd'
-import { CheckSquare, ListTodo } from 'lucide-react'
+import { CheckSquare, Download, ListTodo } from 'lucide-react'
+import ExportModal from '../components/settings/ExportModal'
 import TaskCard from '../components/tasks/TaskCard'
 import FilterBar from '../components/tasks/FilterBar'
+import TaskSavedViewsPanel from '../components/tasks/TaskSavedViewsPanel'
 import BulkActionBar from '../components/tasks/BulkActionBar'
 import CommitTaskMenu from '../components/planning/CommitTaskMenu'
 import EmptyState from '../components/common/EmptyState'
@@ -310,11 +312,19 @@ const BoardView = memo(function BoardView({ selectMode, tasksByStatus }) {
 const Tasks = memo(function Tasks() {
   const [showFilter, setShowFilter] = useState(false)
   const [selectMode, setSelectMode] = useState(false)
+  const [showExport, setShowExport] = useState(false)
   const [filterProgramId, setFilterProgramId] = useState('')
   const [filterProjectId, setFilterProjectId] = useState('')
 
   const view = useSettingsStore((state) => state.view)
   const filters = useSettingsStore((state) => state.filters)
+  const sortBy = useSettingsStore((state) => state.sortBy)
+  const savedTaskViews = useSettingsStore((state) => state.savedTaskViews)
+  const saveTaskView = useSettingsStore((state) => state.saveTaskView)
+  const deleteTaskView = useSettingsStore((state) => state.deleteTaskView)
+  const toggleFilter = useSettingsStore((state) => state.toggleFilter)
+  const clearFilters = useSettingsStore((state) => state.clearFilters)
+  const setSortBy = useSettingsStore((state) => state.setSortBy)
   const selectedTaskIds = useSettingsStore((state) => state.selectedTaskIds)
   const clearTaskSelection = useSettingsStore((state) => state.clearTaskSelection)
   const workspaceViewScope = useSettingsStore((state) => state.workspaceViewScope)
@@ -433,6 +443,15 @@ const Tasks = memo(function Tasks() {
                 <CheckSquare size={13} />
                 {selectMode ? `Selecting (${selectedTaskIds.length})` : 'Select tasks'}
               </button>
+              <button
+                onClick={() => setShowExport(true)}
+                className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-xl transition-colors"
+                style={{ color: 'var(--text-secondary)', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
+                title="Export tasks"
+              >
+                <Download size={13} />
+                Export
+              </button>
             </div>
           }
         >
@@ -501,6 +520,21 @@ const Tasks = memo(function Tasks() {
         </PageHero>
 
         {showFilter && <FilterBar onClose={() => setShowFilter(false)} />}
+        {showFilter && (
+          <div className="mt-3">
+            <TaskSavedViewsPanel
+              savedViews={savedTaskViews}
+              onApply={(savedView) => {
+                clearFilters()
+                savedView.filters.status.forEach((s) => toggleFilter('status', s))
+                savedView.filters.priority.forEach((p) => toggleFilter('priority', p))
+                setSortBy(savedView.sortBy)
+              }}
+              onSave={(name) => saveTaskView({ name, filters, sortBy })}
+              onDelete={deleteTaskView}
+            />
+          </div>
+        )}
       </div>
 
       <div className={`flex-1 overflow-y-auto px-4 md:px-6 pb-24 md:pb-8 ${view === 'board' ? 'overflow-x-auto' : ''}`}>
@@ -532,6 +566,7 @@ const Tasks = memo(function Tasks() {
       </div>
 
       <BulkActionBar active={selectMode} onExitSelectMode={() => setSelectMode(false)} />
+      {showExport && <ExportModal onClose={() => setShowExport(false)} />}
     </div>
   )
 })
