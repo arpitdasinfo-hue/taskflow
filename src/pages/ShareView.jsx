@@ -512,6 +512,8 @@ const ManagerGantt = ({ programs, projects, tasks, milestones }) => {
             showDependencies={showDependencies}
             onlyDependencyRisk={onlyDependencyRisk}
             readOnly
+            compact
+            isFullscreen={isFullscreen}
           />
         </div>
       )}

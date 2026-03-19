@@ -27,9 +27,12 @@ const TimelineGrid = memo(function TimelineGrid({
   onlyDependencyRisk,
   readOnly = false,
   compact = false,
+  isFullscreen = false,
 }) {
   const leftColumnWidth = compact ? 268 : LEFT_COLUMN_WIDTH
-  const viewportHeight = compact || readOnly ? 'min(58vh, 720px)' : 'min(70vh, 920px)'
+  const viewportHeight = isFullscreen
+    ? 'calc(100dvh - 160px)'
+    : (compact || readOnly ? 'min(58vh, 720px)' : 'min(70vh, 920px)')
   const dependencyLayer = useMemo(() => {
     const rowOffsets = new Map()
     let totalHeight = 0

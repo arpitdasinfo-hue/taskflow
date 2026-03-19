@@ -502,9 +502,9 @@ const Timeline = memo(function Timeline() {
     Number(!showDependencies)
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 overflow-y-auto">
+    <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
       <Header />
-      <div ref={fullscreenRef} className={`gantt-fullscreen-shell ${isFullscreen ? 'is-fullscreen' : ''}`}>
+      <div ref={fullscreenRef} className={`gantt-fullscreen-shell flex-1 flex flex-col min-h-0 overflow-y-auto ${isFullscreen ? 'is-fullscreen' : ''}`}>
         <TimelineToolbar
           zoom={zoom}
           rangeLabel={rangeLabel}
@@ -590,6 +590,7 @@ const Timeline = memo(function Timeline() {
                 onCreateTaskInRange={createTaskInRange}
                 showDependencies={showDependencies}
                 onlyDependencyRisk={onlyDependencyRisk}
+                isFullscreen={isFullscreen}
               />
             )}
           </div>
