@@ -1,4 +1,5 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react'
+import { motion, useReducedMotion } from 'framer-motion'
 import Header from '../components/layout/Header'
 import TimelineToolbar from '../components/timeline/TimelineToolbar'
 import TimelineFilterBar from '../components/timeline/TimelineFilterBar'
@@ -15,6 +16,9 @@ import useTimelineRows from '../hooks/useTimelineRows'
 import useWorkspaceScopedData from '../hooks/useWorkspaceScopedData'
 import useElementFullscreen from '../hooks/useElementFullscreen'
 import useToastStore from '../store/useToastStore'
+import { createFadeUpVariants, createScaleFadeVariants, createStaggerContainer } from '../lib/motion'
+
+void motion
 
 const NOTICE_TIMEOUT_MS = 6000
 
@@ -45,6 +49,7 @@ const configsMatch = (left = {}, right = {}) => {
 }
 
 const Timeline = memo(function Timeline() {
+  const reduceMotion = useReducedMotion()
   const { programs, projects, milestones, tasks } = useWorkspaceScopedData()
   const updateProject = useProjectStore((s) => s.updateProject)
   const addTask = useTaskStore((s) => s.addTask)
@@ -491,11 +496,16 @@ const Timeline = memo(function Timeline() {
     Number(onlyDependencyRisk) +
     Number(!showDependencies)
 
+  const sectionVariants = createFadeUpVariants(reduceMotion, 18)
+  const cardVariants = createScaleFadeVariants(reduceMotion)
+  const staggerVariants = createStaggerContainer(reduceMotion, 0.05, 0.02)
+
   return (
     <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
       <Header />
       <div ref={fullscreenRef} className={`gantt-fullscreen-shell flex-1 flex flex-col min-h-0 ${isFullscreen ? 'is-fullscreen' : ''}`}>
-        <div className="flex-shrink-0">
+        <motion.div variants={staggerVariants} initial="initial" animate="animate" className="flex-shrink-0">
+          <motion.div variants={sectionVariants}>
           <TimelineToolbar
             zoom={zoom}
             rangeLabel={rangeLabel}
@@ -515,6 +525,7 @@ const Timeline = memo(function Timeline() {
             activeFilterCount={activeFilterCount}
             filterPanelOpen={showFilterPanel}
             isFullscreen={isFullscreen}
+            compact
             onToggleFullscreen={toggleFullscreen}
             onChangeProgram={setProgramScope}
             onChangeProject={setProjectScope}
@@ -529,7 +540,9 @@ const Timeline = memo(function Timeline() {
             onResetToToday={resetToToday}
             onToggleFilterPanel={() => setShowFilterPanel((value) => !value)}
           />
+          </motion.div>
 
+          <motion.div variants={cardVariants}>
           <TimelinePlanningPanel
             savedViews={savedGanttViews}
             activeSavedViewId={activeSavedViewId}
@@ -538,8 +551,10 @@ const Timeline = memo(function Timeline() {
             onDeleteSavedView={deleteGanttView}
             showInsights={false}
           />
+          </motion.div>
 
           {showFilterPanel && (
+            <motion.div variants={cardVariants}>
             <TimelineFilterBar
               onlyDelayed={onlyDelayed}
               onlyCritical={onlyCritical}
@@ -552,13 +567,17 @@ const Timeline = memo(function Timeline() {
               onClear={clearFilters}
               onClose={() => setShowFilterPanel(false)}
             />
+            </motion.div>
           )}
 
-          <TimelineLegend />
-        </div>
+          <motion.div variants={cardVariants}>
+            <TimelineLegend />
+          </motion.div>
+        </motion.div>
 
         <div className="flex-1 min-h-0 px-4 md:px-6 pb-4">
-          <div
+          <motion.div
+            variants={sectionVariants}
             className="h-full rounded-[24px] overflow-hidden"
             style={{
               background: 'linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0.018))',
@@ -586,7 +605,7 @@ const Timeline = memo(function Timeline() {
                 fillHeight
               />
             )}
-          </div>
+          </motion.div>
         </div>
       </div>
 

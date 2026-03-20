@@ -1,4 +1,5 @@
 import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { createPortal } from 'react-dom'
 import {
   Plus, Folder, FolderOpen, CheckCircle2, Clock, AlertTriangle,
@@ -18,6 +19,14 @@ import useSettingsStore from '../store/useSettingsStore'
 import { sortTasksByStartDate } from '../lib/taskSort'
 import { taskMatchesProgram } from '../lib/taskScope'
 import useWorkspaceScopedData from '../hooks/useWorkspaceScopedData'
+import {
+  createCollapseVariants,
+  createFadeUpVariants,
+  createStaggerContainer,
+  MOTION_SPRINGS,
+} from '../lib/motion'
+
+void motion
 
 const PRIORITY_COLOR = { critical: '#ef4444', high: '#f97316', medium: '#f59e0b', low: '#94a3b8' }
 const STATUS_LABEL = { todo: 'To Do', 'in-progress': 'Active', review: 'Review', done: 'Done', blocked: 'Blocked' }
@@ -314,13 +323,13 @@ const CompactStat = memo(function CompactStat({ label, value, tone = 'default' }
 
   return (
     <div
-      className="min-w-[92px] rounded-2xl px-3 py-2"
+      className="min-w-[84px] rounded-2xl px-3 py-1.5"
       style={{ background: palette.background, border: `1px solid ${palette.border}` }}
     >
       <div className="text-[10px] font-semibold uppercase tracking-[0.24em]" style={{ color: 'var(--text-secondary)' }}>
         {label}
       </div>
-      <div className="mt-1 text-lg font-bold leading-none" style={{ color: palette.color }}>
+      <div className="mt-1 text-base font-bold leading-none" style={{ color: palette.color }}>
         {value}
       </div>
     </div>
@@ -328,15 +337,15 @@ const CompactStat = memo(function CompactStat({ label, value, tone = 'default' }
 })
 
 const MilestonePreviewStrip = memo(function MilestonePreviewStrip({ label, milestones, accentColor, onToggle, expanded }) {
-  const visibleMilestones = sortMilestones(milestones).slice(0, 3)
+  const visibleMilestones = sortMilestones(milestones).slice(0, 2)
   const nextMilestone = visibleMilestones.find((milestone) => milestone.status !== 'completed') ?? visibleMilestones[0] ?? null
 
   return (
-    <div className="flex flex-col gap-2 rounded-2xl px-3 py-2.5" style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.05)' }}>
+    <div className="flex flex-col gap-1.5 rounded-2xl px-3 py-2" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
           <p className="text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>{label}</p>
-          <p className="text-[11px] mt-1 truncate" style={{ color: 'var(--text-secondary)' }}>
+          <p className="text-[10px] mt-1 truncate" style={{ color: 'var(--text-secondary)' }}>
             {milestones.length > 0
               ? nextMilestone
                 ? `Next ${formatShortDate(nextMilestone.dueDate) ?? 'milestone'} · ${nextMilestone.name}`
@@ -355,16 +364,16 @@ const MilestonePreviewStrip = memo(function MilestonePreviewStrip({ label, miles
           </button>
         )}
       </div>
-      {visibleMilestones.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
+        {visibleMilestones.length > 0 && (
+        <div className="flex flex-wrap gap-1">
           {visibleMilestones.map((milestone) => (
             <div
               key={milestone.id}
-              className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px]"
-              style={{ background: 'rgba(255,255,255,0.04)', color: 'var(--text-primary)', border: '1px solid rgba(255,255,255,0.06)' }}
+              className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px]"
+              style={{ background: 'rgba(255,255,255,0.035)', color: 'var(--text-primary)', border: '1px solid rgba(255,255,255,0.05)' }}
             >
               <span style={{ color: accentColor }}>◆</span>
-              <span className="font-medium max-w-[180px] truncate">{milestone.name}</span>
+              <span className="font-medium max-w-[154px] truncate">{milestone.name}</span>
               {milestone.dueDate && (
                 <span style={{ color: 'var(--text-secondary)' }}>{formatShortDate(milestone.dueDate)}</span>
               )}
@@ -377,7 +386,7 @@ const MilestonePreviewStrip = memo(function MilestonePreviewStrip({ label, miles
 })
 
 const ProgramMilestonesOverview = memo(function ProgramMilestonesOverview({ milestones, projects, accentColor }) {
-  const visibleMilestones = useMemo(() => sortMilestones(milestones).slice(0, 3), [milestones])
+  const visibleMilestones = useMemo(() => sortMilestones(milestones).slice(0, 2), [milestones])
   const projectMap = useMemo(
     () => new Map(projects.map((project) => [project.id, project])),
     [projects]
@@ -391,8 +400,8 @@ const ProgramMilestonesOverview = memo(function ProgramMilestonesOverview({ mile
 
   return (
     <div
-      className="rounded-2xl px-3 py-2.5"
-      style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.05)' }}
+      className="rounded-2xl px-3 py-2"
+      style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
@@ -402,7 +411,7 @@ const ProgramMilestonesOverview = memo(function ProgramMilestonesOverview({ mile
             </p>
             <InfoTooltip text="Program milestones are rolled up from the milestones inside its projects and sub-projects." />
           </div>
-          <p className="text-[11px] mt-1" style={{ color: 'var(--text-secondary)' }}>
+          <p className="text-[10px] mt-1" style={{ color: 'var(--text-secondary)' }}>
             {totalCount > 0
               ? nextMilestone
                 ? `Next ${formatShortDate(nextMilestone.dueDate) ?? 'milestone'} · ${nextMilestone.name}`
@@ -418,7 +427,7 @@ const ProgramMilestonesOverview = memo(function ProgramMilestonesOverview({ mile
       </div>
 
       {visibleMilestones.length > 0 ? (
-        <div className="mt-2.5 space-y-1">
+        <div className="mt-2 space-y-1">
           {visibleMilestones.map((milestone) => {
             const project = projectMap.get(milestone.projectId)
             const isCompleted = milestone.status === 'completed'
@@ -429,14 +438,14 @@ const ProgramMilestonesOverview = memo(function ProgramMilestonesOverview({ mile
             return (
               <div
                 key={milestone.id}
-                className="flex items-center gap-3 rounded-xl px-2.5 py-2"
-                style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}
+                className="flex items-center gap-2.5 rounded-xl px-2.5 py-1.5"
+                style={{ background: 'rgba(255,255,255,0.018)', border: '1px solid rgba(255,255,255,0.035)' }}
               >
                 <span style={{ color: projectColor }} className="text-[11px] flex-shrink-0">◆</span>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span
-                      className="text-[12px] font-medium truncate"
+                      className="text-[11px] font-medium truncate"
                       style={{
                         color: isCompleted ? 'var(--text-secondary)' : 'var(--text-primary)',
                         textDecoration: isCompleted ? 'line-through' : 'none',
@@ -471,7 +480,7 @@ const ProgramMilestonesOverview = memo(function ProgramMilestonesOverview({ mile
                       ? { background: 'rgba(16,185,129,0.14)', color: '#34d399' }
                       : isOverdue
                         ? { background: 'rgba(239,68,68,0.14)', color: '#f87171' }
-                        : { background: 'rgba(255,255,255,0.06)', color: 'var(--text-secondary)' }}
+                          : { background: 'rgba(255,255,255,0.06)', color: 'var(--text-secondary)' }}
                   >
                     {isCompleted ? 'Done' : isOverdue ? 'Late' : 'Upcoming'}
                   </span>
@@ -612,6 +621,8 @@ const ProjectPanel = memo(function ProjectPanel({ project, depth = 0 }) {
   const health = getHealthMeta({ total, done, blocked, overdue, unscheduled })
   const scheduleWindow = buildScheduleWindow(project, childProjects, allProjectTasks, projectMilestones)
   const windowLabel = formatWindowLabel(scheduleWindow.startDate, scheduleWindow.dueDate)
+  const reduceMotion = useReducedMotion()
+  const collapseVariants = useMemo(() => createCollapseVariants(reduceMotion), [reduceMotion])
 
   useEffect(() => {
     if (activeProjectId === project.id) {
@@ -712,8 +723,9 @@ const ProjectPanel = memo(function ProjectPanel({ project, depth = 0 }) {
   }
 
   return (
-    <div
-      className="rounded-[26px] overflow-hidden"
+    <motion.div
+      layout={!reduceMotion}
+      className="rounded-[24px] overflow-hidden"
       data-project-id={project.id}
       onDragOver={handleProjectDragOver}
       onDrop={handleProjectDrop}
@@ -725,7 +737,7 @@ const ProjectPanel = memo(function ProjectPanel({ project, depth = 0 }) {
     >
       <div
         onClick={toggleExpanded}
-        className="group cursor-pointer px-4 py-3"
+        className="group cursor-pointer px-3.5 py-2.5"
         style={{ background: expanded ? 'rgba(255,255,255,0.025)' : 'rgba(255,255,255,0.015)', borderBottom: expanded ? '1px solid rgba(255,255,255,0.05)' : 'none' }}
       >
         <div className="flex items-start gap-3">
@@ -759,7 +771,7 @@ const ProjectPanel = memo(function ProjectPanel({ project, depth = 0 }) {
               </span>
               <InfoTooltip text={project.description} />
             </div>
-            <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]" style={{ color: 'var(--text-secondary)' }}>
+            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px]" style={{ color: 'var(--text-secondary)' }}>
               <span>{windowLabel}</span>
               <span>{total} task{total === 1 ? '' : 's'}</span>
               {childProjects.length > 0 && <span>{childProjects.length} sub-project{childProjects.length === 1 ? '' : 's'}</span>}
@@ -796,7 +808,7 @@ const ProjectPanel = memo(function ProjectPanel({ project, depth = 0 }) {
       </div>
 
       {showMovePicker && (
-        <div className="px-4 pb-2">
+          <motion.div className="px-3.5 pb-2" variants={collapseVariants} initial="initial" animate="animate" exit="exit">
           <select
             value={project.programId ?? ''}
             onChange={(event) => {
@@ -811,11 +823,11 @@ const ProjectPanel = memo(function ProjectPanel({ project, depth = 0 }) {
               <option key={programOption.id} value={programOption.id}>{programOption.name}</option>
             ))}
           </select>
-        </div>
+        </motion.div>
       )}
 
       {deleteArmed && (
-        <div className="px-4 pb-3">
+        <motion.div className="px-3.5 pb-3" variants={collapseVariants} initial="initial" animate="animate" exit="exit">
           <div className="flex items-center justify-between gap-3 rounded-2xl px-3 py-2.5" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.16)' }}>
             <span className="text-[11px]" style={{ color: '#fca5a5' }}>Delete this project and its nested work?</span>
             <div className="flex items-center gap-2">
@@ -823,11 +835,19 @@ const ProjectPanel = memo(function ProjectPanel({ project, depth = 0 }) {
               <button type="button" onClick={() => deleteProject(project.id)} className="text-[11px] px-2 py-1 rounded-lg" style={{ color: '#fff', background: '#dc2626' }}>Delete</button>
             </div>
           </div>
-        </div>
+        </motion.div>
       )}
 
+      <AnimatePresence initial={false}>
       {expanded && (
-        <div className="px-4 pb-3.5 pt-2.5 space-y-2.5" style={{ background: 'rgba(255,255,255,0.018)' }}>
+        <motion.div
+          variants={collapseVariants}
+          initial="initial"
+          animate="animate"
+          exit="exit"
+          className="overflow-hidden"
+        >
+        <div className="px-3.5 pb-3 pt-2 space-y-2" style={{ background: 'rgba(255,255,255,0.018)' }}>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px]" style={{ color: 'var(--text-secondary)' }}>
             <span><strong style={{ color: 'var(--text-primary)' }}>{done}</strong> of {total} done</span>
             <span><strong style={{ color: 'var(--text-primary)' }}>{inProgress}</strong> active</span>
@@ -844,11 +864,20 @@ const ProjectPanel = memo(function ProjectPanel({ project, depth = 0 }) {
             onToggle={() => setShowMilestones((current) => !current)}
           />
 
+          <AnimatePresence initial={false}>
           {showMilestones && (
-            <div className="rounded-2xl px-3 py-3" style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.05)' }}>
+            <motion.div
+              variants={collapseVariants}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              className="overflow-hidden rounded-2xl px-3 py-3"
+              style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.05)' }}
+            >
               <MilestonePanel projectId={project.id} projectColor={project.color} />
-            </div>
+            </motion.div>
           )}
+          </AnimatePresence>
 
           {childProjects.length > 0 && (
             <div className="rounded-2xl px-3 py-2.5" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
@@ -970,12 +999,14 @@ const ProjectPanel = memo(function ProjectPanel({ project, depth = 0 }) {
             )}
           </div>
         </div>
+        </motion.div>
       )}
+      </AnimatePresence>
 
       {canShareProject && showShare && (
         <ShareModal resourceType="project" resourceId={project.id} resourceName={project.name} onClose={() => setShowShare(false)} />
       )}
-    </div>
+    </motion.div>
   )
 })
 
@@ -1011,6 +1042,8 @@ const ProgramSection = memo(function ProgramSection({ program, projects, expande
   const canShareProgram = (program.scope ?? 'professional') !== 'personal'
   const scheduleWindow = buildScheduleWindow(program, projects, allTasks, projectMilestones)
   const windowLabel = formatWindowLabel(scheduleWindow.startDate, scheduleWindow.dueDate)
+  const reduceMotion = useReducedMotion()
+  const collapseVariants = useMemo(() => createCollapseVariants(reduceMotion), [reduceMotion])
 
   const submitProject = () => {
     if (!newProjName.trim()) return
@@ -1057,8 +1090,8 @@ const ProgramSection = memo(function ProgramSection({ program, projects, expande
   }
 
   return (
-    <div className="mb-4 rounded-[28px] overflow-hidden" data-program-id={program.id} onDragOver={handleProgramDragOver} onDrop={handleProgramDrop} style={{ border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.02)' }}>
-      <div className="px-4 md:px-5 py-3.5" style={{ background: expanded ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.02)', borderBottom: expanded ? '1px solid rgba(255,255,255,0.06)' : 'none' }}>
+    <motion.div className="mb-4 rounded-[26px] overflow-hidden" layout={!reduceMotion} data-program-id={program.id} onDragOver={handleProgramDragOver} onDrop={handleProgramDrop} style={{ border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.02)' }}>
+      <div className="px-4 md:px-5 py-3" style={{ background: expanded ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.02)', borderBottom: expanded ? '1px solid rgba(255,255,255,0.06)' : 'none' }}>
         <div className="flex items-start gap-3">
           <button type="button" onClick={onToggle} style={{ color: 'var(--text-secondary)' }}>
             {expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
@@ -1113,7 +1146,7 @@ const ProgramSection = memo(function ProgramSection({ program, projects, expande
               <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: health.background, color: health.color }}>{health.label}</span>
               <InfoTooltip text={program.description} />
             </div>
-            <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]" style={{ color: 'var(--text-secondary)' }}>
+            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px]" style={{ color: 'var(--text-secondary)' }}>
               <span style={{ color: scopeConfig.color }}>{scopeConfig.label}</span>
               <span>{windowLabel}</span>
               <span>{topLevelProjects.length} project{topLevelProjects.length === 1 ? '' : 's'}</span>
@@ -1143,7 +1176,7 @@ const ProgramSection = memo(function ProgramSection({ program, projects, expande
       </div>
 
       {deleteArmed && (
-        <div className="px-4 md:px-5 py-3">
+        <motion.div className="px-4 md:px-5 py-3" variants={collapseVariants} initial="initial" animate="animate" exit="exit">
           <div className="flex items-center justify-between gap-3 rounded-2xl px-3 py-2.5" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.16)' }}>
             <span className="text-[11px]" style={{ color: '#fca5a5' }}>Delete this program and unassign its projects?</span>
             <div className="flex items-center gap-2">
@@ -1151,11 +1184,19 @@ const ProgramSection = memo(function ProgramSection({ program, projects, expande
               <button type="button" onClick={() => deleteProgram(program.id)} className="text-[11px] px-2 py-1 rounded-lg" style={{ color: '#fff', background: '#dc2626' }}>Delete</button>
             </div>
           </div>
-        </div>
+        </motion.div>
       )}
 
+      <AnimatePresence initial={false}>
       {expanded && (
-        <div className="px-4 md:px-5 pb-4 pt-3 space-y-3">
+        <motion.div
+          variants={collapseVariants}
+          initial="initial"
+          animate="animate"
+          exit="exit"
+          className="overflow-hidden"
+        >
+        <div className="px-4 md:px-5 pb-3 pt-2.5 space-y-2.5">
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px]" style={{ color: 'var(--text-secondary)' }}>
             <span><strong style={{ color: 'var(--text-primary)' }}>{topLevelProjects.length}</strong> active projects</span>
             <span><strong style={{ color: 'var(--text-primary)' }}>{doneTasks}</strong> of {totalTasks} done</span>
@@ -1205,10 +1246,12 @@ const ProgramSection = memo(function ProgramSection({ program, projects, expande
             )}
           </div>
         </div>
+        </motion.div>
       )}
+      </AnimatePresence>
 
       {canShareProgram && showShare && <ShareModal resourceType="program" resourceId={program.id} resourceName={program.name} onClose={() => setShowShare(false)} />}
-    </div>
+    </motion.div>
   )
 })
 
@@ -1343,6 +1386,9 @@ const Projects = memo(function Projects() {
   const topLevelProjectCount = focusedProgram ? visibleProjects.filter((project) => !project.parentId).length : projects.filter((project) => !project.parentId).length
   const headerTitle = focusedProgram ? focusedProgram.name : 'Programs'
   const [openProgramId, setOpenProgramId] = useState(null)
+  const reduceMotion = useReducedMotion()
+  const sectionVariants = useMemo(() => createFadeUpVariants(reduceMotion), [reduceMotion])
+  const staggerVariants = useMemo(() => createStaggerContainer(reduceMotion, 0.045, 0.03), [reduceMotion])
 
   useEffect(() => {
     if (focusedProgramId) {
@@ -1387,7 +1433,8 @@ const Projects = memo(function Projects() {
 
   return (
     <div className="flex-1 overflow-y-auto px-4 md:px-6 pb-24 md:pb-8">
-      <div className="py-2 mb-3">
+      <motion.div variants={staggerVariants} initial="initial" animate="animate" className="py-2 mb-3">
+      <motion.div variants={sectionVariants}>
         <GlassCard padding="p-4 md:p-5" rounded="rounded-[30px]">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
             <div className="min-w-0 flex-1">
@@ -1439,12 +1486,18 @@ const Projects = memo(function Projects() {
             </div>
           </div>
         </GlassCard>
-      </div>
+      </motion.div>
 
-      {addingProgram && <NewProgramForm onDone={() => setAddingProgram(false)} />}
+      <AnimatePresence initial={false}>
+        {addingProgram && (
+          <motion.div variants={sectionVariants} initial="initial" animate="animate" exit="exit">
+            <NewProgramForm onDone={() => setAddingProgram(false)} />
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {programs.length === 0 && unassignedProjects.length === 0 && !addingProgram ? (
-        <div className="flex flex-col items-center justify-center py-20 gap-3">
+        <motion.div variants={sectionVariants} className="flex flex-col items-center justify-center py-20 gap-3">
           <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(var(--accent-rgb),0.1)' }}>
             <FolderOpen size={22} style={{ color: 'var(--accent)' }} />
           </div>
@@ -1455,10 +1508,11 @@ const Projects = memo(function Projects() {
           <button type="button" onClick={() => setAddingProgram(true)} className="btn-accent px-4 py-2 text-xs mt-1">
             Create first program
           </button>
-        </div>
+        </motion.div>
       ) : (
-        <>
+        <motion.div variants={staggerVariants} className="space-y-0">
           {visiblePrograms.map((program) => (
+            <motion.div key={program.id} variants={sectionVariants}>
             <ProgramSection
               key={program.id}
               program={program}
@@ -1469,10 +1523,16 @@ const Projects = memo(function Projects() {
                 setOpenProgramId((current) => (current === program.id ? null : program.id))
               }}
             />
+            </motion.div>
           ))}
-          {!focusedProgram && <UnassignedSection projects={unassignedProjects} />}
-        </>
+          {!focusedProgram && (
+            <motion.div variants={sectionVariants}>
+              <UnassignedSection projects={unassignedProjects} />
+            </motion.div>
+          )}
+        </motion.div>
       )}
+      </motion.div>
     </div>
   )
 })

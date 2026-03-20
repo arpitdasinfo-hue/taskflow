@@ -1,4 +1,5 @@
 import { useEffect, lazy, Suspense, Component, useMemo, useRef, useState } from 'react'
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { registerSW } from 'virtual:pwa-register'
 import Sidebar from './components/layout/Sidebar'
 import BottomNav from './components/layout/BottomNav'
@@ -18,6 +19,9 @@ import Auth from './pages/Auth'
 import ToastContainer from './components/common/Toast'
 import CommandPalette from './components/common/CommandPalette'
 import useToastStore from './store/useToastStore'
+import { createPageVariants } from './lib/motion'
+
+void motion
 
 // Lazy-load pages for code-splitting
 const Dashboard        = lazy(() => import('./pages/Dashboard'))
@@ -70,18 +74,37 @@ class ErrorBoundary extends Component {
 }
 
 function PageRouter({ page }) {
+  const reduceMotion = useReducedMotion()
+  const pageVariants = useMemo(() => createPageVariants(reduceMotion), [reduceMotion])
+  const pageContent = (
+    <>
+      {page === 'dashboard'          && <Dashboard />}
+      {page === 'tasks'              && <Tasks />}
+      {page === 'today'              && <Today />}
+      {page === 'settings'           && <Settings />}
+      {page === 'projects'           && <Projects />}
+      {page === 'program-dashboard'  && <ProgramDashboard />}
+      {page === 'timeline'           && <Timeline />}
+      {page === 'activity'           && <ActivityPage />}
+      {page === 'trash'              && <Trash />}
+    </>
+  )
+
   return (
     <ErrorBoundary>
       <Suspense fallback={<PageFallback />}>
-        {page === 'dashboard'          && <Dashboard />}
-        {page === 'tasks'              && <Tasks />}
-        {page === 'today'              && <Today />}
-        {page === 'settings'           && <Settings />}
-        {page === 'projects'           && <Projects />}
-        {page === 'program-dashboard'  && <ProgramDashboard />}
-        {page === 'timeline'           && <Timeline />}
-        {page === 'activity'           && <ActivityPage />}
-        {page === 'trash'              && <Trash />}
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.div
+            key={page}
+            variants={pageVariants}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            className="flex-1 min-h-0 flex flex-col"
+          >
+            {pageContent}
+          </motion.div>
+        </AnimatePresence>
       </Suspense>
     </ErrorBoundary>
   )
@@ -494,7 +517,9 @@ export default function App() {
       <BottomNav />
 
       {/* Task detail slide-over / bottom sheet */}
-      {selectedTaskId && <TaskDetail />}
+      <AnimatePresence initial={false}>
+        {selectedTaskId && <TaskDetail key={selectedTaskId} />}
+      </AnimatePresence>
 
       {/* Floating action button */}
       {activePage !== 'trash' && <QuickAdd />}

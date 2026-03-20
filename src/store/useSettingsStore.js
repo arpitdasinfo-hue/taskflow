@@ -71,12 +71,15 @@ const applyThemeToDom = (theme, { contrastMode = 'standard', uiDensity = 'comfor
   style.setProperty('--bg-gradient', tokens.gradient)
   style.setProperty('--text-primary', tokens.textPrimary)
   style.setProperty('--text-secondary', tokens.textSecondary)
+  style.setProperty('--chrome-bg', theme.preview?.[2] ?? tokens.accentDark)
   style.setProperty('--density-multiplier', uiDensity === 'compact' ? '0.9' : '1')
   root.dataset.contrast = contrastMode
   root.dataset.density = uiDensity
 
   const meta = document.querySelector('meta[name="theme-color"]')
-  if (meta) meta.setAttribute('content', theme.preview?.[2] ?? tokens.accentDark)
+  const chromeColor = theme.preview?.[2] ?? tokens.accentDark
+  if (meta) meta.setAttribute('content', chromeColor)
+  document.body.style.backgroundColor = chromeColor
 }
 
 const normalizeThemePreferences = (raw) => {

@@ -1,4 +1,5 @@
 import { memo, useState, useCallback, useEffect, useRef, useMemo } from 'react'
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { X, Trash2, Calendar, Tag, ChevronDown, Folder, AlertTriangle, Flag } from 'lucide-react'
 import { format } from 'date-fns'
 import useSettingsStore from '../../store/useSettingsStore'
@@ -14,6 +15,9 @@ import CommitTaskMenu from '../planning/CommitTaskMenu'
 import { useIsBlockedByDependency } from '../../hooks/useBlockedTasks'
 import useToastStore from '../../store/useToastStore'
 import useTemplateStore from '../../store/useTemplateStore'
+import { createDrawerVariants, createFadeUpVariants, createOverlayVariants, MOTION_SPRINGS } from '../../lib/motion'
+
+void motion
 
 const STATUSES   = ['todo', 'in-progress', 'review', 'done', 'blocked']
 const PRIORITIES = ['critical', 'high', 'medium', 'low']
@@ -21,6 +25,9 @@ const STATUS_LABELS = { 'todo': 'To Do', 'in-progress': 'In Progress', 'review':
 
 const SelectField = memo(function SelectField({ value, options, onChange, renderOption }) {
   const [open, setOpen] = useState(false)
+  const reduceMotion = useReducedMotion()
+  const menuVariants = useMemo(() => createFadeUpVariants(reduceMotion, 10), [reduceMotion])
+
   return (
     <div className="relative">
       <button
@@ -31,31 +38,46 @@ const SelectField = memo(function SelectField({ value, options, onChange, render
         <span>{renderOption ? renderOption(value, true) : value}</span>
         <ChevronDown size={14} style={{ color: 'var(--text-secondary)' }} />
       </button>
-      {open && (
-        <>
-          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div
-            className="absolute top-full left-0 right-0 mt-1 rounded-xl overflow-hidden z-50 anim-slide-down"
-            style={{ background: '#ffffff', border: '1px solid rgba(15,23,42,0.12)', boxShadow: '0 16px 48px rgba(15,23,42,0.18)' }}
-          >
-            {options.map((opt) => (
-              <button
-                key={opt}
-                onClick={() => { onChange(opt); setOpen(false) }}
-                className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-left hover:bg-slate-100 transition-colors"
-                style={opt === value ? { background: 'rgba(var(--accent-rgb),0.1)', color: 'var(--accent)' } : { color: '#0f172a' }}
-              >
-                {renderOption ? renderOption(opt, false) : opt}
-              </button>
-            ))}
-          </div>
-        </>
-      )}
+      <AnimatePresence initial={false}>
+        {open && (
+          <>
+            <motion.div
+              className="fixed inset-0 z-40"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setOpen(false)}
+            />
+            <motion.div
+              className="absolute top-full left-0 right-0 mt-1 rounded-xl overflow-hidden z-50"
+              variants={menuVariants}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              style={{ background: '#ffffff', border: '1px solid rgba(15,23,42,0.12)', boxShadow: '0 16px 48px rgba(15,23,42,0.18)' }}
+            >
+              {options.map((opt) => (
+                <motion.button
+                  key={opt}
+                  onClick={() => { onChange(opt); setOpen(false) }}
+                  whileHover={reduceMotion ? undefined : { x: 2 }}
+                  transition={MOTION_SPRINGS.soft}
+                  className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-left hover:bg-slate-100 transition-colors"
+                  style={opt === value ? { background: 'rgba(var(--accent-rgb),0.1)', color: 'var(--accent)' } : { color: '#0f172a' }}
+                >
+                  {renderOption ? renderOption(opt, false) : opt}
+                </motion.button>
+              ))}
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   )
 })
 
 const TaskDetail = memo(function TaskDetail() {
+  const reduceMotion = useReducedMotion()
   const selectedTaskId = useSettingsStore((s) => s.selectedTaskId)
   const closeTask      = useSettingsStore((s) => s.closeTask)
   const tasks          = useTaskStore((s) => s.tasks)
@@ -80,6 +102,9 @@ const TaskDetail = memo(function TaskDetail() {
   const [templateName, setTemplateName] = useState('')
   const confirmTimerRef = useRef(null)
   const addTemplate = useTemplateStore((s) => s.addTemplate)
+  const overlayVariants = useMemo(() => createOverlayVariants(reduceMotion), [reduceMotion])
+  const desktopDrawerVariants = useMemo(() => createDrawerVariants(reduceMotion, 'right'), [reduceMotion])
+  const mobileDrawerVariants = useMemo(() => createDrawerVariants(reduceMotion, 'bottom'), [reduceMotion])
 
   useEffect(() => {
     if (task) {
@@ -555,24 +580,39 @@ const TaskDetail = memo(function TaskDetail() {
   // Desktop: slide-over panel | Mobile: bottom sheet
   return (
     <>
-      {/* Overlay */}
-      <div className="overlay-bg" onClick={closeTask} />
+      <motion.div
+        className="overlay-bg"
+        variants={overlayVariants}
+        initial="initial"
+        animate="animate"
+        exit="exit"
+        onClick={closeTask}
+      />
 
       {/* Desktop panel */}
-      <div
+      <motion.div
         className="hidden md:flex fixed top-0 right-0 bottom-0 w-[400px] z-50 flex-col animate-slide-right"
-        style={{ animationDuration: '0.3s' }}
+        variants={desktopDrawerVariants}
+        initial="initial"
+        animate="animate"
+        exit="exit"
+        transition={MOTION_SPRINGS.gentle}
       >
         {panel}
-      </div>
+      </motion.div>
 
       {/* Mobile bottom sheet */}
-      <div
+      <motion.div
         className="md:hidden fixed left-0 right-0 bottom-0 z-50 rounded-t-3xl overflow-hidden anim-slide-up"
+        variants={mobileDrawerVariants}
+        initial="initial"
+        animate="animate"
+        exit="exit"
+        transition={MOTION_SPRINGS.gentle}
         style={{ maxHeight: '90dvh', height: '90dvh' }}
       >
         {panel}
-      </div>
+      </motion.div>
     </>
   )
 })

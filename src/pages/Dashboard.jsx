@@ -1,4 +1,5 @@
 import { memo, useMemo } from 'react'
+import { motion, useReducedMotion } from 'framer-motion'
 import {
   AlertTriangle,
   ArrowRight,
@@ -16,6 +17,9 @@ import usePlanningStore from '../store/usePlanningStore'
 import { useAllProgramStats } from '../hooks/useProgramStats'
 import { getPeriodBounds } from '../lib/planning'
 import useWorkspaceScopedData from '../hooks/useWorkspaceScopedData'
+import { createFadeUpVariants, createScaleFadeVariants, createStaggerContainer } from '../lib/motion'
+
+void motion
 
 const formatShortDate = (value) => {
   if (!value) return 'No date'
@@ -170,6 +174,7 @@ const ProgramPulseRow = memo(function ProgramPulseRow({ program, stats, onOpen }
 })
 
 const Dashboard = memo(function Dashboard() {
+  const reduceMotion = useReducedMotion()
   const setPage = useSettingsStore((state) => state.setPage)
   const setActiveProgram = useSettingsStore((state) => state.setActiveProgram)
   const setActiveProject = useSettingsStore((state) => state.setActiveProject)
@@ -318,9 +323,15 @@ const Dashboard = memo(function Dashboard() {
     )
   }
 
+  const sectionVariants = createFadeUpVariants(reduceMotion, 18)
+  const cardVariants = createScaleFadeVariants(reduceMotion)
+  const staggerVariants = createStaggerContainer(reduceMotion, 0.05, 0.02)
+
   return (
     <div className="flex-1 overflow-y-auto px-4 md:px-6 pb-24 md:pb-8">
-      <GlassCard padding="p-4 md:p-5" className="mt-2 mb-4">
+      <motion.div variants={staggerVariants} initial="initial" animate="animate" className="space-y-4">
+      <motion.div variants={sectionVariants}>
+      <GlassCard padding="p-4 md:p-5" className="mt-2">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.24em]" style={{ color: 'var(--text-secondary)' }}>
@@ -330,10 +341,7 @@ const Dashboard = memo(function Dashboard() {
             <h1 className="mt-2 text-[1.7rem] md:text-[1.95rem] font-bold leading-tight" style={{ color: 'var(--text-primary)' }}>
               See the week, not the noise
             </h1>
-            <p className="mt-2 text-sm max-w-2xl" style={{ color: 'var(--text-secondary)' }}>
-              Review delivery pressure, launches, and next actions from one clean surface.
-            </p>
-            <div className="mt-4 flex flex-wrap items-center gap-2">
+            <div className="mt-3 flex flex-wrap items-center gap-2">
               <button type="button" onClick={openPlanner} className="btn-accent px-3 py-2 text-xs">
                 Open planner
               </button>
@@ -350,16 +358,17 @@ const Dashboard = memo(function Dashboard() {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 xl:w-[500px]">
-            <StatPill label="Open work" value={openTasks.length} tone="accent" onClick={() => openTasksView('open')} />
-            <StatPill label="This week" value={weekCommitments.length} tone="default" onClick={openPlanner} />
-            <StatPill label="Next launch" value={nextMilestone ? formatShortDate(nextMilestone.dueDate) : 'None'} tone={nextMilestone ? 'success' : 'neutral'} onClick={() => openAnalytics('launch')} />
-            <StatPill label="Risk" value={flaggedPrograms.length > 0 ? `${flaggedPrograms.length} flagged` : 'Stable'} tone={flaggedPrograms.length > 0 ? 'danger' : 'success'} onClick={() => openAnalytics('flagged')} />
-          </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 xl:w-[500px]">
+          <StatPill label="Open work" value={openTasks.length} tone="accent" onClick={() => openTasksView('open')} />
+          <StatPill label="This week" value={weekCommitments.length} tone="default" onClick={openPlanner} />
+          <StatPill label="Next launch" value={nextMilestone ? formatShortDate(nextMilestone.dueDate) : 'None'} tone={nextMilestone ? 'success' : 'neutral'} onClick={() => openAnalytics('launch')} />
+          <StatPill label="Risk" value={flaggedPrograms.length > 0 ? `${flaggedPrograms.length} flagged` : 'Stable'} tone={flaggedPrograms.length > 0 ? 'danger' : 'success'} onClick={() => openAnalytics('flagged')} />
         </div>
+      </div>
       </GlassCard>
+      </motion.div>
 
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4 mb-4">
+      <motion.div variants={sectionVariants} className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         <SignalCard
           title="Overdue"
           value={overdueTasks.length}
@@ -392,9 +401,10 @@ const Dashboard = memo(function Dashboard() {
           icon={Target}
           onClick={() => openTasksView('critical')}
         />
-      </div>
+      </motion.div>
 
-      <div className="grid gap-4 xl:grid-cols-[0.95fr_1.05fr] mb-4">
+      <motion.div variants={staggerVariants} className="grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
+        <motion.div variants={cardVariants}>
         <GlassCard padding="p-4 md:p-5">
           <div className="flex items-center justify-between gap-3 mb-3">
             <div>
@@ -428,7 +438,9 @@ const Dashboard = memo(function Dashboard() {
             ))}
           </div>
         </GlassCard>
+        </motion.div>
 
+        <motion.div variants={cardVariants}>
         <GlassCard padding="p-4 md:p-5">
           <div className="flex items-center justify-between gap-3 mb-3">
             <div>
@@ -485,9 +497,11 @@ const Dashboard = memo(function Dashboard() {
             </button>
           </div>
         </GlassCard>
-      </div>
+        </motion.div>
+      </motion.div>
 
-      <div className="grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
+      <motion.div variants={staggerVariants} className="grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
+        <motion.div variants={cardVariants}>
         <GlassCard padding="p-4 md:p-5">
           <div className="flex items-center justify-between gap-3 mb-3">
             <div>
@@ -517,7 +531,9 @@ const Dashboard = memo(function Dashboard() {
             ))}
           </div>
         </GlassCard>
+        </motion.div>
 
+        <motion.div variants={cardVariants}>
         <GlassCard padding="p-4 md:p-5">
           <div className="flex items-center justify-between gap-3 mb-3">
             <div>
@@ -549,7 +565,9 @@ const Dashboard = memo(function Dashboard() {
             ))}
           </div>
         </GlassCard>
-      </div>
+        </motion.div>
+      </motion.div>
+      </motion.div>
     </div>
   )
 })

@@ -19,6 +19,7 @@
     linear-gradient(160deg, #0a0015 0%, #180430 55%, #0d001e 100%);
   --text-primary: #f3e8ff;
   --text-secondary: #c4b5fd;
+  --chrome-bg: #0d001e;
   --density-multiplier: 1;
   --transition-theme: background 0.6s ease, border-color 0.6s ease, box-shadow 0.6s ease, color 0.5s ease;
 }
@@ -36,6 +37,7 @@ body {
   height: 100%;
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
   background: var(--bg-gradient);
+  background-color: var(--chrome-bg);
   background-attachment: fixed;
   color: var(--text-primary);
   -webkit-font-smoothing: antialiased;
@@ -74,6 +76,7 @@ body {
       transparent 160px
     );
   opacity: 0.85;
+  animation: ambient-grid-drift 26s ease-in-out infinite alternate;
 }
 
 #root::after {
@@ -81,6 +84,7 @@ body {
   background:
     radial-gradient(circle at center, transparent 42%, rgba(0,0,0,0.14) 100%),
     linear-gradient(180deg, rgba(0,0,0,0.04), rgba(0,0,0,0.16));
+  animation: ambient-vignette-pulse 18s ease-in-out infinite;
 }
 
 /* ── Glass Utilities ────────────────────────────────────────────────────── */
@@ -96,6 +100,39 @@ body {
     inset 0 1px 0 var(--glass-highlight),
     inset 0 -1px 0 rgba(0,0,0,0.12);
   transition: var(--transition-theme), transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+@keyframes ambient-grid-drift {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+    opacity: 0.82;
+  }
+  100% {
+    transform: translate3d(0, -14px, 0) scale(1.03);
+    opacity: 0.92;
+  }
+}
+
+@keyframes ambient-vignette-pulse {
+  0%, 100% {
+    opacity: 0.92;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.015);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #root::before,
+  #root::after,
+  .glass,
+  .glass-hover,
+  .progress-fill {
+    animation: none !important;
+    transition: none !important;
+  }
 }
 
 .glass-hover:hover {

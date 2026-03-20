@@ -1,4 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useState } from 'react'
+import { motion, useReducedMotion } from 'framer-motion'
 import { DragDropContext, Draggable, Droppable } from '@hello-pangea/dnd'
 import {
   CalendarClock,
@@ -27,6 +28,9 @@ import {
   getPreviousPeriodBounds,
   groupCommitmentsByBucket,
 } from '../lib/planning'
+import { createFadeUpVariants, createScaleFadeVariants, createStaggerContainer } from '../lib/motion'
+
+void motion
 
 const STATUS_OPTIONS = [
   { value: 'todo', label: 'To Do' },
@@ -388,6 +392,7 @@ const PlannerAssignButtons = memo(function PlannerAssignButtons({ taskId, target
 })
 
 const Today = memo(function Today() {
+  const reduceMotion = useReducedMotion()
   const [candidateQuery, setCandidateQuery] = useState('')
   const [captureTitle, setCaptureTitle] = useState('')
   const [captureTarget, setCaptureTarget] = useState('day')
@@ -712,12 +717,18 @@ const Today = memo(function Today() {
     setCommitmentLayout(updates)
   }, [entriesByDroppable, monthBounds, setCommitmentLayout, todayBounds, weekBounds])
 
+  const sectionVariants = createFadeUpVariants(reduceMotion, 18)
+  const cardVariants = createScaleFadeVariants(reduceMotion)
+  const staggerVariants = createStaggerContainer(reduceMotion, 0.05, 0.02)
+
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       <Header />
 
       <div className="flex-1 overflow-y-auto px-4 md:px-6 pb-24 md:pb-8">
-        <GlassCard padding="p-4 md:p-5" className="mb-4">
+        <motion.div variants={staggerVariants} initial="initial" animate="animate" className="space-y-4">
+        <motion.div variants={sectionVariants}>
+        <GlassCard padding="p-4 md:p-5">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
@@ -834,8 +845,10 @@ const Today = memo(function Today() {
             </div>
           </div>
         </GlassCard>
+        </motion.div>
 
-        <GlassCard padding="p-3 md:p-4" className="mb-4">
+        <motion.div variants={sectionVariants}>
+        <GlassCard padding="p-3 md:p-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-center gap-1 p-1 rounded-2xl" style={{ background: 'rgba(255,255,255,0.04)' }}>
               {Object.entries(PERIOD_META).map(([periodType, meta]) => (
@@ -866,17 +879,18 @@ const Today = memo(function Today() {
             </div>
           </div>
         </GlassCard>
+        </motion.div>
 
         <DragDropContext onDragEnd={onDragEnd}>
-          <div className="grid grid-cols-1 gap-4">
+          <motion.div variants={staggerVariants} className="grid grid-cols-1 gap-4">
             <div className={activePeriodMeta.buckets.length === 1 ? 'grid grid-cols-1' : 'grid grid-cols-1 xl:grid-cols-3 gap-3'}>
               {activePeriodMeta.buckets.map((bucket) => {
                 const droppableId = `${activePeriod}:${bucket}`
                 const color = PLANNING_BUCKET_COLORS[bucket]
 
                 return (
+                  <motion.div key={droppableId} variants={cardVariants}>
                   <PlanningBucket
-                    key={droppableId}
                     droppableId={droppableId}
                     title={PLANNING_BUCKET_LABELS[bucket]}
                     hint={activePeriod === 'day' ? 'Drag to reorder priority inside Today.' : 'Drag within this lane to sequence the work.'}
@@ -889,10 +903,12 @@ const Today = memo(function Today() {
                     emptyDescription={activePeriodMeta.emptyDescription}
                     compact
                   />
+                  </motion.div>
                 )
               })}
             </div>
 
+            <motion.div variants={sectionVariants}>
             <GlassCard padding="p-4">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                 <div className="flex items-center gap-2">
@@ -950,8 +966,8 @@ const Today = memo(function Today() {
                 />
               </div>
 
-              <div className="mt-3 flex items-center gap-2 text-[11px]" style={{ color: 'var(--text-secondary)' }}>
-                <CircleDot size={13} />
+            <div className="mt-3 flex items-center gap-2 text-[11px]" style={{ color: 'var(--text-secondary)' }}>
+              <CircleDot size={13} />
                 <span>Tasks only</span>
                 <InfoTooltip
                   text="Programs, projects, and sub-projects remain context only. Planner commits tasks, not structure rows."
@@ -959,8 +975,10 @@ const Today = memo(function Today() {
                 />
               </div>
             </GlassCard>
-          </div>
+            </motion.div>
+          </motion.div>
         </DragDropContext>
+        </motion.div>
       </div>
     </div>
   )

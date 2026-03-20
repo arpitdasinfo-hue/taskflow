@@ -1,4 +1,5 @@
-import { memo, useEffect, useState } from 'react'
+import { memo, useEffect, useMemo, useState } from 'react'
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import {
   LayoutDashboard, ListTodo, CalendarClock, Settings2, FolderKanban,
   Zap, ChevronLeft, ChevronRight, Folder, ChevronDown, BarChart3, GanttChart, LogOut, Trash2, BriefcaseBusiness, House, Activity,
@@ -7,8 +8,10 @@ import useSettingsStore from '../../store/useSettingsStore'
 import useAuthStore from '../../store/useAuthStore'
 import { useTaskStats } from '../../hooks/useFilteredTasks'
 import useWorkspaceScopedData from '../../hooks/useWorkspaceScopedData'
-import InfoTooltip from '../common/InfoTooltip'
 import { WORKSPACE_VIEW_OPTIONS } from '../../lib/workspaceScope'
+import { createCollapseVariants, MOTION_SPRINGS } from '../../lib/motion'
+
+void motion
 
 const NAV_ITEMS = [
   { id: 'dashboard',         label: 'Dashboard',  icon: LayoutDashboard },
@@ -22,13 +25,6 @@ const NAV_ITEMS = [
   { id: 'settings',          label: 'Settings',   icon: Settings2       },
 ]
 
-const PROGRAM_STATUS_COLORS = {
-  planning:  '#94a3b8',
-  active:    '#22d3ee',
-  'on-hold': '#f59e0b',
-  completed: '#10b981',
-}
-
 const WORKSPACE_SCOPE_ICON = {
   professional: BriefcaseBusiness,
   personal: House,
@@ -37,6 +33,7 @@ const WORKSPACE_SCOPE_ICON = {
 const WorkspaceScopeSwitch = memo(function WorkspaceScopeSwitch({ collapsed }) {
   const workspaceViewScope = useSettingsStore((state) => state.workspaceViewScope)
   const setWorkspaceViewScope = useSettingsStore((state) => state.setWorkspaceViewScope)
+  const reduceMotion = useReducedMotion()
 
   return (
     <div className={`px-2 mb-3 ${collapsed ? '' : ''}`}>
@@ -48,19 +45,30 @@ const WorkspaceScopeSwitch = memo(function WorkspaceScopeSwitch({ collapsed }) {
           const active = workspaceViewScope === option.id
           const Icon = WORKSPACE_SCOPE_ICON[option.id]
           return (
-            <button
+            <motion.button
               key={option.id}
               type="button"
               onClick={() => setWorkspaceViewScope(option.id)}
-              className={`flex items-center gap-2 rounded-xl text-xs font-semibold transition-colors ${collapsed ? 'w-9 h-9 justify-center' : 'flex-1 px-2.5 py-2 justify-center'}`}
+              whileHover={reduceMotion ? undefined : { y: -1 }}
+              whileTap={reduceMotion ? undefined : { scale: 0.98 }}
+              className={`relative overflow-hidden flex items-center gap-2 rounded-xl text-xs font-semibold transition-colors ${collapsed ? 'w-9 h-9 justify-center' : 'flex-1 px-2.5 py-2 justify-center'}`}
+              layout
               style={active
                 ? { background: 'rgba(var(--accent-rgb),0.2)', color: 'var(--accent)', border: '1px solid rgba(var(--accent-rgb),0.28)' }
                 : { color: 'var(--text-secondary)', border: '1px solid transparent' }}
               title={collapsed ? option.label : undefined}
             >
-              <Icon size={13} />
-              {!collapsed && <span>{option.id === 'professional' ? 'Professional' : 'Personal'}</span>}
-            </button>
+              {active && (
+                <motion.span
+                  layoutId="workspace-scope-pill"
+                  className="absolute inset-0 rounded-xl"
+                  style={{ background: 'rgba(var(--accent-rgb),0.16)', border: '1px solid rgba(var(--accent-rgb),0.28)' }}
+                  transition={reduceMotion ? { duration: 0 } : MOTION_SPRINGS.soft}
+                />
+              )}
+              <Icon size={13} className="relative z-[1]" />
+              {!collapsed && <span className="relative z-[1]">{option.id === 'professional' ? 'Professional' : 'Personal'}</span>}
+            </motion.button>
           )
         })}
       </div>
@@ -75,10 +83,11 @@ const ProgramGroup = memo(function ProgramGroup({ program, projects, tasks, allP
   const setActiveProject     = useSettingsStore((s) => s.setActiveProject)
   const setActiveProgram     = useSettingsStore((s) => s.setActiveProgram)
   const setPage              = useSettingsStore((s) => s.setPage)
+  const reduceMotion = useReducedMotion()
   const [open, setOpen]      = useState(() => activeProgramId === program.id || projects.some((project) => project.id === activeProjectId))
   const taskCount = (pid) => tasks.filter((t) => t.projectId === pid && t.status !== 'done').length
-  const statusColor = PROGRAM_STATUS_COLORS[program.status] || '#94a3b8'
   const topLevel = projects.filter((p) => !p.parentId)
+  const collapseVariants = useMemo(() => createCollapseVariants(reduceMotion), [reduceMotion])
 
   useEffect(() => {
     if (activeProgramId === program.id || projects.some((project) => project.id === activeProjectId)) {
@@ -121,8 +130,10 @@ const ProgramGroup = memo(function ProgramGroup({ program, projects, tasks, allP
   return (
     <div className="mb-1">
       {/* Program row */}
-      <button
+      <motion.button
         onClick={handleProgramClick}
+        whileHover={reduceMotion ? undefined : { x: 1 }}
+        transition={reduceMotion ? undefined : MOTION_SPRINGS.gentle}
         className="w-full flex items-center gap-1.5 px-2 py-1 rounded-lg mb-0.5 transition-colors hover:bg-white/5"
       >
         <span className="w-2 h-2 rounded flex-shrink-0"
@@ -131,84 +142,107 @@ const ProgramGroup = memo(function ProgramGroup({ program, projects, tasks, allP
           style={{ color: 'var(--text-secondary)' }}>
           {program.name}
         </span>
-        <InfoTooltip text={program.description} />
-        <span className="text-[10px] px-1 py-0.5 rounded-full"
-          style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--text-secondary)' }}>
+        <span className="text-[10px] px-1.5 py-0.5 rounded-full"
+          style={{ background: 'rgba(255,255,255,0.04)', color: 'var(--text-secondary)' }}>
           {topLevel.length}
         </span>
-        {/* Status dot */}
-        <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" title={program.status || 'planning'}
-          style={{ background: statusColor }} />
         <ChevronDown size={10} style={{
           color: 'var(--text-secondary)',
           transform: open ? 'rotate(0deg)' : 'rotate(-90deg)',
           transition: 'transform 0.2s',
           flexShrink: 0,
         }} />
-      </button>
+      </motion.button>
 
       {/* Projects nested under program */}
-      {open && topLevel.map((project) => {
-        const isActive = activeProjectId === project.id
-        const count    = taskCount(project.id)
-        const subProjects = allProjects.filter((p) => p.parentId === project.id)
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            variants={collapseVariants}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            className="overflow-hidden"
+          >
+            <div className="space-y-0.5">
+              {topLevel.map((project) => {
+                const isActive = activeProjectId === project.id
+                const count = taskCount(project.id)
+                const subProjects = allProjects.filter((p) => p.parentId === project.id)
 
-        return (
-          <div key={project.id}>
-            <button
-              onClick={() => handleProjectClick(project.id, isActive)}
-              className="w-full flex items-center gap-2 pl-5 pr-2 py-1.5 rounded-xl text-xs font-medium transition-all mb-0.5"
-              style={isActive
-                ? { background: `${project.color}20`, color: project.color, border: `1px solid ${project.color}30` }
-                : { color: 'var(--text-secondary)' }
-              }
-              title={project.name}>
-              <span className="w-1.5 h-1.5 rounded-full flex-shrink-0"
-                style={{ background: project.color, boxShadow: isActive ? `0 0 5px ${project.color}` : 'none' }} />
-              <span className="flex-1 text-left truncate">{project.name}</span>
-              <InfoTooltip text={project.description} />
-              {count > 0 && (
-                <span className="text-[10px] font-bold px-1 py-0.5 rounded-full min-w-[18px] text-center"
-                  style={isActive
-                    ? { background: `${project.color}30`, color: project.color }
-                    : { background: 'rgba(255,255,255,0.07)', color: 'var(--text-secondary)' }
-                  }>
-                  {count}
-                </span>
-              )}
-            </button>
+                return (
+                  <div key={project.id}>
+                    <motion.button
+                      onClick={() => handleProjectClick(project.id, isActive)}
+                      whileHover={reduceMotion ? undefined : { x: 1 }}
+                      transition={reduceMotion ? undefined : MOTION_SPRINGS.gentle}
+                      className="w-full flex items-center gap-2 pl-5 pr-2 py-1.5 rounded-xl text-xs font-medium transition-all"
+                      style={isActive
+                        ? { background: `${project.color}16`, color: project.color, border: `1px solid ${project.color}26` }
+                        : { color: 'var(--text-secondary)' }}
+                      title={project.name}
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                        style={{ background: project.color, boxShadow: isActive ? `0 0 5px ${project.color}` : 'none' }} />
+                      <span className="flex-1 text-left truncate">{project.name}</span>
+                      {count > 0 && (
+                        <span className="text-[10px] font-bold px-1 py-0.5 rounded-full min-w-[18px] text-center"
+                          style={isActive
+                            ? { background: `${project.color}24`, color: project.color }
+                            : { background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)' }}>
+                          {count}
+                        </span>
+                      )}
+                    </motion.button>
 
-            {/* Sub-projects (3rd level) */}
-            {isActive && subProjects.map((sub) => {
-              const isSubActive = activeProjectId === sub.id
-              const subCount    = taskCount(sub.id)
-              return (
-                <button key={sub.id}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    handleProjectClick(sub.id, isSubActive)
-                  }}
-                  className="w-full flex items-center gap-2 pl-9 pr-2 py-1 rounded-xl text-[11px] font-medium transition-all mb-0.5"
-                  style={isSubActive
-                    ? { background: `${sub.color}20`, color: sub.color, border: `1px solid ${sub.color}30` }
-                    : { color: 'var(--text-secondary)' }
-                  }
-                  title={sub.name}>
-                  <span className="w-1 h-1 rounded-full flex-shrink-0" style={{ background: sub.color }} />
-                  <span className="flex-1 text-left truncate">{sub.name}</span>
-                  <InfoTooltip text={sub.description} />
-                  {subCount > 0 && (
-                    <span className="text-[10px] font-bold px-1 py-0.5 rounded-full min-w-[18px] text-center"
-                      style={{ background: 'rgba(255,255,255,0.07)', color: 'var(--text-secondary)' }}>
-                      {subCount}
-                    </span>
-                  )}
-                </button>
-              )
-            })}
-          </div>
-        )
-      })}
+                    <AnimatePresence initial={false}>
+                      {isActive && subProjects.length > 0 && (
+                        <motion.div
+                          variants={collapseVariants}
+                          initial="initial"
+                          animate="animate"
+                          exit="exit"
+                          className="overflow-hidden"
+                        >
+                          {subProjects.map((sub) => {
+                            const isSubActive = activeProjectId === sub.id
+                            const subCount = taskCount(sub.id)
+                            return (
+                              <motion.button
+                                key={sub.id}
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  handleProjectClick(sub.id, isSubActive)
+                                }}
+                                whileHover={reduceMotion ? undefined : { x: 1 }}
+                                transition={reduceMotion ? undefined : MOTION_SPRINGS.gentle}
+                                className="w-full flex items-center gap-2 pl-9 pr-2 py-1 rounded-xl text-[11px] font-medium transition-all mb-0.5"
+                                style={isSubActive
+                                  ? { background: `${sub.color}18`, color: sub.color, border: `1px solid ${sub.color}28` }
+                                  : { color: 'var(--text-secondary)' }}
+                                title={sub.name}
+                              >
+                                <span className="w-1 h-1 rounded-full flex-shrink-0" style={{ background: sub.color }} />
+                                <span className="flex-1 text-left truncate">{sub.name}</span>
+                                {subCount > 0 && (
+                                  <span className="text-[10px] font-bold px-1 py-0.5 rounded-full min-w-[18px] text-center"
+                                    style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)' }}>
+                                    {subCount}
+                                  </span>
+                                )}
+                              </motion.button>
+                            )
+                          })}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                )
+              })}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 })
@@ -268,18 +302,30 @@ const Sidebar = memo(function Sidebar() {
             : id === 'trash' && trashTasks.length > 0 ? trashTasks.length
             : null
           return (
-            <button key={id}
+            <motion.button key={id}
               onClick={() => { setPage(id); setActiveProject(null); setActiveProgram(null) }}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 no-select ${sidebarCollapsed ? 'justify-center px-0' : ''}`}
+              whileHover={{ x: sidebarCollapsed ? 0 : 2 }}
+              whileTap={{ scale: 0.99 }}
+              className={`relative overflow-hidden w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 no-select ${sidebarCollapsed ? 'justify-center px-0' : ''}`}
               style={isActive
                 ? { background: 'var(--accent)', color: '#fff', boxShadow: '0 4px 12px rgba(var(--accent-rgb),0.3)' }
                 : { color: 'var(--text-secondary)' }
               }
               title={sidebarCollapsed ? label : undefined}>
-              <Icon size={17} strokeWidth={isActive ? 2.5 : 2} className="flex-shrink-0" />
-              {!sidebarCollapsed && <span className="flex-1 text-left">{label}</span>}
+              {isActive && (
+                <motion.span
+                  layoutId="sidebar-active-nav"
+                  className="absolute inset-0 rounded-xl"
+                  style={{ background: 'var(--accent)', boxShadow: '0 6px 18px rgba(var(--accent-rgb),0.28)' }}
+                  transition={MOTION_SPRINGS.soft}
+                />
+              )}
+              <span className="relative z-[1] flex items-center gap-3 w-full">
+                <Icon size={17} strokeWidth={isActive ? 2.5 : 2} className="flex-shrink-0" />
+                {!sidebarCollapsed && <span className="flex-1 text-left">{label}</span>}
+              </span>
               {!sidebarCollapsed && badge && (
-                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full"
+                <span className="relative z-[1] text-[10px] font-bold px-1.5 py-0.5 rounded-full"
                   style={isActive
                     ? { background: 'rgba(255,255,255,0.25)', color: '#fff' }
                     : { background: 'rgba(var(--accent-rgb),0.15)', color: 'var(--accent)' }
@@ -287,7 +333,7 @@ const Sidebar = memo(function Sidebar() {
                   {badge}
                 </span>
               )}
-            </button>
+            </motion.button>
           )
         })}
       </nav>
@@ -336,11 +382,13 @@ const Sidebar = memo(function Sidebar() {
               const isActive = activeProjectId === project.id
               const count = tasks.filter((t) => t.projectId === project.id && t.status !== 'done').length
               return (
-                <button key={project.id}
+                <motion.button key={project.id}
                   onClick={() => {
                     setPage('projects')
                     setActiveProject(isActive ? null : project.id)
                   }}
+                  whileHover={sidebarCollapsed ? undefined : { x: 1 }}
+                  transition={MOTION_SPRINGS.gentle}
                   className="w-full flex items-center gap-2 pl-4 pr-2 py-1.5 rounded-xl text-xs font-medium transition-all mb-0.5"
                   style={isActive
                     ? { background: `${project.color}20`, color: project.color, border: `1px solid ${project.color}30` }
@@ -349,7 +397,6 @@ const Sidebar = memo(function Sidebar() {
                   title={project.name}>
                   <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: project.color }} />
                   <span className="flex-1 text-left truncate">{project.name}</span>
-                  <InfoTooltip text={project.description} />
                   {count > 0 && (
                     <span className="text-[10px] font-bold px-1 py-0.5 rounded-full min-w-[18px] text-center"
                       style={isActive
@@ -359,7 +406,7 @@ const Sidebar = memo(function Sidebar() {
                       {count}
                     </span>
                   )}
-                </button>
+                </motion.button>
               )
             })}
           </div>
