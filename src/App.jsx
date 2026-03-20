@@ -306,6 +306,44 @@ export default function App() {
   }, [])
 
   useEffect(() => {
+    if (typeof window === 'undefined' || typeof document === 'undefined') return undefined
+
+    const root = document.documentElement
+    const overlay = navigator.windowControlsOverlay
+
+    const applyTitlebarGeometry = () => {
+      if (!overlay?.visible) {
+        root.dataset.windowControlsOverlay = 'false'
+        root.style.setProperty('--titlebar-area-left', '0px')
+        root.style.setProperty('--titlebar-area-top', '0px')
+        root.style.setProperty('--titlebar-area-width', '100vw')
+        root.style.setProperty('--titlebar-area-height', '0px')
+        root.style.setProperty('--titlebar-area-right', '0px')
+        return
+      }
+
+      const rect = overlay.getTitlebarAreaRect()
+      const rightInset = Math.max(0, window.innerWidth - rect.x - rect.width)
+
+      root.dataset.windowControlsOverlay = 'true'
+      root.style.setProperty('--titlebar-area-left', `${rect.x}px`)
+      root.style.setProperty('--titlebar-area-top', `${rect.y}px`)
+      root.style.setProperty('--titlebar-area-width', `${rect.width}px`)
+      root.style.setProperty('--titlebar-area-height', `${rect.height}px`)
+      root.style.setProperty('--titlebar-area-right', `${rightInset}px`)
+    }
+
+    applyTitlebarGeometry()
+    overlay?.addEventListener?.('geometrychange', applyTitlebarGeometry)
+    window.addEventListener('resize', applyTitlebarGeometry)
+
+    return () => {
+      overlay?.removeEventListener?.('geometrychange', applyTitlebarGeometry)
+      window.removeEventListener('resize', applyTitlebarGeometry)
+    }
+  }, [])
+
+  useEffect(() => {
     if (!user?.id) {
       lastAppliedRemoteThemeRef.current = ''
       return
@@ -505,6 +543,8 @@ export default function App() {
 
   return (
     <div className="flex h-full min-h-dvh">
+      <div className="window-overlay-surface" aria-hidden="true" />
+
       {/* Desktop sidebar */}
       <Sidebar />
 

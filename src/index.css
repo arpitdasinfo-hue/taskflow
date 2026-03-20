@@ -22,6 +22,11 @@
   --chrome-bg: #0d001e;
   --density-multiplier: 1;
   --transition-theme: background 0.6s ease, border-color 0.6s ease, box-shadow 0.6s ease, color 0.5s ease;
+  --titlebar-area-left: 0px;
+  --titlebar-area-top: 0px;
+  --titlebar-area-width: 100vw;
+  --titlebar-area-height: 0px;
+  --titlebar-area-right: 0px;
 }
 
 /* ── Base Reset ─────────────────────────────────────────────────────────── */
@@ -45,6 +50,10 @@ body {
   overflow-x: hidden;
   position: relative;
   transition: var(--transition-theme);
+}
+
+html[data-window-controls-overlay='true'] body {
+  background-color: var(--chrome-bg);
 }
 
 #root {
@@ -280,7 +289,31 @@ select optgroup {
 
 /* ── iOS safe-area ──────────────────────────────────────────────────────── */
 .safe-bottom { padding-bottom: max(env(safe-area-inset-bottom, 0px), 16px); }
-.safe-top    { padding-top:    env(safe-area-inset-top, 0px); }
+.safe-top    { padding-top:    max(env(safe-area-inset-top, 0px), var(--titlebar-area-height)); }
+
+/* ── Desktop titlebar overlay ───────────────────────────────────────────── */
+.window-overlay-surface {
+  position: fixed;
+  inset: 0 0 auto 0;
+  height: max(env(safe-area-inset-top, 0px), var(--titlebar-area-height));
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.015) 72%, rgba(255,255,255,0) 100%),
+    var(--chrome-bg);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.05),
+    0 10px 28px rgba(0,0,0,0.12);
+  backdrop-filter: blur(20px) saturate(120%);
+  -webkit-backdrop-filter: blur(20px) saturate(120%);
+  pointer-events: none;
+  opacity: 0;
+  z-index: 20;
+  transition: var(--transition-theme), opacity 0.24s ease;
+}
+
+html[data-window-controls-overlay='true'] .window-overlay-surface {
+  opacity: 1;
+}
 
 /* ── Custom Checkbox ────────────────────────────────────────────────────── */
 .custom-checkbox {
