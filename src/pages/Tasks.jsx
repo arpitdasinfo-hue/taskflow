@@ -18,7 +18,6 @@ import useSettingsStore from '../store/useSettingsStore'
 import useTaskStore from '../store/useTaskStore'
 import { useFilteredTasks } from '../hooks/useFilteredTasks'
 import useWorkspaceScopedData from '../hooks/useWorkspaceScopedData'
-import { sortTasksByStartDate } from '../lib/taskSort'
 import { getTaskProgramId } from '../lib/taskScope'
 import useToastStore from '../store/useToastStore'
 import {
@@ -360,7 +359,7 @@ const Tasks = memo(function Tasks() {
   }, [projectById, filterProgramId, filterProjectId, workspaceViewScope])
 
   const filteredTasks = useMemo(() => {
-    const scopedTasks = !filterProgramId && !filterProjectId
+    return !filterProgramId && !filterProjectId
       ? tasks
       : tasks.filter((task) => {
           const taskProgramId = getTaskProgramId(task, projectById)
@@ -368,8 +367,6 @@ const Tasks = memo(function Tasks() {
           if (filterProjectId && task.projectId !== filterProjectId) return false
           return true
         })
-
-    return sortTasksByStartDate(scopedTasks)
   }, [tasks, projectById, filterProgramId, filterProjectId])
 
   const tasksByStatus = useMemo(() => {

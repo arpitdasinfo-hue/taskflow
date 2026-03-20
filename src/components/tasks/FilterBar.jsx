@@ -13,7 +13,7 @@ const STATUS_LABELS = {
 const PRIORITY_COLORS = { critical: '#ef4444', high: '#f97316', medium: '#f59e0b', low: '#22d3ee' }
 
 const SORT_OPTIONS = [
-  { value: 'createdAt', label: 'Date Created' },
+  { value: 'startDate', label: 'Start Date' },
   { value: 'updatedAt', label: 'Last Updated' },
   { value: 'dueDate',   label: 'Due Date'      },
   { value: 'priority',  label: 'Priority'      },
@@ -143,7 +143,7 @@ const FilterBar = memo(function FilterBar({ onClose }) {
         </p>
         <div className="flex flex-wrap gap-1.5">
           {SORT_OPTIONS.map(({ value, label }) => {
-            const active = sortBy === value
+            const active = sortBy === value || (value === 'startDate' && sortBy === 'createdAt')
             return (
               <button key={value} onClick={() => setSortBy(value)}
                 className="text-xs px-2.5 py-1 rounded-full border font-medium transition-all"

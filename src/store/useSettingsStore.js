@@ -129,7 +129,7 @@ const useSettingsStore = create(
       workspaceViewScope: 'professional',
       projectsViewMode: 'portfolio',
       selectedTaskIds: [],
-      sortBy: 'createdAt',
+      sortBy: 'startDate',
       sidebarCollapsed: false,
       ganttConfig: DEFAULT_GANTT_CONFIG,
       savedGanttViews: [],
@@ -304,7 +304,7 @@ const useSettingsStore = create(
           id: id ?? nanoid(),
           name: normalizedName,
           filters: filters ?? { status: [], priority: [], tags: [] },
-          sortBy: sortBy ?? 'createdAt',
+          sortBy: sortBy ?? 'startDate',
           updatedAt: new Date().toISOString(),
         }
         set((state) => {

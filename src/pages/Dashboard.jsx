@@ -188,16 +188,28 @@ const Dashboard = memo(function Dashboard() {
   const blockedTasks = useMemo(() => openTasks.filter((task) => task.status === 'blocked'), [openTasks])
   const criticalTasks = useMemo(() => openTasks.filter((task) => task.priority === 'critical'), [openTasks])
   const unscheduledTasks = useMemo(() => openTasks.filter((task) => !task.startDate || !task.dueDate), [openTasks])
+  const activeTaskIds = useMemo(() => new Set(activeTasks.map((task) => task.id)), [activeTasks])
+  const openTaskIds = useMemo(() => new Set(openTasks.map((task) => task.id)), [openTasks])
 
   const weekBounds = getPeriodBounds('week')
   const todayBounds = getPeriodBounds('day')
   const weekCommitments = useMemo(
-    () => commitments.filter((commitment) => commitment.periodType === 'week' && commitment.periodStart === weekBounds.startKey),
-    [commitments, weekBounds.startKey]
+    () => commitments.filter((commitment) =>
+      commitment.periodType === 'week'
+      && commitment.periodStart === weekBounds.startKey
+      && activeTaskIds.has(commitment.taskId)
+      && openTaskIds.has(commitment.taskId)
+    ),
+    [commitments, weekBounds.startKey, activeTaskIds, openTaskIds]
   )
   const todayCommitments = useMemo(
-    () => commitments.filter((commitment) => commitment.periodType === 'day' && commitment.periodStart === todayBounds.startKey),
-    [commitments, todayBounds.startKey]
+    () => commitments.filter((commitment) =>
+      commitment.periodType === 'day'
+      && commitment.periodStart === todayBounds.startKey
+      && activeTaskIds.has(commitment.taskId)
+      && openTaskIds.has(commitment.taskId)
+    ),
+    [commitments, todayBounds.startKey, activeTaskIds, openTaskIds]
   )
 
   const projectById = useMemo(() => new Map(projects.map((project) => [project.id, project])), [projects])

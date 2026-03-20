@@ -4,6 +4,7 @@ import useSettingsStore from '../store/useSettingsStore'
 import useProjectStore from '../store/useProjectStore'
 import { taskMatchesProgram } from '../lib/taskScope'
 import { filterTasksByWorkspaceScope } from '../lib/workspaceScope'
+import { sortTasksByStartDate } from '../lib/taskSort'
 
 const PRIORITY_ORDER = { critical: 0, high: 1, medium: 2, low: 3 }
 
@@ -54,19 +55,21 @@ export function useFilteredTasks() {
       result = result.filter((task) => (!task.startDate || !task.dueDate) && task.status !== 'done')
     }
 
-    result.sort((a, b) => {
-      if (sortBy === 'priority')
-        return (PRIORITY_ORDER[a.priority] ?? 9) - (PRIORITY_ORDER[b.priority] ?? 9)
-      if (sortBy === 'dueDate') {
+    if (sortBy === 'priority') {
+      result.sort((a, b) => (PRIORITY_ORDER[a.priority] ?? 9) - (PRIORITY_ORDER[b.priority] ?? 9))
+    } else if (sortBy === 'dueDate') {
+      result.sort((a, b) => {
         if (!a.dueDate && !b.dueDate) return 0
         if (!a.dueDate) return 1
         if (!b.dueDate) return -1
         return new Date(a.dueDate) - new Date(b.dueDate)
-      }
-      if (sortBy === 'updatedAt')
-        return new Date(b.updatedAt) - new Date(a.updatedAt)
-      return new Date(b.createdAt) - new Date(a.createdAt)
-    })
+      })
+    } else if (sortBy === 'updatedAt') {
+      result.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
+    } else {
+      // `createdAt` is kept as a legacy alias for the old persisted value.
+      result = sortTasksByStartDate(result)
+    }
 
     return result
   }, [tasks, filters, sortBy, activeProjectId, activeProgramId, taskDrilldown, projects, programs, workspaceViewScope])
