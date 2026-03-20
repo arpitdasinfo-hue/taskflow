@@ -7,7 +7,6 @@ import {
 } from 'lucide-react'
 import GlassCard from '../components/common/GlassCard'
 import InfoTooltip from '../components/common/InfoTooltip'
-import PageHero from '../components/common/PageHero'
 import { InlineDateChip, InlineStatusChip } from '../components/common/InlineFieldChips'
 import ColorPalettePicker from '../components/common/ColorPalettePicker'
 import ShareModal from '../components/ShareModal'
@@ -306,68 +305,42 @@ const ActionMenu = memo(function ActionMenu({ label, icon: Icon = MoreHorizontal
   )
 })
 
-const MetricTile = memo(function MetricTile({ icon: Icon, label, value, detail, tone = 'default' }) {
-  const palette = tone === 'danger'
-    ? { background: 'rgba(239,68,68,0.09)', border: 'rgba(239,68,68,0.18)', color: '#fca5a5' }
+const CompactStat = memo(function CompactStat({ label, value, tone = 'default' }) {
+  const palette = tone === 'success'
+    ? { background: 'rgba(16,185,129,0.1)', border: 'rgba(16,185,129,0.16)', color: '#34d399' }
     : tone === 'accent'
-      ? { background: 'rgba(var(--accent-rgb),0.12)', border: 'rgba(var(--accent-rgb),0.16)', color: 'var(--accent)' }
-      : { background: 'rgba(255,255,255,0.03)', border: 'rgba(255,255,255,0.06)', color: 'var(--text-secondary)' }
+      ? { background: 'rgba(var(--accent-rgb),0.12)', border: 'rgba(var(--accent-rgb),0.18)', color: 'var(--accent)' }
+      : { background: 'rgba(255,255,255,0.035)', border: 'rgba(255,255,255,0.07)', color: 'var(--text-primary)' }
 
   return (
     <div
-      className="rounded-2xl px-3 py-2.5"
+      className="min-w-[92px] rounded-2xl px-3 py-2"
       style={{ background: palette.background, border: `1px solid ${palette.border}` }}
     >
-      <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>
-        <Icon size={11} style={{ color: palette.color }} />
+      <div className="text-[10px] font-semibold uppercase tracking-[0.24em]" style={{ color: 'var(--text-secondary)' }}>
         {label}
       </div>
-      <div className="mt-1.5 text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{value}</div>
-      {detail && (
-        <p className="mt-1 text-[11px] leading-4.5" style={{ color: 'var(--text-secondary)' }}>
-          {detail}
-        </p>
-      )}
-    </div>
-  )
-})
-
-const SummaryPill = memo(function SummaryPill({ label, value, tone = 'default', accentColor = 'var(--accent)' }) {
-  const palette = tone === 'danger'
-    ? { background: 'rgba(239,68,68,0.10)', border: 'rgba(239,68,68,0.18)', color: '#fca5a5' }
-    : tone === 'accent'
-      ? { background: `${accentColor}16`, border: `${accentColor}24`, color: accentColor }
-      : { background: 'rgba(255,255,255,0.04)', border: 'rgba(255,255,255,0.06)', color: 'var(--text-primary)' }
-
-  return (
-    <div
-      className="inline-flex items-center gap-2 rounded-full px-3 py-1.5"
-      style={{ background: palette.background, border: `1px solid ${palette.border}` }}
-    >
-      <span className="text-[10px] font-semibold uppercase tracking-[0.2em]" style={{ color: 'var(--text-secondary)' }}>
-        {label}
-      </span>
-      <span className="text-[11px] font-semibold" style={{ color: palette.color }}>
+      <div className="mt-1 text-lg font-bold leading-none" style={{ color: palette.color }}>
         {value}
-      </span>
+      </div>
     </div>
   )
 })
 
 const MilestonePreviewStrip = memo(function MilestonePreviewStrip({ label, milestones, accentColor, onToggle, expanded }) {
   const visibleMilestones = sortMilestones(milestones).slice(0, 3)
+  const nextMilestone = visibleMilestones.find((milestone) => milestone.status !== 'completed') ?? visibleMilestones[0] ?? null
 
   return (
-    <div
-      className="rounded-2xl px-3 py-2.5"
-      style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}
-    >
+    <div className="flex flex-col gap-2 rounded-2xl px-3 py-2.5" style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.05)' }}>
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
           <p className="text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>{label}</p>
           <p className="text-[11px] mt-1 truncate" style={{ color: 'var(--text-secondary)' }}>
             {milestones.length > 0
-              ? `${milestones.length} milestone${milestones.length === 1 ? '' : 's'} in this workstream`
+              ? nextMilestone
+                ? `Next ${formatShortDate(nextMilestone.dueDate) ?? 'milestone'} · ${nextMilestone.name}`
+                : `${milestones.length} milestone${milestones.length === 1 ? '' : 's'} in this workstream`
               : 'No milestones pinned yet'}
           </p>
         </div>
@@ -376,22 +349,22 @@ const MilestonePreviewStrip = memo(function MilestonePreviewStrip({ label, miles
             type="button"
             onClick={onToggle}
             className="text-[11px] px-2.5 py-1.5 rounded-full transition-colors"
-            style={{ background: `${accentColor}18`, color: accentColor }}
+            style={{ background: 'rgba(255,255,255,0.05)', color: expanded ? accentColor : 'var(--text-secondary)', border: `1px solid ${expanded ? `${accentColor}22` : 'rgba(255,255,255,0.08)'}` }}
           >
-            {expanded ? 'Hide details' : milestones.length > 0 ? 'Manage' : 'Add milestone'}
+            {expanded ? 'Hide' : milestones.length > 0 ? 'View all' : 'Add'}
           </button>
         )}
       </div>
       {visibleMilestones.length > 0 && (
-        <div className="flex flex-wrap gap-2 mt-3">
+        <div className="flex flex-wrap gap-1.5">
           {visibleMilestones.map((milestone) => (
             <div
               key={milestone.id}
-              className="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-full text-[10px]"
-              style={{ background: `${accentColor}14`, color: 'var(--text-primary)', border: `1px solid ${accentColor}24` }}
+              className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px]"
+              style={{ background: 'rgba(255,255,255,0.04)', color: 'var(--text-primary)', border: '1px solid rgba(255,255,255,0.06)' }}
             >
               <span style={{ color: accentColor }}>◆</span>
-              <span className="font-medium">{milestone.name}</span>
+              <span className="font-medium max-w-[180px] truncate">{milestone.name}</span>
               {milestone.dueDate && (
                 <span style={{ color: 'var(--text-secondary)' }}>{formatShortDate(milestone.dueDate)}</span>
               )}
@@ -404,7 +377,7 @@ const MilestonePreviewStrip = memo(function MilestonePreviewStrip({ label, miles
 })
 
 const ProgramMilestonesOverview = memo(function ProgramMilestonesOverview({ milestones, projects, accentColor }) {
-  const visibleMilestones = useMemo(() => sortMilestones(milestones).slice(0, 4), [milestones])
+  const visibleMilestones = useMemo(() => sortMilestones(milestones).slice(0, 3), [milestones])
   const projectMap = useMemo(
     () => new Map(projects.map((project) => [project.id, project])),
     [projects]
@@ -414,11 +387,12 @@ const ProgramMilestonesOverview = memo(function ProgramMilestonesOverview({ mile
   const completedCount = milestones.filter((milestone) => milestone.status === 'completed').length
   const upcomingCount = milestones.filter((milestone) => milestone.status !== 'completed').length
   const hiddenCount = Math.max(0, totalCount - visibleMilestones.length)
+  const nextMilestone = sortMilestones(milestones).find((milestone) => milestone.status !== 'completed') ?? null
 
   return (
     <div
       className="rounded-2xl px-3 py-2.5"
-      style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}
+      style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.05)' }}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
@@ -430,24 +404,21 @@ const ProgramMilestonesOverview = memo(function ProgramMilestonesOverview({ mile
           </div>
           <p className="text-[11px] mt-1" style={{ color: 'var(--text-secondary)' }}>
             {totalCount > 0
-              ? `${upcomingCount} upcoming, ${completedCount} completed`
+              ? nextMilestone
+                ? `Next ${formatShortDate(nextMilestone.dueDate) ?? 'milestone'} · ${nextMilestone.name}`
+                : `${upcomingCount} upcoming, ${completedCount} completed`
               : 'No project milestones yet'}
           </p>
         </div>
-        <div className="flex items-center gap-1.5 flex-wrap justify-end">
-          <span className="text-[10px] px-2 py-1 rounded-full" style={{ background: `${accentColor}18`, color: accentColor }}>
-            {totalCount} total
-          </span>
-          {upcomingCount > 0 && (
-            <span className="text-[10px] px-2 py-1 rounded-full" style={{ background: 'rgba(245,158,11,0.12)', color: '#fbbf24' }}>
-              {upcomingCount} upcoming
-            </span>
-          )}
+        <div className="flex items-center gap-3 text-[10px]" style={{ color: 'var(--text-secondary)' }}>
+          <span>{totalCount} total</span>
+          <span>{upcomingCount} upcoming</span>
+          <span>{completedCount} done</span>
         </div>
       </div>
 
       {visibleMilestones.length > 0 ? (
-        <div className="mt-3 space-y-1.5">
+        <div className="mt-2.5 space-y-1">
           {visibleMilestones.map((milestone) => {
             const project = projectMap.get(milestone.projectId)
             const isCompleted = milestone.status === 'completed'
@@ -458,8 +429,8 @@ const ProgramMilestonesOverview = memo(function ProgramMilestonesOverview({ mile
             return (
               <div
                 key={milestone.id}
-                className="flex items-center gap-3 rounded-xl px-3 py-2"
-                style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.05)' }}
+                className="flex items-center gap-3 rounded-xl px-2.5 py-2"
+                style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}
               >
                 <span style={{ color: projectColor }} className="text-[11px] flex-shrink-0">◆</span>
                 <div className="min-w-0 flex-1">
@@ -474,12 +445,7 @@ const ProgramMilestonesOverview = memo(function ProgramMilestonesOverview({ mile
                       {milestone.name}
                     </span>
                     {project && (
-                      <span
-                        className="text-[10px] px-2 py-0.5 rounded-full"
-                        style={{ background: `${projectColor}18`, color: projectColor }}
-                      >
-                        {project.name}
-                      </span>
+                      <span className="text-[10px]" style={{ color: projectColor }}>{project.name}</span>
                     )}
                   </div>
                 </div>
@@ -752,15 +718,15 @@ const ProjectPanel = memo(function ProjectPanel({ project, depth = 0 }) {
       onDragOver={handleProjectDragOver}
       onDrop={handleProjectDrop}
       style={{
-        border: `1px solid ${project.color}${depth > 0 ? '22' : '28'}`,
-        background: depth > 0 ? 'rgba(255,255,255,0.014)' : 'rgba(255,255,255,0.02)',
-        boxShadow: expanded ? `0 18px 42px ${project.color}10` : 'none',
+        border: depth > 0 ? '1px solid rgba(255,255,255,0.06)' : '1px solid rgba(255,255,255,0.08)',
+        background: depth > 0 ? 'rgba(255,255,255,0.012)' : 'rgba(255,255,255,0.018)',
+        boxShadow: expanded ? `0 12px 30px ${project.color}0b` : 'none',
       }}
     >
       <div
         onClick={toggleExpanded}
         className="group cursor-pointer px-4 py-3"
-        style={{ background: `${project.color}${expanded ? '0f' : '09'}`, borderBottom: expanded ? `1px solid ${project.color}18` : 'none' }}
+        style={{ background: expanded ? 'rgba(255,255,255,0.025)' : 'rgba(255,255,255,0.015)', borderBottom: expanded ? '1px solid rgba(255,255,255,0.05)' : 'none' }}
       >
         <div className="flex items-start gap-3">
           <button type="button" onClick={(event) => { event.stopPropagation(); toggleExpanded() }} style={{ color: 'var(--text-secondary)' }}>
@@ -811,7 +777,7 @@ const ProjectPanel = memo(function ProjectPanel({ project, depth = 0 }) {
                 <span style={{ color: project.color }}>{completion}%</span>
               </div>
             </div>
-            <span className="text-[10px] px-2 py-1 rounded-full" style={{ background: `${project.color}18`, color: project.color }}>
+            <span className="text-[10px]" style={{ color: 'var(--text-secondary)' }}>
               {inProgress} active
             </span>
           </div>
@@ -861,13 +827,13 @@ const ProjectPanel = memo(function ProjectPanel({ project, depth = 0 }) {
       )}
 
       {expanded && (
-        <div className="px-4 pb-3.5 pt-2.5 space-y-2.5" style={{ background: `${project.color}05` }}>
-          <div className="flex flex-wrap gap-2">
-            <SummaryPill label="Tasks" value={`${total} total · ${done} done`} accentColor={project.color} tone="accent" />
-            <SummaryPill label="Active" value={`${inProgress} in flow`} accentColor={project.color} />
-            <SummaryPill label="Schedule" value={windowLabel} accentColor={project.color} />
-            <SummaryPill label="Health" value={health.label} accentColor={project.color} tone={overdue > 0 || blocked > 0 ? 'danger' : 'default'} />
-            {unscheduled > 0 && <SummaryPill label="Needs dates" value={`${unscheduled} unscheduled`} accentColor={project.color} tone="danger" />}
+        <div className="px-4 pb-3.5 pt-2.5 space-y-2.5" style={{ background: 'rgba(255,255,255,0.018)' }}>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px]" style={{ color: 'var(--text-secondary)' }}>
+            <span><strong style={{ color: 'var(--text-primary)' }}>{done}</strong> of {total} done</span>
+            <span><strong style={{ color: 'var(--text-primary)' }}>{inProgress}</strong> active</span>
+            <span><strong style={{ color: health.color }}>{health.label}</strong></span>
+            <span>{windowLabel}</span>
+            {unscheduled > 0 && <span><strong style={{ color: '#fca5a5' }}>{unscheduled}</strong> need dates</span>}
           </div>
 
           <MilestonePreviewStrip
@@ -879,18 +845,16 @@ const ProjectPanel = memo(function ProjectPanel({ project, depth = 0 }) {
           />
 
           {showMilestones && (
-            <div className="rounded-2xl px-3 py-3" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+            <div className="rounded-2xl px-3 py-3" style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.05)' }}>
               <MilestonePanel projectId={project.id} projectColor={project.color} />
             </div>
           )}
 
           {childProjects.length > 0 && (
-            <div className="rounded-2xl px-3 py-2.5" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
-              <div className="flex items-center justify-between gap-3 mb-3">
-                <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>Sub-projects</p>
-                </div>
-                <span className="text-[10px] px-2 py-1 rounded-full" style={{ background: `${project.color}18`, color: project.color }}>{childProjects.length}</span>
+            <div className="rounded-2xl px-3 py-2.5" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
+              <div className="flex items-center justify-between gap-3 mb-2">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>Sub-projects</p>
+                <span className="text-[10px]" style={{ color: 'var(--text-secondary)' }}>{childProjects.length}</span>
               </div>
               <div className="space-y-2">
                 {childProjects.map((childProject) => (
@@ -901,7 +865,7 @@ const ProjectPanel = memo(function ProjectPanel({ project, depth = 0 }) {
           )}
 
           {depth === 0 && (
-            <div className="rounded-2xl px-3.5 py-3" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
+            <div className="rounded-2xl px-3.5 py-2.5" style={{ background: 'rgba(255,255,255,0.018)', border: '1px solid rgba(255,255,255,0.04)' }}>
               {addingSub ? (
                 <div className="space-y-2.5">
                   <div>
@@ -930,7 +894,7 @@ const ProjectPanel = memo(function ProjectPanel({ project, depth = 0 }) {
                 <button
                   type="button"
                   onClick={() => setAddingSub(true)}
-                  className="flex items-center gap-2 text-[11px] px-2.5 py-2 rounded-xl transition-colors hover:bg-white/5"
+                  className="flex items-center gap-2 text-[11px] px-2 py-1.5 rounded-xl transition-colors hover:bg-white/5"
                   style={{ color: 'var(--text-secondary)' }}
                 >
                   <Plus size={12} /> Add sub-project
@@ -939,8 +903,8 @@ const ProjectPanel = memo(function ProjectPanel({ project, depth = 0 }) {
             </div>
           )}
 
-          <div className="rounded-2xl px-3 py-2.5" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
-            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-3">
+          <div className="rounded-2xl px-3 py-2.5" style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.05)' }}>
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-2.5">
               <div>
                 <p className="text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>Work items</p>
               </div>
@@ -1015,17 +979,13 @@ const ProjectPanel = memo(function ProjectPanel({ project, depth = 0 }) {
   )
 })
 
-const ProgramSection = memo(function ProgramSection({ program, projects }) {
+const ProgramSection = memo(function ProgramSection({ program, projects, expanded, onToggle }) {
   const updateProgram = useProjectStore((state) => state.updateProgram)
   const moveProgram = useProjectStore((state) => state.moveProgram)
   const deleteProgram = useProjectStore((state) => state.deleteProgram)
   const addProject = useProjectStore((state) => state.addProject)
   const moveProject = useProjectStore((state) => state.moveProject)
   const { milestones, tasks } = useWorkspaceScopedData()
-  const activeProgramId = useSettingsStore((state) => state.activeProgramId)
-  const activeProjectId = useSettingsStore((state) => state.activeProjectId)
-
-  const [collapsed, setCollapsed] = useState(false)
   const [addingProject, setAddingProject] = useState(false)
   const [newProjName, setNewProjName] = useState('')
   const [newProjColor, setNewProjColor] = useState(PROJECT_COLORS[0])
@@ -1034,7 +994,6 @@ const ProgramSection = memo(function ProgramSection({ program, projects }) {
   const [deleteArmed, setDeleteArmed] = useState(false)
 
   const topLevelProjects = projects.filter((project) => !project.parentId)
-  const containsActiveProject = !!activeProjectId && projects.some((project) => project.id === activeProjectId)
   const projectMilestones = useMemo(() => sortMilestones(milestones.filter((milestone) => projects.some((project) => project.id === milestone.projectId))), [milestones, projects])
 
   const programDirectTasks = useMemo(() => sortTasksByStartDate(tasks.filter((task) => !task.projectId && taskMatchesProgram(task, program.id, projects))), [tasks, program.id, projects])
@@ -1052,10 +1011,6 @@ const ProgramSection = memo(function ProgramSection({ program, projects }) {
   const canShareProgram = (program.scope ?? 'professional') !== 'personal'
   const scheduleWindow = buildScheduleWindow(program, projects, allTasks, projectMilestones)
   const windowLabel = formatWindowLabel(scheduleWindow.startDate, scheduleWindow.dueDate)
-
-  useEffect(() => {
-    if (activeProgramId === program.id || containsActiveProject) setCollapsed(false)
-  }, [activeProgramId, containsActiveProject, program.id])
 
   const submitProject = () => {
     if (!newProjName.trim()) return
@@ -1102,11 +1057,11 @@ const ProgramSection = memo(function ProgramSection({ program, projects }) {
   }
 
   return (
-    <div className="mb-4 rounded-[28px] overflow-hidden" data-program-id={program.id} onDragOver={handleProgramDragOver} onDrop={handleProgramDrop} style={{ border: `1px solid ${program.color}24`, background: 'rgba(255,255,255,0.02)' }}>
-      <div className="px-4 md:px-5 py-3.5" style={{ background: `${program.color}08` }}>
+    <div className="mb-4 rounded-[28px] overflow-hidden" data-program-id={program.id} onDragOver={handleProgramDragOver} onDrop={handleProgramDrop} style={{ border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.02)' }}>
+      <div className="px-4 md:px-5 py-3.5" style={{ background: expanded ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.02)', borderBottom: expanded ? '1px solid rgba(255,255,255,0.06)' : 'none' }}>
         <div className="flex items-start gap-3">
-          <button type="button" onClick={() => setCollapsed((current) => !current)} style={{ color: 'var(--text-secondary)' }}>
-            {collapsed ? <ChevronRight size={15} /> : <ChevronDown size={15} />}
+          <button type="button" onClick={onToggle} style={{ color: 'var(--text-secondary)' }}>
+            {expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
           </button>
           <button
             type="button"
@@ -1155,16 +1110,11 @@ const ProgramSection = memo(function ProgramSection({ program, projects }) {
                   </>
                 )}
               </div>
-              <span
-                className="text-[10px] px-2 py-0.5 rounded-full"
-                style={{ background: scopeConfig.background, color: scopeConfig.color }}
-              >
-                {scopeConfig.label}
-              </span>
               <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: health.background, color: health.color }}>{health.label}</span>
               <InfoTooltip text={program.description} />
             </div>
             <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]" style={{ color: 'var(--text-secondary)' }}>
+              <span style={{ color: scopeConfig.color }}>{scopeConfig.label}</span>
               <span>{windowLabel}</span>
               <span>{topLevelProjects.length} project{topLevelProjects.length === 1 ? '' : 's'}</span>
               <span>{totalTasks} task{totalTasks === 1 ? '' : 's'}</span>
@@ -1204,21 +1154,19 @@ const ProgramSection = memo(function ProgramSection({ program, projects }) {
         </div>
       )}
 
-      {!collapsed && (
-        <div className="px-4 md:px-5 pb-4 pt-3.5 space-y-3" style={{ borderTop: `1px solid ${program.color}12` }}>
-          <div className="flex flex-wrap gap-2">
-            <SummaryPill label="Projects" value={`${topLevelProjects.length} active`} accentColor={program.color} tone="accent" />
-            <SummaryPill label="Tasks" value={`${totalTasks} total · ${doneTasks} done`} accentColor={program.color} />
-            <SummaryPill label="Active" value={`${inProgress} in flow`} accentColor={program.color} />
-            <SummaryPill label="Health" value={health.label} accentColor={program.color} tone={overdue > 0 || blocked > 0 ? 'danger' : 'default'} />
-            <SummaryPill label="Schedule" value={windowLabel} accentColor={program.color} />
-            {unscheduled > 0 && <SummaryPill label="Needs dates" value={`${unscheduled} unscheduled`} accentColor={program.color} tone="danger" />}
+      {expanded && (
+        <div className="px-4 md:px-5 pb-4 pt-3 space-y-3">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px]" style={{ color: 'var(--text-secondary)' }}>
+            <span><strong style={{ color: 'var(--text-primary)' }}>{topLevelProjects.length}</strong> active projects</span>
+            <span><strong style={{ color: 'var(--text-primary)' }}>{doneTasks}</strong> of {totalTasks} done</span>
+            <span><strong style={{ color: 'var(--text-primary)' }}>{inProgress}</strong> in flow</span>
+            <span><strong style={{ color: health.color }}>{health.label}</strong></span>
+            {unscheduled > 0 && <span><strong style={{ color: '#fca5a5' }}>{unscheduled}</strong> need dates</span>}
           </div>
-
           <ProgramMilestonesOverview milestones={projectMilestones} projects={projects} accentColor={program.color} />
 
           {addingProject && (
-            <div className="rounded-2xl p-3" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(var(--accent-rgb),0.18)' }}>
+            <div className="rounded-2xl p-3" style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.08)' }}>
               <div className="flex flex-col gap-2.5">
                 <div>
                   <p className="text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>New project</p>
@@ -1247,8 +1195,8 @@ const ProgramSection = memo(function ProgramSection({ program, projects }) {
 
           <div className="space-y-3">
             {topLevelProjects.length === 0 && programDirectTasks.length === 0 && !addingProject ? (
-              <div className="rounded-2xl px-4 py-4 text-center text-[11px]" style={{ background: 'rgba(255,255,255,0.02)', border: '1px dashed rgba(255,255,255,0.08)', color: 'var(--text-secondary)' }}>
-                    No projects yet. Add the first project for this program.
+              <div className="rounded-2xl px-4 py-3 text-center text-[11px]" style={{ background: 'rgba(255,255,255,0.02)', border: '1px dashed rgba(255,255,255,0.08)', color: 'var(--text-secondary)' }}>
+                No projects yet. Add the first project for this program.
               </div>
             ) : (
               topLevelProjects.map((projectItem) => (
@@ -1261,139 +1209,6 @@ const ProgramSection = memo(function ProgramSection({ program, projects }) {
 
       {canShareProgram && showShare && <ShareModal resourceType="program" resourceId={program.id} resourceName={program.name} onClose={() => setShowShare(false)} />}
     </div>
-  )
-})
-
-const StructureExplorer = memo(function StructureExplorer({
-  programs,
-  projects,
-  tasks,
-  unassignedProjects,
-  activeProgramId,
-  activeProjectId,
-  previewProgramId,
-  onSelectProgram,
-  onSelectProject,
-  onSelectUnassigned,
-}) {
-  const topLevelProjects = useMemo(() => projects.filter((project) => !project.parentId), [projects])
-
-  return (
-    <GlassCard padding="p-3.5" rounded="rounded-[28px]" className="sticky top-4">
-      <div className="flex items-start justify-between gap-3 mb-3">
-        <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>
-            Structure
-          </p>
-          <p className="mt-1.5 text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-            Programs & Projects
-          </p>
-        </div>
-        <div className="flex items-center gap-1.5 flex-wrap justify-end">
-          <span
-            className="px-2 py-1 rounded-full text-[10px] font-semibold"
-            style={{ background: 'rgba(var(--accent-rgb),0.12)', color: 'var(--accent)' }}
-          >
-            {programs.length} programs
-          </span>
-          <span
-            className="px-2 py-1 rounded-full text-[10px] font-semibold"
-            style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)' }}
-          >
-            {topLevelProjects.length} top-level projects
-          </span>
-        </div>
-      </div>
-
-      <div className="space-y-2.5">
-        {programs.map((program) => {
-          const programProjects = topLevelProjects.filter((project) => project.programId === program.id)
-          const programTasks = tasks.filter((task) => taskMatchesProgram(task, program.id, projects))
-          const isProgramActive = activeProgramId === program.id || (!activeProgramId && !activeProjectId && previewProgramId === program.id)
-          const hasActiveProject = programProjects.some((project) => project.id === activeProjectId)
-          const isExpanded = isProgramActive || hasActiveProject
-
-          return (
-            <div
-              key={program.id}
-              className="rounded-2xl px-3 py-2.5"
-              style={{
-                background: isExpanded ? `${program.color}10` : 'rgba(255,255,255,0.03)',
-                border: `1px solid ${isExpanded ? `${program.color}30` : 'rgba(255,255,255,0.06)'}`,
-              }}
-            >
-              <button type="button" onClick={() => onSelectProgram(program.id)} className="w-full text-left">
-                <div className="flex items-center gap-2.5">
-                  <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: program.color, boxShadow: `0 0 8px ${program.color}55` }} />
-                  <span className="flex-1 text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{program.name}</span>
-                  <span className="text-[10px] px-2 py-1 rounded-full" style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--text-secondary)' }}>
-                    {programProjects.length} projects
-                  </span>
-                </div>
-                <div className="mt-1.5 pl-5 text-[11px] flex items-center gap-2 flex-wrap" style={{ color: 'var(--text-secondary)' }}>
-                  <span>{programTasks.length} tasks</span>
-                  <span>{programTasks.filter((task) => task.status === 'done').length} done</span>
-                  {isProgramActive && !activeProjectId && <span style={{ color: 'var(--accent)' }}>Selected</span>}
-                </div>
-              </button>
-
-              {isExpanded && programProjects.length > 0 && (
-                <div className="mt-2.5 pl-5 space-y-1.5">
-                  {programProjects.map((project) => {
-                    const projectTasks = tasks.filter((task) => task.projectId === project.id)
-                    const isProjectActive = activeProjectId === project.id
-                    return (
-                      <button
-                        key={project.id}
-                        type="button"
-                        onClick={() => onSelectProject(project.id)}
-                        className="w-full flex items-center gap-2 px-2.5 py-2 rounded-xl text-left transition-colors"
-                        style={isProjectActive
-                          ? { background: `${project.color}20`, border: `1px solid ${project.color}35`, color: project.color }
-                          : { background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', color: 'var(--text-secondary)' }}
-                      >
-                        <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: project.color }} />
-                        <span className="flex-1 text-[12px] font-medium truncate" style={{ color: isProjectActive ? project.color : 'var(--text-primary)' }}>
-                          {project.name}
-                        </span>
-                        <span className="text-[10px] px-2 py-1 rounded-full" style={{ background: 'rgba(255,255,255,0.06)', color: 'inherit' }}>
-                          {projectTasks.length}
-                        </span>
-                      </button>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
-          )
-        })}
-
-        {unassignedProjects.length > 0 && (
-          <button
-            type="button"
-            onClick={onSelectUnassigned}
-            className="w-full text-left rounded-2xl px-3 py-2.5 transition-colors"
-            style={{
-              background: !activeProgramId && activeProjectId && !projects.find((project) => project.id === activeProjectId)?.programId
-                ? 'rgba(var(--accent-rgb),0.12)'
-                : 'rgba(255,255,255,0.03)',
-              border: '1px solid rgba(255,255,255,0.06)',
-            }}
-          >
-            <div className="flex items-center gap-2.5">
-              <Folder size={14} style={{ color: 'var(--text-secondary)' }} />
-              <span className="flex-1 text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Unassigned projects</span>
-              <span className="text-[10px] px-2 py-1 rounded-full" style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--text-secondary)' }}>
-                {unassignedProjects.filter((project) => !project.parentId).length}
-              </span>
-            </div>
-            <div className="mt-1.5 text-[11px]" style={{ color: 'var(--text-secondary)' }}>
-              Review detached work
-            </div>
-          </button>
-        )}
-      </div>
-    </GlassCard>
   )
 })
 
@@ -1527,6 +1342,23 @@ const Projects = memo(function Projects() {
   const doneTasks = visibleTasks.filter((task) => task.status === 'done').length
   const topLevelProjectCount = focusedProgram ? visibleProjects.filter((project) => !project.parentId).length : projects.filter((project) => !project.parentId).length
   const headerTitle = focusedProgram ? focusedProgram.name : 'Programs'
+  const [openProgramId, setOpenProgramId] = useState(null)
+
+  useEffect(() => {
+    if (focusedProgramId) {
+      setOpenProgramId(focusedProgramId)
+      return
+    }
+    if (activeProject?.programId) {
+      setOpenProgramId(activeProject.programId)
+      return
+    }
+    setOpenProgramId((current) => {
+      if (current && visiblePrograms.some((program) => program.id === current)) return current
+      return visiblePrograms[0]?.id ?? null
+    })
+  }, [focusedProgramId, activeProject?.programId, visiblePrograms])
+
   useEffect(() => {
     const selector = activeProjectId
       ? `[data-project-id="${activeProjectId}"]`
@@ -1556,54 +1388,57 @@ const Projects = memo(function Projects() {
   return (
     <div className="flex-1 overflow-y-auto px-4 md:px-6 pb-24 md:pb-8">
       <div className="py-2 mb-3">
-        <PageHero
-          eyebrow="Programs"
-          title={headerTitle}
-          infoText={focusedProgram
-            ? 'Review the selected program, manage its projects, and keep milestones and work items tucked under the structure.'
-            : 'Use one program at a time when you want a cleaner workspace, or clear the scope to scan all programs.'}
-          stats={[
-            { label: 'Programs', value: programs.length, tone: 'accent' },
-            { label: 'Projects', value: topLevelProjectCount, tone: 'default' },
-            { label: 'Done', value: `${doneTasks}/${totalTasks}`, tone: 'success' },
-          ]}
-          compact
-          actions={
-            <>
-              <button type="button" onClick={() => setAddingProgram(true)} className="btn-accent flex items-center gap-1.5 px-3 py-2 text-xs">
-                <Plus size={13} /> New program
-              </button>
-            </>
-          }
-        >
-          {programs.length > 0 && (
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="hidden md:inline text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>
-                Focus
-              </span>
-              <select
-                value={focusedProgram?.id ?? ''}
-                onChange={(event) => {
-                  const nextProgramId = event.target.value || null
-                  setActiveProject(null)
-                  setActiveProgram(nextProgramId)
-                }}
-                className="text-xs px-3 py-2 rounded-xl min-w-[220px]"
-                style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-primary)' }}
-              >
-                <option value="">All programs</option>
-                {programs.map((program) => (
-                  <option key={program.id} value={program.id}>{program.name}</option>
-                ))}
-              </select>
-              {focusedProgram && (
-                <button type="button" onClick={clearFocus} className="btn-ghost px-3 py-2 text-xs">
-                  Show all
-                </button>
+        <GlassCard padding="p-4 md:p-5" rounded="rounded-[30px]">
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.24em]" style={{ color: 'var(--text-secondary)' }}>
+                  Programs
+                </div>
+                <InfoTooltip text="Use focus to jump to one program, or keep all visible and work one expanded program at a time." />
+              </div>
+              <h1 className="mt-2 text-[1.9rem] md:text-[2.15rem] font-bold leading-tight" style={{ color: 'var(--text-primary)' }}>
+                {headerTitle}
+              </h1>
+              {programs.length > 0 && (
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <span className="text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>
+                    Focus
+                  </span>
+                  <select
+                    value={focusedProgram?.id ?? ''}
+                    onChange={(event) => {
+                      const nextProgramId = event.target.value || null
+                      setActiveProject(null)
+                      setActiveProgram(nextProgramId)
+                    }}
+                    className="text-xs px-3 py-2 rounded-xl min-w-[220px]"
+                    style={{ background: 'rgba(255,255,255,0.045)', border: '1px solid rgba(255,255,255,0.08)', color: 'var(--text-primary)' }}
+                  >
+                    <option value="">All programs</option>
+                    {programs.map((program) => (
+                      <option key={program.id} value={program.id}>{program.name}</option>
+                    ))}
+                  </select>
+                  {focusedProgram && (
+                    <button type="button" onClick={clearFocus} className="btn-ghost px-3 py-2 text-xs">
+                      Show all
+                    </button>
+                  )}
+                </div>
               )}
             </div>
-          )}
-        </PageHero>
+
+            <div className="flex items-start gap-2.5 flex-wrap xl:justify-end">
+              <CompactStat label="Programs" value={programs.length} tone="accent" />
+              <CompactStat label="Projects" value={topLevelProjectCount} />
+              <CompactStat label="Done" value={`${doneTasks}/${totalTasks}`} tone="success" />
+              <button type="button" onClick={() => setAddingProgram(true)} className="btn-accent flex items-center gap-1.5 px-3.5 py-2.5 text-xs">
+                <Plus size={13} /> New program
+              </button>
+            </div>
+          </div>
+        </GlassCard>
       </div>
 
       {addingProgram && <NewProgramForm onDone={() => setAddingProgram(false)} />}
@@ -1624,7 +1459,16 @@ const Projects = memo(function Projects() {
       ) : (
         <>
           {visiblePrograms.map((program) => (
-            <ProgramSection key={program.id} program={program} projects={visibleProjects.filter((project) => project.programId === program.id)} />
+            <ProgramSection
+              key={program.id}
+              program={program}
+              projects={visibleProjects.filter((project) => project.programId === program.id)}
+              expanded={focusedProgram ? true : openProgramId === program.id}
+              onToggle={() => {
+                if (focusedProgram) return
+                setOpenProgramId((current) => (current === program.id ? null : program.id))
+              }}
+            />
           ))}
           {!focusedProgram && <UnassignedSection projects={unassignedProjects} />}
         </>
