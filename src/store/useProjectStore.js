@@ -72,12 +72,13 @@ const resolveProjectScope = (project, state) => {
     visited.add(entry.id)
 
     if (entry.programId) {
-      return normalizeScopeValue(programMap.get(entry.programId)?.scope)
+      const program = programMap.get(entry.programId)
+      return program ? normalizeScopeValue(program.scope) : normalizeScopeValue(entry.scope)
     }
 
     if (entry.parentId) {
       const parent = projectMap.get(entry.parentId)
-      return resolveFromTree(parent, visited)
+      return parent ? resolveFromTree(parent, visited) : normalizeScopeValue(entry.scope)
     }
 
     return normalizeScopeValue(entry.scope)

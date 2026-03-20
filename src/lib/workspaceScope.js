@@ -26,7 +26,10 @@ export const programMatchesWorkspaceScope = (program, scope) =>
 
 export const getProjectWorkspaceScope = (project, programsOrMap = []) => {
   if (!project?.programId) return normalizeWorkspaceViewScope(project?.scope)
-  return getProgramWorkspaceScope(toProgramMap(programsOrMap).get(project.programId))
+  const program = toProgramMap(programsOrMap).get(project.programId)
+  return program
+    ? getProgramWorkspaceScope(program)
+    : normalizeWorkspaceViewScope(project?.scope)
 }
 
 export const projectMatchesWorkspaceScope = (project, programsOrMap = [], scope) =>
@@ -35,8 +38,14 @@ export const projectMatchesWorkspaceScope = (project, programsOrMap = [], scope)
 export const getTaskWorkspaceScope = (task, programsOrMap = [], projectsOrMap = []) => {
   const projectMap = toProjectMap(projectsOrMap)
   const programId = getTaskProgramId(task, projectMap)
-  if (!programId) return normalizeWorkspaceViewScope(task?.scope)
-  return getProgramWorkspaceScope(toProgramMap(programsOrMap).get(programId))
+  const fallbackScope = task?.projectId
+    ? normalizeWorkspaceViewScope(projectMap.get(task.projectId)?.scope ?? task?.scope)
+    : normalizeWorkspaceViewScope(task?.scope)
+
+  if (!programId) return fallbackScope
+
+  const program = toProgramMap(programsOrMap).get(programId)
+  return program ? getProgramWorkspaceScope(program) : fallbackScope
 }
 
 export const taskMatchesWorkspaceScope = (task, programsOrMap = [], projectsOrMap = [], scope) =>
