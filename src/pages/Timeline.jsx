@@ -260,13 +260,6 @@ const Timeline = memo(function Timeline() {
     tasks: rows.filter((row) => row.type === 'task').length,
   }), [rows])
 
-  const expandableProjectIds = useMemo(
-    () => rows
-      .filter((row) => row.type === 'project' && row.expandable && row.projectId)
-      .map((row) => row.projectId),
-    [rows]
-  )
-
   const currentViewSnapshot = useMemo(() => ({
     zoom,
     viewMode,
@@ -344,14 +337,6 @@ const Timeline = memo(function Timeline() {
       else next.add(projectId)
       return next
     })
-  }
-
-  const expandAllProjects = () => {
-    setExpandedProjectIds(new Set(expandableProjectIds))
-  }
-
-  const collapseAllProjects = () => {
-    setExpandedProjectIds(new Set())
   }
 
   const clearFilters = () => {

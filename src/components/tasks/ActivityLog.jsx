@@ -2,7 +2,6 @@ import { memo } from 'react'
 import { formatDistanceToNow } from 'date-fns'
 import { Plus, Trash2, ArrowRightLeft, Edit3, Calendar } from 'lucide-react'
 import useActivityStore from '../../store/useActivityStore'
-import useSettingsStore from '../../store/useSettingsStore'
 
 const ACTION_ICON = {
   created:        Plus,
@@ -40,7 +39,6 @@ const ActivityLog = memo(function ActivityLog({ taskId }) {
   const activities = useActivityStore((s) =>
     s.activities.filter((a) => a.taskId === taskId)
   )
-  const selectTask = useSettingsStore((s) => s.selectTask)
 
   if (activities.length === 0) {
     return (

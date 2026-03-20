@@ -43,7 +43,7 @@ const fromActivityRow = (row) => ({
 
 const useActivityStore = create(
   persist(
-    immer((set, get) => ({
+    immer((set) => ({
       activities: [],
       syncing: false,
       syncError: null,

@@ -3,8 +3,6 @@ import { startOfDay, toDisplayDate } from '../components/timeline/timelineUtils'
 
 const DAYS_AHEAD_WARNING = 7
 
-const hasSchedule = (item) => Boolean(item?.startDate || item?.dueDate)
-
 const buildDescendantMap = (projects) => {
   const childrenByParent = new Map()
   projects.forEach((project) => {

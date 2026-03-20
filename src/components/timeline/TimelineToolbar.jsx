@@ -135,7 +135,6 @@ const TimelineToolbar = memo(function TimelineToolbar({
   const inputClass = compact ? 'w-full rounded-xl pl-9 pr-3 py-2 text-xs outline-none' : 'w-full rounded-2xl pl-10 pr-4 py-2.5 text-sm outline-none'
   const selectClass = compact ? 'w-full text-xs px-3 py-2 rounded-xl' : 'w-full text-sm px-3 py-2 rounded-xl'
   const actionButtonClass = compact ? 'inline-flex items-center justify-center gap-1 px-2 py-1.5 rounded-xl text-[11px] font-medium transition-colors hover:bg-white/10' : 'inline-flex items-center justify-center gap-1 px-3 py-2 rounded-xl text-xs font-medium transition-colors hover:bg-white/10'
-  const secondaryButtonClass = compact ? 'inline-flex items-center gap-1.5 px-2 py-1.5 rounded-xl text-[11px] font-medium disabled:opacity-40' : 'inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium disabled:opacity-40'
   const toggleButtonClass = compact ? 'inline-flex items-center justify-center gap-1 px-2 py-1.5 rounded-xl text-[11px] font-medium transition-colors' : 'inline-flex items-center justify-center gap-1 px-3 py-2 rounded-xl text-xs font-medium transition-colors'
   const segmentedButtonClass = compact ? 'flex-1 px-2 py-1.5 rounded-lg text-[11px] font-medium transition-colors min-w-0 whitespace-nowrap' : 'flex-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors'
 

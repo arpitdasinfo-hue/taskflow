@@ -1047,7 +1047,6 @@ const ProgramSection = memo(function ProgramSection({ program, projects }) {
   const now = new Date()
   const overdue = allTasks.filter((task) => task.dueDate && new Date(task.dueDate) < now && task.status !== 'done').length
   const unscheduled = allTasks.filter((task) => !task.startDate && !task.dueDate).length
-  const completion = totalTasks ? Math.round((doneTasks / totalTasks) * 100) : 0
   const health = getHealthMeta({ total: totalTasks, done: doneTasks, blocked, overdue, unscheduled })
   const scopeConfig = PROGRAM_SCOPE_CONFIG[program.scope ?? 'professional'] ?? PROGRAM_SCOPE_CONFIG.professional
   const canShareProgram = (program.scope ?? 'professional') !== 'personal'

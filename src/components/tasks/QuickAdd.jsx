@@ -191,7 +191,7 @@ const QuickAdd = memo(function QuickAdd() {
     return () => window.removeEventListener('taskflow:quick-add', onQuickAddRequest)
   }, [deriveTaskSelection, workspaceViewScope])
 
-  const handleSubmit = useCallback(() => {
+  const handleSubmit = () => {
     if (!name.trim()) return
 
     if (type === 'program') {
@@ -236,7 +236,7 @@ const QuickAdd = memo(function QuickAdd() {
     }
 
     handleClose()
-  }, [name, type, desc, color, addProgram, handleClose, addProject, programId, addTask, priority, selectedProjectId, selectedSubProjectId, startDate, dueDate, planningTarget, commitTask, filterProgramId, programScope])
+  }
 
   const submitLabel = type === 'task' ? 'Add task' : 'Create'
 

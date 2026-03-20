@@ -405,7 +405,7 @@ const Today = memo(function Today() {
   const carryForwardPeriod = usePlanningStore((state) => state.carryForwardPeriod)
   const syncScheduledCommitments = usePlanningStore((state) => state.syncScheduledCommitments)
   const selectTask = useSettingsStore((state) => state.selectTask)
-  const { programs, projects, tasks: scopedTasks, programById, projectById, workspaceViewScope } = useWorkspaceScopedData()
+  const { tasks: scopedTasks, programById, projectById, workspaceViewScope } = useWorkspaceScopedData()
 
   const todayBounds = getPeriodBounds('day')
   const weekBounds = getPeriodBounds('week')

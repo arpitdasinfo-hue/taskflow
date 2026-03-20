@@ -12,19 +12,20 @@ import PageHero from '../components/common/PageHero'
 import Header from '../components/layout/Header'
 import TaskDataTable, {
   TaskContextChip,
-  TASK_PRIORITY_COLOR,
-  TASK_STATUS_COLOR,
-  TASK_STATUS_LABEL,
 } from '../components/tasks/TaskDataTable'
 import { InlineDateChip, InlineStatusChip } from '../components/common/InlineFieldChips'
 import useSettingsStore from '../store/useSettingsStore'
-import useProjectStore from '../store/useProjectStore'
 import useTaskStore from '../store/useTaskStore'
 import { useFilteredTasks } from '../hooks/useFilteredTasks'
 import useWorkspaceScopedData from '../hooks/useWorkspaceScopedData'
 import { sortTasksByStartDate } from '../lib/taskSort'
 import { getTaskProgramId } from '../lib/taskScope'
 import useToastStore from '../store/useToastStore'
+import {
+  TASK_PRIORITY_COLOR,
+  TASK_STATUS_COLOR,
+  TASK_STATUS_LABEL,
+} from '../components/tasks/taskTablePresentation'
 
 const STATUS_COLUMNS = [
   { id: 'todo', label: 'To Do', color: '#94a3b8' },

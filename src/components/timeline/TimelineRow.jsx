@@ -13,10 +13,11 @@ const getItemRange = (item) => {
   return { start, end }
 }
 
-const getRowIcon = (type) => {
-  if (type === 'program') return Layers3
-  if (type === 'project') return FolderKanban
-  return CheckSquare2
+const renderRowIcon = (type, compact) => {
+  const iconProps = { size: compact ? 12 : 13, style: { color: 'var(--text-secondary)' } }
+  if (type === 'program') return <Layers3 {...iconProps} />
+  if (type === 'project') return <FolderKanban {...iconProps} />
+  return <CheckSquare2 {...iconProps} />
 }
 
 const getSummaryLine = (row) => {
@@ -179,7 +180,6 @@ const TimelineRow = memo(function TimelineRow({
   const isProject = row.type === 'project'
   const isTask = row.type === 'task'
   const canCreateTask = !readOnly && (row.type === 'program' || row.type === 'project')
-  const RowIcon = getRowIcon(row.type)
   const createSurfaceRef = useRef(null)
   const createInteractionRef = useRef(null)
   const [createDraft, setCreateDraft] = useState(null)
@@ -295,7 +295,7 @@ const TimelineRow = memo(function TimelineRow({
           className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-xl"
           style={{ background: row.type === 'program' ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.05)' }}
         >
-          <RowIcon size={compact ? 12 : 13} style={{ color: 'var(--text-secondary)' }} />
+          {renderRowIcon(row.type, compact)}
         </div>
         <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: row.color }} />
 

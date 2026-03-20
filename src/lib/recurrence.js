@@ -15,7 +15,6 @@ export function computeNextOccurrence(task) {
 
   // Reference date: prefer dueDate, fall back to startDate, then today
   const refDate = new Date(task.dueDate ?? task.startDate ?? new Date())
-  const now = new Date()
   // If the reference date is in the future, don't spawn yet
   // (next occurrence is only spawned when this one is marked done)
 

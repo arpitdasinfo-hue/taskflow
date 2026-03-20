@@ -934,35 +934,33 @@ export default function ShareView({ token }) {
     return { total, done, blocked, inProgress, overdue, completion }
   }, [filteredTasks])
 
-  const programStats = useMemo(() => {
-    return filteredPrograms.map((program) => {
-      const programProjects = filteredProjects.filter((project) => project.programId === program.id)
-      const projectIds = new Set(programProjects.map((project) => project.id))
-      const programTasks = filteredTasks.filter((task) =>
-        getTaskProgramId(task, projects) === program.id &&
-        (!task.projectId || projectIds.has(task.projectId))
-      )
-      const done = programTasks.filter((task) => task.status === 'done').length
-      return {
-        id: program.id,
-        name: program.name,
-        color: program.color,
-        projects: programProjects.length,
-        tasks: programTasks.length,
-        done,
-        completion: programTasks.length ? Math.round((done / programTasks.length) * 100) : 0,
-        blocked: programTasks.filter((task) => task.status === 'blocked').length,
-      }
-    })
-  }, [filteredPrograms, filteredProjects, filteredTasks])
+  const programStats = filteredPrograms.map((program) => {
+    const programProjects = filteredProjects.filter((project) => project.programId === program.id)
+    const projectIds = new Set(programProjects.map((project) => project.id))
+    const programTasks = filteredTasks.filter((task) =>
+      getTaskProgramId(task, projects) === program.id &&
+      (!task.projectId || projectIds.has(task.projectId))
+    )
+    const done = programTasks.filter((task) => task.status === 'done').length
+    return {
+      id: program.id,
+      name: program.name,
+      color: program.color,
+      projects: programProjects.length,
+      tasks: programTasks.length,
+      done,
+      completion: programTasks.length ? Math.round((done / programTasks.length) * 100) : 0,
+      blocked: programTasks.filter((task) => task.status === 'blocked').length,
+    }
+  })
 
-  const shareScopeLabel = useMemo(() => {
+  const shareScopeLabel = (() => {
     if (!link?.resource_type) return 'Shared view'
     if (link.resource_type === 'workspace') return 'Workspace'
     if (link.resource_type === 'program') return 'Program'
     if (link.resource_type === 'project') return 'Project'
     return 'Shared view'
-  }, [link?.resource_type])
+  })()
 
   const availableSections = useMemo(() => {
     const sections = []

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, lazy, Suspense, Component, useMemo, useRef, useState } from 'react'
+import { useEffect, lazy, Suspense, Component, useMemo, useRef, useState } from 'react'
 import { registerSW } from 'virtual:pwa-register'
 import Sidebar from './components/layout/Sidebar'
 import BottomNav from './components/layout/BottomNav'

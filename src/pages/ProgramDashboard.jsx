@@ -443,7 +443,7 @@ const ProgramDashboard = memo(function ProgramDashboard() {
     return 'Standalone task'
   }
 
-  const reviewDetail = useMemo(() => {
+  const reviewDetail = (() => {
     if (activeInsight === 'programs') {
       return {
         title: 'Programs in scope',
@@ -636,18 +636,7 @@ const ProgramDashboard = memo(function ProgramDashboard() {
         )
       ),
     }
-  }, [
-    activeInsight,
-    scopedProgramCards,
-    actionQueue,
-    flaggedPrograms,
-    flaggedProgramCards,
-    insights.scheduleConflicts,
-    insights.unscheduledTasks,
-    insights.blockedOrLateTasks,
-    milestoneTimelineItems,
-    nextMilestone,
-  ])
+  })()
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">

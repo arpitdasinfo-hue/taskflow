@@ -51,8 +51,6 @@ const InfoTooltip = memo(function InfoTooltip({
     setPosition({ left, top, placement })
   }, [align])
 
-  if (!text) return null
-
   useEffect(() => {
     if (!show || typeof window === 'undefined') return undefined
 
@@ -68,6 +66,8 @@ const InfoTooltip = memo(function InfoTooltip({
       setPosition(null)
     }
   }, [show, updatePosition])
+
+  if (!text) return null
 
   return (
     <span
