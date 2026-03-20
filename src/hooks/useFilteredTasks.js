@@ -49,6 +49,8 @@ export function useFilteredTasks() {
       result = result.filter((task) => task.dueDate && new Date(task.dueDate) < todayStart && task.status !== 'done')
     } else if (taskDrilldown === 'blocked') {
       result = result.filter((task) => task.status === 'blocked')
+    } else if (taskDrilldown === 'blockedOrLate') {
+      result = result.filter((task) => task.status === 'blocked' || (task.dueDate && new Date(task.dueDate) < todayStart && task.status !== 'done'))
     } else if (taskDrilldown === 'critical') {
       result = result.filter((task) => task.priority === 'critical' && task.status !== 'done')
     } else if (taskDrilldown === 'unscheduled') {

@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useState } from 'react'
+import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import { CheckCircle2, Clock, AlertTriangle, TrendingUp, CalendarClock, ArrowRight, Flag, FolderClock } from 'lucide-react'
 import Header from '../components/layout/Header'
 import { ProgramStatusBadge, ProgramHealthBadge } from '../components/common/ProgramStatusBadge'
@@ -229,6 +229,7 @@ const ProgramDashboard = memo(function ProgramDashboard() {
   const allStats  = useAllProgramStats({ programs, projects, milestones, tasks })
   const [selectedProgramId, setSelectedProgramId] = useState('')
   const [selectedProjectId, setSelectedProjectId] = useState('')
+  const reviewDetailRef = useRef(null)
   const activeInsight = analyticsInsight || 'launch'
   const insights  = useTimelineIntelligence({
     programs,
@@ -388,22 +389,42 @@ const ProgramDashboard = memo(function ProgramDashboard() {
 
   const openRiskView = () => {
     clearTaskDrilldown()
+    if (selectedProjectId) {
+      setActiveProject(selectedProjectId)
+    } else {
+      setActiveProject(null)
+      setActiveProgram(selectedProgramId || null)
+    }
     setGanttConfig({
       viewMode: 'risk',
       showDependencies: true,
       onlyDelayed: true,
       onlyCritical: true,
       onlyDependencyRisk: true,
+      filteredProgramIds: selectedProgramId ? [selectedProgramId] : [],
+      filteredProjectIds: selectedProjectId ? [selectedProjectId] : [],
+      filteredSubProjectIds: [],
     })
     setPage('timeline')
   }
 
   const expandAllInTimeline = () => {
     clearTaskDrilldown()
+    if (selectedProjectId) {
+      setActiveProject(selectedProjectId)
+    } else {
+      setActiveProject(null)
+      setActiveProgram(selectedProgramId || null)
+    }
     setGanttConfig({
       expandedProjectIds: projects
         .filter((project) => tasks.some((task) => task.projectId === project.id))
+        .filter((project) => !selectedProgramId || project.programId === selectedProgramId)
+        .filter((project) => !selectedProjectId || project.id === selectedProjectId || project.parentId === selectedProjectId)
         .map((project) => project.id),
+      filteredProgramIds: selectedProgramId ? [selectedProgramId] : [],
+      filteredProjectIds: selectedProjectId ? [selectedProjectId] : [],
+      filteredSubProjectIds: [],
     })
     setPage('timeline')
   }
@@ -429,9 +450,22 @@ const ProgramDashboard = memo(function ProgramDashboard() {
 
   const openTaskList = (drilldown = null) => {
     clearAnalyticsInsight()
+    if (selectedProjectId) {
+      setActiveProject(selectedProjectId)
+    } else {
+      setActiveProject(null)
+      setActiveProgram(selectedProgramId || null)
+    }
     if (drilldown) setTaskDrilldown(drilldown)
     else clearTaskDrilldown()
     setPage('tasks')
+  }
+
+  const focusInsight = (insight) => {
+    setAnalyticsInsight(insight)
+    requestAnimationFrame(() => {
+      reviewDetailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
   }
 
   const getTaskContext = (task) => {
@@ -661,10 +695,10 @@ const ProgramDashboard = memo(function ProgramDashboard() {
               infoText="This page should answer what is slipping, what launches next, and which workstream needs attention before you open Gantt or Tasks."
               compact
               stats={[
-                { label: 'Programs', value: scopedPrograms.length, tone: 'accent', onClick: () => setAnalyticsInsight('programs'), active: activeInsight === 'programs' },
-                { label: 'Open tasks', value: scopedOpenTasks.length, tone: 'default', onClick: () => setAnalyticsInsight('tasks'), active: activeInsight === 'tasks' },
-                { label: 'Flagged', value: flaggedPrograms, tone: flaggedPrograms > 0 ? 'danger' : 'default', onClick: () => setAnalyticsInsight('flagged'), active: activeInsight === 'flagged' },
-                { label: 'Next launch', value: nextMilestone ? new Date(nextMilestone.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'TBD', tone: nextMilestone ? 'success' : 'default', onClick: () => setAnalyticsInsight('launch'), active: activeInsight === 'launch' },
+                { label: 'Programs', value: scopedPrograms.length, tone: 'accent', onClick: () => focusInsight('programs'), active: activeInsight === 'programs' },
+                { label: 'Open tasks', value: scopedOpenTasks.length, tone: 'default', onClick: () => openTaskList('open') },
+                { label: 'Flagged', value: flaggedPrograms, tone: flaggedPrograms > 0 ? 'danger' : 'default', onClick: () => focusInsight('flagged'), active: activeInsight === 'flagged' },
+                { label: 'Next launch', value: nextMilestone ? new Date(nextMilestone.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'TBD', tone: nextMilestone ? 'success' : 'default', onClick: () => focusInsight('launch'), active: activeInsight === 'launch' },
               ]}
             />
 
@@ -735,7 +769,7 @@ const ProgramDashboard = memo(function ProgramDashboard() {
                 detail={flaggedPrograms > 0 ? 'Programs showing overdue work or blocked flow.' : 'No program is currently flagged.'}
                 tone={flaggedPrograms > 0 ? 'danger' : 'accent'}
                 icon={Flag}
-                onClick={() => setAnalyticsInsight('flagged')}
+                onClick={() => focusInsight('flagged')}
                 active={activeInsight === 'flagged'}
               />
               <ReviewFocusCard
@@ -744,7 +778,7 @@ const ProgramDashboard = memo(function ProgramDashboard() {
                 detail="Dates that invert task or project windows."
                 tone={(insights.cards.find((card) => card.id === 'conflicts')?.value ?? 0) > 0 ? 'danger' : 'neutral'}
                 icon={AlertTriangle}
-                onClick={() => setAnalyticsInsight('conflicts')}
+                onClick={openRiskView}
                 active={activeInsight === 'conflicts'}
               />
               <ReviewFocusCard
@@ -753,7 +787,7 @@ const ProgramDashboard = memo(function ProgramDashboard() {
                 detail="Tasks still missing a full start and due range."
                 tone={(insights.cards.find((card) => card.id === 'unscheduled')?.value ?? 0) > 0 ? 'warning' : 'neutral'}
                 icon={FolderClock}
-                onClick={() => setAnalyticsInsight('unscheduled')}
+                onClick={() => openTaskList('unscheduled')}
                 active={activeInsight === 'unscheduled'}
               />
               <ReviewFocusCard
@@ -762,14 +796,16 @@ const ProgramDashboard = memo(function ProgramDashboard() {
                 detail="Items that need schedule or dependency intervention."
                 tone={(insights.cards.find((card) => card.id === 'blocked')?.value ?? 0) > 0 ? 'danger' : 'neutral'}
                 icon={CalendarClock}
-                onClick={() => setAnalyticsInsight('blocked')}
+                onClick={() => openTaskList('blockedOrLate')}
                 active={activeInsight === 'blocked'}
               />
             </div>
 
-            <ReviewDetailShell title={reviewDetail.title} infoText={reviewDetail.infoText} actions={reviewDetail.actions}>
+            <div ref={reviewDetailRef}>
+              <ReviewDetailShell title={reviewDetail.title} infoText={reviewDetail.infoText} actions={reviewDetail.actions}>
               {reviewDetail.content}
-            </ReviewDetailShell>
+              </ReviewDetailShell>
+            </div>
 
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">

@@ -44,6 +44,7 @@ const DRILLDOWN_LABEL = {
   open: 'Open work',
   overdue: 'Overdue',
   blocked: 'Blocked',
+  blockedOrLate: 'Blocked or late',
   critical: 'Critical',
   unscheduled: 'Unscheduled',
 }
@@ -330,6 +331,10 @@ const Tasks = memo(function Tasks() {
   const workspaceViewScope = useSettingsStore((state) => state.workspaceViewScope)
   const taskDrilldown = useSettingsStore((state) => state.taskDrilldown)
   const clearTaskDrilldown = useSettingsStore((state) => state.clearTaskDrilldown)
+  const activeProjectId = useSettingsStore((state) => state.activeProjectId)
+  const activeProgramId = useSettingsStore((state) => state.activeProgramId)
+  const setActiveProject = useSettingsStore((state) => state.setActiveProject)
+  const setActiveProgram = useSettingsStore((state) => state.setActiveProgram)
   const selectAllTasks = useSettingsStore((state) => state.selectAllTasks)
   const toggleTaskSelection = useSettingsStore((state) => state.toggleTaskSelection)
   const selectTask = useSettingsStore((state) => state.selectTask)
@@ -357,6 +362,28 @@ const Tasks = memo(function Tasks() {
       setFilterProjectId('')
     }
   }, [projectById, filterProgramId, filterProjectId, workspaceViewScope])
+
+  useEffect(() => {
+    if (!activeProgramId && !activeProjectId) {
+      setFilterProgramId('')
+      setFilterProjectId('')
+      return
+    }
+
+    if (activeProjectId) {
+      const project = projectById.get(activeProjectId)
+      if (!project) {
+        setFilterProjectId('')
+        return
+      }
+      setFilterProjectId(project.id)
+      setFilterProgramId(project.programId || '')
+      return
+    }
+
+    setFilterProjectId('')
+    setFilterProgramId(activeProgramId || '')
+  }, [activeProgramId, activeProjectId, projectById])
 
   const filteredTasks = useMemo(() => {
     return !filterProgramId && !filterProjectId
@@ -463,6 +490,8 @@ const Tasks = memo(function Tasks() {
                 onChange={(event) => {
                   setFilterProgramId(event.target.value)
                   setFilterProjectId('')
+                  setActiveProject(null)
+                  setActiveProgram(event.target.value || null)
                 }}
                 className="text-xs px-3 py-2 rounded-xl min-w-[180px]"
                 style={SELECT_STYLE}
@@ -482,7 +511,9 @@ const Tasks = memo(function Tasks() {
                   const project = projectById.get(nextProjectId)
                   if (project?.programId && project.programId !== filterProgramId) {
                     setFilterProgramId(project.programId)
+                    setActiveProgram(project.programId)
                   }
+                  setActiveProject(nextProjectId || null)
                 }}
                 className="text-xs px-3 py-2 rounded-xl min-w-[220px]"
                 style={SELECT_STYLE}
@@ -506,6 +537,7 @@ const Tasks = memo(function Tasks() {
                   onClick={() => {
                     setFilterProgramId('')
                     setFilterProjectId('')
+                    setActiveProgram(null)
                   }}
                   className="px-3 py-2 rounded-xl text-xs"
                   style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)', border: '1px solid rgba(255,255,255,0.1)' }}
