@@ -11,7 +11,8 @@ import {
   Target,
 } from 'lucide-react'
 import GlassCard from '../components/common/GlassCard'
-import InfoTooltip from '../components/common/InfoTooltip'
+import PageHero from '../components/common/PageHero'
+import SectionShell from '../components/common/SectionShell'
 import useSettingsStore from '../store/useSettingsStore'
 import usePlanningStore from '../store/usePlanningStore'
 import { useAllProgramStats } from '../hooks/useProgramStats'
@@ -331,41 +332,35 @@ const Dashboard = memo(function Dashboard() {
     <div className="flex-1 overflow-y-auto px-4 md:px-6 pb-24 md:pb-8">
       <motion.div variants={staggerVariants} initial="initial" animate="animate" className="space-y-4">
       <motion.div variants={sectionVariants}>
-      <GlassCard padding="p-4 md:p-5" className="mt-2">
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.24em]" style={{ color: 'var(--text-secondary)' }}>
-              Command center
-              <InfoTooltip text="Use Dashboard for quick pressure checks: launches, blocked work, unscheduled work, and the most important open tasks." widthClassName="w-72" />
-            </div>
-            <h1 className="mt-2 text-[1.7rem] md:text-[1.95rem] font-bold leading-tight" style={{ color: 'var(--text-primary)' }}>
-              See the week, not the noise
-            </h1>
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              <button type="button" onClick={openPlanner} className="btn-accent px-3 py-2 text-xs">
-                Open planner
-              </button>
-              <button type="button" onClick={() => openTasksView('open')} className="btn-ghost px-3 py-2 text-xs">
-                Open all tasks
-              </button>
-              <button type="button" onClick={() => {
-                clearTaskDrilldown()
-                clearAnalyticsInsight()
-                setPage('timeline')
-              }} className="btn-ghost px-3 py-2 text-xs">
-                Open gantt
-              </button>
-            </div>
+      <PageHero
+        eyebrow="Command center"
+        title="See the week, not the noise"
+        infoText="Use Dashboard for fast pressure checks: launches, blocked work, unscheduled work, and the most important open tasks."
+        minimal
+        stats={[
+          { label: 'Open work', value: openTasks.length, tone: 'accent', onClick: () => openTasksView('open') },
+          { label: 'This week', value: weekCommitments.length, tone: 'default', onClick: openPlanner },
+          { label: 'Next launch', value: nextMilestone ? formatShortDate(nextMilestone.dueDate) : 'None', tone: nextMilestone ? 'success' : 'default', onClick: () => openAnalytics('launch') },
+          { label: 'Risk', value: flaggedPrograms.length > 0 ? `${flaggedPrograms.length} flagged` : 'Stable', tone: flaggedPrograms.length > 0 ? 'danger' : 'success', onClick: () => openAnalytics('flagged') },
+        ]}
+        actions={(
+          <div className="flex flex-wrap items-center gap-2">
+            <button type="button" onClick={openPlanner} className="btn-accent px-3 py-2 text-xs">
+              Open planner
+            </button>
+            <button type="button" onClick={() => openTasksView('open')} className="btn-ghost px-3 py-2 text-xs">
+              Open all tasks
+            </button>
+            <button type="button" onClick={() => {
+              clearTaskDrilldown()
+              clearAnalyticsInsight()
+              setPage('timeline')
+            }} className="btn-ghost px-3 py-2 text-xs">
+              Open gantt
+            </button>
           </div>
-
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 xl:w-[500px]">
-          <StatPill label="Open work" value={openTasks.length} tone="accent" onClick={() => openTasksView('open')} />
-          <StatPill label="This week" value={weekCommitments.length} tone="default" onClick={openPlanner} />
-          <StatPill label="Next launch" value={nextMilestone ? formatShortDate(nextMilestone.dueDate) : 'None'} tone={nextMilestone ? 'success' : 'neutral'} onClick={() => openAnalytics('launch')} />
-          <StatPill label="Risk" value={flaggedPrograms.length > 0 ? `${flaggedPrograms.length} flagged` : 'Stable'} tone={flaggedPrograms.length > 0 ? 'danger' : 'success'} onClick={() => openAnalytics('flagged')} />
-        </div>
-      </div>
-      </GlassCard>
+        )}
+      />
       </motion.div>
 
       <motion.div variants={sectionVariants} className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -405,21 +400,16 @@ const Dashboard = memo(function Dashboard() {
 
       <motion.div variants={staggerVariants} className="grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
         <motion.div variants={cardVariants}>
-        <GlassCard padding="p-4 md:p-5">
-          <div className="flex items-center justify-between gap-3 mb-3">
-            <div>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>
-                Launch watch
-              </p>
-              <p className="mt-1 text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-                Upcoming milestones
-              </p>
-            </div>
+        <SectionShell
+          eyebrow="Launch watch"
+          title="Upcoming milestones"
+          compact
+          actions={
             <button type="button" onClick={() => openAnalytics('launch')} className="text-xs font-medium" style={{ color: 'var(--accent)' }}>
               Open analytics
             </button>
-          </div>
-
+          }
+        >
           <div className="space-y-2">
             {nextMilestones.length === 0 ? (
               <div className="rounded-2xl px-3 py-4 text-sm" style={{ background: 'rgba(255,255,255,0.03)', border: '1px dashed rgba(255,255,255,0.1)', color: 'var(--text-secondary)' }}>
@@ -437,25 +427,20 @@ const Dashboard = memo(function Dashboard() {
               />
             ))}
           </div>
-        </GlassCard>
+        </SectionShell>
         </motion.div>
 
         <motion.div variants={cardVariants}>
-        <GlassCard padding="p-4 md:p-5">
-          <div className="flex items-center justify-between gap-3 mb-3">
-            <div>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>
-                Planner pulse
-              </p>
-              <p className="mt-1 text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-                Work already committed
-              </p>
-            </div>
+        <SectionShell
+          eyebrow="Planner pulse"
+          title="Work already committed"
+          compact
+          actions={
             <button type="button" onClick={openPlanner} className="text-xs font-medium" style={{ color: 'var(--accent)' }}>
               Open planner
             </button>
-          </div>
-
+          }
+        >
           <div className="grid grid-cols-3 gap-2 mb-3">
             <StatPill label="Today" value={todayCommitments.length} tone="accent" onClick={openPlanner} />
             <StatPill label="Week" value={weekCommitments.length} tone="success" onClick={openPlanner} />
@@ -496,27 +481,22 @@ const Dashboard = memo(function Dashboard() {
               </div>
             </button>
           </div>
-        </GlassCard>
+        </SectionShell>
         </motion.div>
       </motion.div>
 
       <motion.div variants={staggerVariants} className="grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
         <motion.div variants={cardVariants}>
-        <GlassCard padding="p-4 md:p-5">
-          <div className="flex items-center justify-between gap-3 mb-3">
-            <div>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>
-                Program pulse
-              </p>
-              <p className="mt-1 text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-                Which programs need attention
-              </p>
-            </div>
+        <SectionShell
+          eyebrow="Program pulse"
+          title="Which programs need attention"
+          compact
+          actions={
             <button type="button" onClick={() => openAnalytics('flagged')} className="text-xs font-medium" style={{ color: 'var(--accent)' }}>
               Open analytics
             </button>
-          </div>
-
+          }
+        >
           <div className="space-y-2">
             {pulsePrograms.map((program) => (
               <ProgramPulseRow
@@ -530,25 +510,20 @@ const Dashboard = memo(function Dashboard() {
               />
             ))}
           </div>
-        </GlassCard>
+        </SectionShell>
         </motion.div>
 
         <motion.div variants={cardVariants}>
-        <GlassCard padding="p-4 md:p-5">
-          <div className="flex items-center justify-between gap-3 mb-3">
-            <div>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>
-                Action queue
-              </p>
-              <p className="mt-1 text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-                Open work most likely to move this week
-              </p>
-            </div>
+        <SectionShell
+          eyebrow="Action queue"
+          title="Open work most likely to move this week"
+          compact
+          actions={
             <button type="button" onClick={() => openTasksView('open')} className="text-xs font-medium" style={{ color: 'var(--accent)' }}>
               Open all tasks
             </button>
-          </div>
-
+          }
+        >
           <div className="space-y-2">
             {actionQueue.map((task) => (
               <QueueRow
@@ -564,7 +539,7 @@ const Dashboard = memo(function Dashboard() {
               />
             ))}
           </div>
-        </GlassCard>
+        </SectionShell>
         </motion.div>
       </motion.div>
       </motion.div>

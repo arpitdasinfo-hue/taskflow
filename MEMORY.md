@@ -186,3 +186,28 @@ When continuing work on this repo:
 - prefer incremental, reviewable refactors
 - be careful not to mix unrelated local WIP into commits
 - when adding new summary numbers or cards, make them actionable where the data exists
+
+## Recent UI Standardization Work
+
+These patterns were introduced to reduce visual weight while preserving information:
+
+- `PageHero` now supports a `minimal` mode for dense page headers
+- `ScopeBar` now supports a denser `minimal` mode
+- `SectionShell` was added as a shared compact section wrapper for titled content blocks
+- `TaskDataTable` was tightened for denser row scanning and calmer sticky action columns
+
+Pages already moved toward this pattern:
+
+- `Dashboard`
+  - slimmer hero
+  - shared compact sections for launch watch, planner pulse, program pulse, and action queue
+- `Programs`
+  - slimmer top strip using the shared hero
+  - focus selection preserved without a large header card
+
+Design intent for this direction:
+
+- less card nesting
+- less duplicated chrome
+- more content visible above the fold
+- more consistent page rhythm across surfaces

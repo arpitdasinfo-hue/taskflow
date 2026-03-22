@@ -101,7 +101,7 @@ const TaskTableRow = memo(function TaskTableRow({
       className="transition-colors hover:bg-white/5"
       style={{ background: isSelected ? 'rgba(var(--accent-rgb),0.06)' : 'transparent' }}
     >
-      <td className="px-3 py-2.5 border-b align-top" style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
+      <td className="px-3 py-2 border-b align-top" style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
         <div className="flex items-start gap-2 min-w-0">
           {selectMode ? (
             <button
@@ -150,15 +150,15 @@ const TaskTableRow = memo(function TaskTableRow({
         </div>
       </td>
 
-      <td className="px-3 py-2.5 border-b whitespace-nowrap" style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
+      <td className="px-3 py-2 border-b whitespace-nowrap" style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
         {getContextContent ? getContextContent(item, task) : <span style={{ color: 'var(--text-secondary)' }}>—</span>}
       </td>
 
-      <td className="px-3 py-2.5 border-b whitespace-nowrap text-xs" style={{ borderColor: 'rgba(255,255,255,0.04)', color: 'var(--text-secondary)' }}>
+      <td className="px-3 py-2 border-b whitespace-nowrap text-xs" style={{ borderColor: 'rgba(255,255,255,0.04)', color: 'var(--text-secondary)' }}>
         {getProjectContent ? getProjectContent(item, task) : '—'}
       </td>
 
-      <td className="px-3 py-2.5 border-b whitespace-nowrap" style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
+      <td className="px-3 py-2 border-b whitespace-nowrap" style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
         {onUpdateDate ? (
           <InlineDateChip
             compact
@@ -171,7 +171,7 @@ const TaskTableRow = memo(function TaskTableRow({
         )}
       </td>
 
-      <td className="px-3 py-2.5 border-b whitespace-nowrap" style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
+      <td className="px-3 py-2 border-b whitespace-nowrap" style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
         {onUpdateDate ? (
           <InlineDateChip
             compact
@@ -188,7 +188,7 @@ const TaskTableRow = memo(function TaskTableRow({
         )}
       </td>
 
-      <td className="px-3 py-2.5 border-b whitespace-nowrap" style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
+      <td className="px-3 py-2 border-b whitespace-nowrap" style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
         {onUpdateStatus ? (
           <InlineStatusChip
             compact
@@ -202,7 +202,7 @@ const TaskTableRow = memo(function TaskTableRow({
         )}
       </td>
 
-      <td className="px-3 py-2.5 border-b whitespace-nowrap" style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
+      <td className="px-3 py-2 border-b whitespace-nowrap" style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
         {onUpdatePriority ? (
           <InlinePriorityChip
             compact
@@ -219,14 +219,14 @@ const TaskTableRow = memo(function TaskTableRow({
       {extraColumns?.map((column) => (
         <td
           key={column.key}
-          className="px-3 py-2.5 border-b whitespace-nowrap text-xs"
+          className="px-3 py-2 border-b whitespace-nowrap text-xs"
           style={{ borderColor: 'rgba(255,255,255,0.04)', color: 'var(--text-secondary)' }}
         >
           {column.render(item, task)}
         </td>
       ))}
 
-      <td className="px-3 py-2.5 border-b whitespace-nowrap text-right sticky right-0 z-10" style={{ borderColor: 'rgba(255,255,255,0.04)', background: isSelected ? 'rgba(var(--accent-rgb),0.06)' : 'rgba(0,0,0,0.45)', backdropFilter: 'blur(12px)' }}>
+      <td className="px-3 py-2 border-b whitespace-nowrap text-right sticky right-0 z-10" style={{ borderColor: 'rgba(255,255,255,0.04)', background: isSelected ? 'rgba(var(--accent-rgb),0.06)' : 'rgba(9,13,21,0.66)', backdropFilter: 'blur(10px)' }}>
         <div className="inline-flex items-center justify-end gap-2">
           {renderActions ? renderActions(item, task) : null}
           {onOpenTask ? (
@@ -275,14 +275,14 @@ const TaskDataTable = memo(function TaskDataTable({
 
   return (
     <div
-      className="rounded-[24px] overflow-hidden"
+      className="rounded-[22px] overflow-hidden"
       style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)' }}
     >
       <div className="overflow-x-auto">
         <table className={`w-full ${minWidthClassName} border-collapse`}>
           <thead>
             <tr style={{ background: 'rgba(255,255,255,0.035)' }}>
-              <th className="px-3 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>
+              <th className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>
                 {selectMode ? (
                   <button
                     type="button"
@@ -300,34 +300,34 @@ const TaskDataTable = memo(function TaskDataTable({
                   </span>
                 )}
               </th>
-              <th className="px-3 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>
+              <th className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>
                 Program
               </th>
-              <th className="px-3 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>
+              <th className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>
                 Project
               </th>
-              <th className="px-3 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>
+              <th className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>
                 Start
               </th>
-              <th className="px-3 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>
+              <th className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>
                 Due
               </th>
-              <th className="px-3 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>
+              <th className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>
                 Status
               </th>
-              <th className="px-3 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>
+              <th className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>
                 Priority
               </th>
               {extraColumns.map((column) => (
                 <th
                   key={column.key}
-                  className="px-3 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.22em]"
+                  className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-[0.22em]"
                   style={{ color: 'var(--text-secondary)' }}
                 >
                   {column.label}
                 </th>
               ))}
-              <th className="px-3 py-3 text-right text-[10px] font-semibold uppercase tracking-[0.22em] sticky right-0 z-10" style={{ color: 'var(--text-secondary)', background: 'rgba(255,255,255,0.035)' }}>
+              <th className="px-3 py-2.5 text-right text-[10px] font-semibold uppercase tracking-[0.22em] sticky right-0 z-10" style={{ color: 'var(--text-secondary)', background: 'rgba(13,18,28,0.92)', backdropFilter: 'blur(10px)' }}>
                 {renderActions ? 'Plan' : ''}
               </th>
             </tr>

@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import GlassCard from '../components/common/GlassCard'
 import InfoTooltip from '../components/common/InfoTooltip'
+import PageHero from '../components/common/PageHero'
 import { InlineDateChip, InlineStatusChip } from '../components/common/InlineFieldChips'
 import ColorPalettePicker from '../components/common/ColorPalettePicker'
 import ShareModal from '../components/ShareModal'
@@ -1435,57 +1436,50 @@ const Projects = memo(function Projects() {
     <div className="flex-1 overflow-y-auto px-4 md:px-6 pb-24 md:pb-8">
       <motion.div variants={staggerVariants} initial="initial" animate="animate" className="py-2 mb-3">
       <motion.div variants={sectionVariants}>
-        <GlassCard padding="p-4 md:p-5" rounded="rounded-[30px]">
-          <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.24em]" style={{ color: 'var(--text-secondary)' }}>
-                  Programs
-                </div>
-                <InfoTooltip text="Use focus to jump to one program, or keep all visible and work one expanded program at a time." />
-              </div>
-              <h1 className="mt-2 text-[1.9rem] md:text-[2.15rem] font-bold leading-tight" style={{ color: 'var(--text-primary)' }}>
-                {headerTitle}
-              </h1>
-              {programs.length > 0 && (
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <span className="text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>
-                    Focus
-                  </span>
-                  <select
-                    value={focusedProgram?.id ?? ''}
-                    onChange={(event) => {
-                      const nextProgramId = event.target.value || null
-                      setActiveProject(null)
-                      setActiveProgram(nextProgramId)
-                    }}
-                    className="text-xs px-3 py-2 rounded-xl min-w-[220px]"
-                    style={{ background: 'rgba(255,255,255,0.045)', border: '1px solid rgba(255,255,255,0.08)', color: 'var(--text-primary)' }}
-                  >
-                    <option value="">All programs</option>
-                    {programs.map((program) => (
-                      <option key={program.id} value={program.id}>{program.name}</option>
-                    ))}
-                  </select>
-                  {focusedProgram && (
-                    <button type="button" onClick={clearFocus} className="btn-ghost px-3 py-2 text-xs">
-                      Show all
-                    </button>
-                  )}
-                </div>
+        <PageHero
+          eyebrow="Programs"
+          title={headerTitle}
+          infoText="Use focus to jump to one program, or keep all visible and work one expanded program at a time."
+          minimal
+          stats={[
+            { label: 'Programs', value: programs.length, tone: 'accent' },
+            { label: 'Projects', value: topLevelProjectCount },
+            { label: 'Done', value: `${doneTasks}/${totalTasks}`, tone: 'success' },
+          ]}
+          actions={(
+            <button type="button" onClick={() => setAddingProgram(true)} className="btn-accent flex items-center gap-1.5 px-3.5 py-2.5 text-xs">
+              <Plus size={13} /> New program
+            </button>
+          )}
+        >
+          {programs.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>
+                Focus
+              </span>
+              <select
+                value={focusedProgram?.id ?? ''}
+                onChange={(event) => {
+                  const nextProgramId = event.target.value || null
+                  setActiveProject(null)
+                  setActiveProgram(nextProgramId)
+                }}
+                className="text-xs px-3 py-2 rounded-xl min-w-[220px]"
+                style={{ background: 'rgba(255,255,255,0.045)', border: '1px solid rgba(255,255,255,0.08)', color: 'var(--text-primary)' }}
+              >
+                <option value="">All programs</option>
+                {programs.map((program) => (
+                  <option key={program.id} value={program.id}>{program.name}</option>
+                ))}
+              </select>
+              {focusedProgram && (
+                <button type="button" onClick={clearFocus} className="btn-ghost px-3 py-2 text-xs">
+                  Show all
+                </button>
               )}
             </div>
-
-            <div className="flex items-start gap-2.5 flex-wrap xl:justify-end">
-              <CompactStat label="Programs" value={programs.length} tone="accent" />
-              <CompactStat label="Projects" value={topLevelProjectCount} />
-              <CompactStat label="Done" value={`${doneTasks}/${totalTasks}`} tone="success" />
-              <button type="button" onClick={() => setAddingProgram(true)} className="btn-accent flex items-center gap-1.5 px-3.5 py-2.5 text-xs">
-                <Plus size={13} /> New program
-              </button>
-            </div>
-          </div>
-        </GlassCard>
+          )}
+        </PageHero>
       </motion.div>
 
       <AnimatePresence initial={false}>
