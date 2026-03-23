@@ -7,9 +7,9 @@ const PAGE_TITLES = {
   tasks:               'All Tasks',
   trash:               'Trash',
   today:               'Planner',
-  projects:            'Projects',
+  projects:            'Programs',
   settings:            'Settings',
-  'program-dashboard': 'Analytics',
+  'program-dashboard': 'Dashboard',
   timeline:            'Gantt Chart',
 }
 

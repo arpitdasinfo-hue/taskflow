@@ -13,6 +13,7 @@ import {
 import GlassCard from '../components/common/GlassCard'
 import PageHero from '../components/common/PageHero'
 import SectionShell from '../components/common/SectionShell'
+import useTimelineIntelligence from '../hooks/useTimelineIntelligence'
 import useSettingsStore from '../store/useSettingsStore'
 import usePlanningStore from '../store/usePlanningStore'
 import { useAllProgramStats } from '../hooks/useProgramStats'
@@ -174,6 +175,33 @@ const ProgramPulseRow = memo(function ProgramPulseRow({ program, stats, onOpen }
   )
 })
 
+const ReviewIssueRow = memo(function ReviewIssueRow({ issue, actionLabel, onClick }) {
+  const tone = issue.severity === 'high' ? 'danger' : issue.severity === 'medium' ? 'warning' : 'accent'
+  const palette = tonePalette[tone] ?? tonePalette.neutral
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="w-full flex items-start justify-between gap-3 rounded-2xl px-3 py-3 text-left transition-colors hover:bg-white/4"
+      style={{ border: `1px solid ${palette.border}` }}
+    >
+      <div className="min-w-0">
+        <div className="text-sm font-semibold" style={{ color: palette.color }}>
+          {issue.title}
+        </div>
+        <div className="mt-1 text-[11px] leading-5" style={{ color: 'var(--text-secondary)' }}>
+          {issue.detail}
+        </div>
+      </div>
+      <div className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.16em] flex-shrink-0" style={{ color: 'var(--text-secondary)' }}>
+        <span>{actionLabel}</span>
+        <ArrowRight size={12} />
+      </div>
+    </button>
+  )
+})
+
 const Dashboard = memo(function Dashboard() {
   const reduceMotion = useReducedMotion()
   const setPage = useSettingsStore((state) => state.setPage)
@@ -183,9 +211,19 @@ const Dashboard = memo(function Dashboard() {
   const setTaskDrilldown = useSettingsStore((state) => state.setTaskDrilldown)
   const clearTaskDrilldown = useSettingsStore((state) => state.clearTaskDrilldown)
   const clearAnalyticsInsight = useSettingsStore((state) => state.clearAnalyticsInsight)
+  const setGanttConfig = useSettingsStore((state) => state.setGanttConfig)
   const { programs, projects, milestones, tasks } = useWorkspaceScopedData()
   const commitments = usePlanningStore((state) => state.commitments)
   const allStats = useAllProgramStats({ programs, projects, milestones, tasks })
+  const emptyScope = useMemo(() => new Set(), [])
+  const timelineReview = useTimelineIntelligence({
+    programs,
+    projects,
+    tasks,
+    filteredProgramIds: emptyScope,
+    filteredProjectIds: emptyScope,
+    filteredSubProjectIds: emptyScope,
+  })
 
   const activeTasks = useMemo(() => tasks.filter((task) => !task.deletedAt), [tasks])
   const openTasks = useMemo(() => activeTasks.filter((task) => task.status !== 'done'), [activeTasks])
@@ -298,12 +336,50 @@ const Dashboard = memo(function Dashboard() {
     setPage('projects')
   }
 
+  const openTimeline = (patch = {}) => {
+    clearTaskDrilldown()
+    clearAnalyticsInsight()
+    setGanttConfig({
+      viewMode: 'roadmap',
+      showDependencies: true,
+      onlyDelayed: false,
+      onlyCritical: false,
+      onlyDependencyRisk: false,
+      filteredProgramIds: [],
+      filteredProjectIds: [],
+      filteredSubProjectIds: [],
+      expandedProjectIds: [],
+      ...patch,
+    })
+    setPage('timeline')
+  }
+
   const openProgramDetail = (programId = null) => {
     clearTaskDrilldown()
     clearAnalyticsInsight()
     if (programId) setActiveProgram(programId)
     setPage('projects')
   }
+
+  const reviewCardActions = {
+    conflicts: () => openTimeline({ viewMode: 'risk', onlyDelayed: true }),
+    unscheduled: () => openTasksView('unscheduled'),
+    dependency: () => openTimeline({ viewMode: 'risk', onlyDependencyRisk: true }),
+    blocked: () => openTasksView('blockedOrLate'),
+  }
+
+  const reviewIssueActions = timelineReview.issues.slice(0, 4).map((issue) => {
+    if (issue.id.startsWith('unscheduled-')) {
+      return { issue, actionLabel: 'Open tasks', onClick: () => openTasksView('unscheduled') }
+    }
+    if (issue.id.startsWith('blocked-soon-')) {
+      return { issue, actionLabel: 'Open tasks', onClick: () => openTasksView('blockedOrLate') }
+    }
+    if (issue.id.startsWith('dependency') || issue.id.startsWith('missing-dependency')) {
+      return { issue, actionLabel: 'Open gantt', onClick: () => openTimeline({ viewMode: 'risk', onlyDependencyRisk: true }) }
+    }
+    return { issue, actionLabel: 'Open gantt', onClick: () => openTimeline({ viewMode: 'risk', onlyDelayed: true }) }
+  })
 
   if (programs.length === 0 && activeTasks.length === 0) {
     return (
@@ -396,6 +472,57 @@ const Dashboard = memo(function Dashboard() {
           icon={Target}
           onClick={() => openTasksView('critical')}
         />
+      </motion.div>
+
+      <motion.div variants={cardVariants}>
+      <SectionShell
+        eyebrow="Portfolio review"
+        title="Keep the analytics readout inside Dashboard"
+        description="Use these signals for schedule and dependency review, then jump straight into the task list or timeline from the same command center."
+        compact
+        actions={
+          <div className="flex items-center gap-2 flex-wrap">
+            <button type="button" onClick={() => openTimeline({ viewMode: 'risk', onlyDelayed: true, onlyDependencyRisk: true })} className="text-xs font-medium" style={{ color: 'var(--accent)' }}>
+              Open risk view
+            </button>
+            <button type="button" onClick={openPrograms} className="text-xs font-medium" style={{ color: 'var(--accent)' }}>
+              Open programs
+            </button>
+          </div>
+        }
+      >
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          {timelineReview.cards.map((card) => (
+            <SignalCard
+              key={card.id}
+              title={card.label}
+              value={card.value}
+              detail={
+                card.id === 'conflicts'
+                  ? 'Dates disagree across projects or tasks.'
+                  : card.id === 'unscheduled'
+                    ? 'Open work missing a start or due date.'
+                    : card.id === 'dependency'
+                      ? 'Dependencies could slow downstream delivery.'
+                      : 'Blocked work or already-late work needs review.'
+              }
+              tone={card.tone === 'danger' ? 'danger' : card.tone === 'warning' ? 'warning' : 'neutral'}
+              icon={card.id === 'dependency' ? ListChecks : card.id === 'unscheduled' ? CalendarClock : card.id === 'blocked' ? AlertTriangle : CheckCircle2}
+              onClick={reviewCardActions[card.id]}
+            />
+          ))}
+        </div>
+
+        <div className="mt-3 grid gap-2 xl:grid-cols-2">
+          {reviewIssueActions.length === 0 ? (
+            <div className="rounded-2xl px-3 py-4 text-sm" style={{ background: 'rgba(255,255,255,0.03)', border: '1px dashed rgba(255,255,255,0.1)', color: 'var(--text-secondary)' }}>
+              Schedule, dependency, and date hygiene looks clean right now.
+            </div>
+          ) : reviewIssueActions.map(({ issue, actionLabel, onClick }) => (
+            <ReviewIssueRow key={issue.id} issue={issue} actionLabel={actionLabel} onClick={onClick} />
+          ))}
+        </div>
+      </SectionShell>
       </motion.div>
 
       <motion.div variants={staggerVariants} className="grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">

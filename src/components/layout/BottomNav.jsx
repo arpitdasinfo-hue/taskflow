@@ -1,5 +1,5 @@
 import { memo } from 'react'
-import { LayoutDashboard, ListTodo, CalendarClock, Settings2, FolderKanban, BarChart3, GanttChart, Trash2, Activity } from 'lucide-react'
+import { LayoutDashboard, ListTodo, CalendarClock, Settings2, FolderKanban, GanttChart, Trash2, Activity } from 'lucide-react'
 import useSettingsStore from '../../store/useSettingsStore'
 import { useTaskStats } from '../../hooks/useFilteredTasks'
 
@@ -8,7 +8,6 @@ const NAV_ITEMS = [
   { id: 'tasks',             label: 'Tasks',     icon: ListTodo        },
   { id: 'today',             label: 'Planner',   icon: CalendarClock   },
   { id: 'projects',          label: 'Programs',  icon: FolderKanban    },
-  { id: 'program-dashboard', label: 'Analytics', icon: BarChart3       },
   { id: 'timeline',          label: 'Gantt',     icon: GanttChart      },
   { id: 'activity',          label: 'Activity',  icon: Activity        },
   { id: 'trash',             label: 'Trash',     icon: Trash2          },
@@ -34,9 +33,12 @@ const BottomNav = memo(function BottomNav() {
     >
       <div className="flex items-stretch h-[60px] overflow-x-auto no-scrollbar px-1">
         {NAV_ITEMS.map(({ id, label, icon: Icon }) => {
+          const isDashboardRoute = activePage === 'dashboard' || activePage === 'program-dashboard'
           const isActive = id === 'projects'
             ? activePage === 'projects'
-            : activePage === id
+            : id === 'dashboard'
+              ? isDashboardRoute
+              : activePage === id
           const showDot = id === 'today' && overdue > 0
           return (
             <button
