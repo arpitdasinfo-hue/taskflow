@@ -8,7 +8,7 @@ const NAV_ITEMS = [
   { id: 'tasks',             label: 'Tasks',     icon: ListTodo        },
   { id: 'today',             label: 'Planner',   icon: CalendarClock   },
   { id: 'projects',          label: 'Programs',  icon: FolderKanban    },
-  { id: 'program-dashboard', label: 'Program',   icon: BarChart3       },
+  { id: 'program-dashboard', label: 'Overview',  icon: BarChart3       },
   { id: 'timeline',          label: 'Gantt',     icon: GanttChart      },
   { id: 'activity',          label: 'Activity',  icon: Activity        },
   { id: 'trash',             label: 'Trash',     icon: Trash2          },

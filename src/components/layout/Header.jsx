@@ -9,7 +9,7 @@ const PAGE_TITLES = {
   today:               'Planner',
   projects:            'Programs',
   settings:            'Settings',
-  'program-dashboard': 'Program Detail',
+  'program-dashboard': 'Program Overview',
   timeline:            'Gantt Chart',
 }
 

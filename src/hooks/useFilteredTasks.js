@@ -3,6 +3,7 @@ import useTaskStore from '../store/useTaskStore'
 import useSettingsStore from '../store/useSettingsStore'
 import useProjectStore from '../store/useProjectStore'
 import { taskMatchesProgram } from '../lib/taskScope'
+import { collectProjectDescendantIds } from '../lib/programWorkspace'
 import { filterTasksByWorkspaceScope } from '../lib/workspaceScope'
 import { sortTasksByStartDate } from '../lib/taskSort'
 
@@ -26,12 +27,15 @@ export function useFilteredTasks() {
   return useMemo(() => {
     let result = filterTasksByWorkspaceScope(tasks, programs, projects, workspaceViewScope)
       .filter((task) => !task.deletedAt)
+    const activeProjectScope = activeProjectId
+      ? collectProjectDescendantIds(projects, activeProjectId)
+      : null
 
     // Program filter (takes all projects in that program)
     if (activeProgramId) {
       result = result.filter((task) => taskMatchesProgram(task, activeProgramId, projects))
     } else if (activeProjectId) {
-      result = result.filter((t) => t.projectId === activeProjectId)
+      result = result.filter((task) => task.projectId && activeProjectScope?.has(task.projectId))
     }
 
     if (filters.status.length)

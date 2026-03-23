@@ -581,7 +581,7 @@ const ProgramDashboard = memo(function ProgramDashboard() {
     <div className="flex-1 overflow-y-auto px-4 md:px-6 pb-24 md:pb-8">
       <div className="space-y-4 py-2">
         <PageHero
-          eyebrow="Program detail"
+          eyebrow="Program overview"
           title={selectedProgram?.name ?? 'Program'}
           description={selectedProgram?.description || `Structure, milestone delivery, and risks for ${selectedProgram?.name ?? 'this program'}.`}
           minimal
