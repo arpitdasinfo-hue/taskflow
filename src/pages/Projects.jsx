@@ -1048,7 +1048,6 @@ const ProgramSection = memo(function ProgramSection({ program, projects, expande
 
   const totalTasks = allTasks.length
   const doneTasks = allTasks.filter((task) => task.status === 'done').length
-  const inProgress = allTasks.filter((task) => task.status === 'in-progress' || task.status === 'review').length
   const blocked = allTasks.filter((task) => task.status === 'blocked').length
   const now = new Date()
   const overdue = allTasks.filter((task) => task.dueDate && new Date(task.dueDate) < now && task.status !== 'done').length
@@ -1279,29 +1278,6 @@ const ProgramSection = memo(function ProgramSection({ program, projects, expande
           className="overflow-hidden"
         >
         <div className="px-4 md:px-5 pb-3 pt-2.5 space-y-2.5">
-          <div className="rounded-2xl px-3 py-2.5" style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.05)' }}>
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="min-w-0">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>Program summary</p>
-                <p className="mt-1 text-[11px]" style={{ color: 'var(--text-secondary)' }}>
-                  {health.detail}. {inProgress > 0 ? `${inProgress} active in flow.` : 'No active tasks in flow.'}
-                  {unscheduled > 0 ? ` ${unscheduled} still need dates.` : ''}
-                </p>
-              </div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <button type="button" onClick={() => openProgramTasks('open')} className="text-[11px] px-2.5 py-2 rounded-xl" style={{ background: `${program.color}16`, color: program.color }}>
-                  Work items
-                </button>
-                <button type="button" onClick={() => openProgramTasks('blocked')} className="text-[11px] px-2.5 py-2 rounded-xl" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)' }}>
-                  Blockers
-                </button>
-                <button type="button" onClick={() => openProgramTimeline(false)} className="text-[11px] px-2.5 py-2 rounded-xl" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)' }}>
-                  Milestones
-                </button>
-              </div>
-            </div>
-          </div>
-
           <ProgramMilestonesOverview milestones={projectMilestones} projects={projects} accentColor={program.color} />
 
           {addingProject && (
@@ -1592,10 +1568,10 @@ const Projects = memo(function Projects() {
       <motion.div variants={sectionVariants}>
         <PageHero
           eyebrow="Programs"
-          title="Organize the portfolio, then move into the work"
+          title="Programs"
           description={focusedProgram
-            ? `${focusedProgram.name} is in focus. Use this page to manage structure, milestones, and handoffs, then jump into tasks or timeline when you need to operate.`
-            : 'Use Programs to shape workstreams, keep project structure clean, and review milestones without duplicating the Dashboard review surface.'}
+            ? `${focusedProgram.name} is in focus. Manage structure here, then jump into tasks or timeline when you need to operate.`
+            : 'Keep structure, milestones, and workstream actions in one place without turning this page into a second dashboard.'}
           infoText="Dashboard is the review surface. Programs is where you organize the work, keep milestones healthy, and jump into the next action."
           minimal
           stats={[

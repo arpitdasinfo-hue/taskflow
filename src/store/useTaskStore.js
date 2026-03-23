@@ -76,6 +76,53 @@ const markTaskSyncSuccess = (set) => {
   })
 }
 
+const toTimestamp = (value) => {
+  if (!value) return 0
+  const ts = new Date(value).getTime()
+  return Number.isNaN(ts) ? 0 : ts
+}
+
+const getEntityTimestamp = (entity) =>
+  Math.max(
+    toTimestamp(entity?.updatedAt),
+    toTimestamp(entity?.createdAt),
+    toTimestamp(entity?.deletedAt)
+  )
+
+const shouldPreserveLocalEntity = (entity, lastSyncedAt, syncError) => {
+  if (!entity?.id) return false
+  if (syncError) return true
+  if (!lastSyncedAt) return true
+  return getEntityTimestamp(entity) >= toTimestamp(lastSyncedAt)
+}
+
+const mergeRemoteTasks = (remoteTasks = [], localTasks = [], { lastSyncedAt = null, syncError = '' } = {}) => {
+  const localById = new Map((localTasks ?? []).map((task) => [task.id, task]))
+  const merged = []
+  const seenIds = new Set()
+  let preservedCount = 0
+
+  ;(remoteTasks ?? []).forEach((remoteTask) => {
+    const localTask = localById.get(remoteTask.id)
+    if (localTask && shouldPreserveLocalEntity(localTask, lastSyncedAt, syncError) && getEntityTimestamp(localTask) > getEntityTimestamp(remoteTask)) {
+      merged.push(localTask)
+      preservedCount += 1
+    } else {
+      merged.push(remoteTask)
+    }
+    seenIds.add(remoteTask.id)
+  })
+
+  ;(localTasks ?? []).forEach((localTask) => {
+    if (!localTask?.id || seenIds.has(localTask.id)) return
+    if (!shouldPreserveLocalEntity(localTask, lastSyncedAt, syncError)) return
+    merged.push(localTask)
+    preservedCount += 1
+  })
+
+  return { items: merged, preservedCount }
+}
+
 const hasOwn = (value, key) => Object.prototype.hasOwnProperty.call(value, key)
 
 const getProgramIdForProject = (projectId) => {
@@ -952,11 +999,11 @@ const useTaskStore = create(
         set((s) => { s.syncing = true })
 
         try {
+          const localState = get()
           let { taskRows, subtaskRows, noteRows } = await fetchWorkspaceTaskData(workspaceId)
           const hasRemoteData = taskRows.length > 0
 
           if (!hasRemoteData) {
-            const localState = get()
             if ((localState.tasks?.length ?? 0) > 0 || (localState.trashTasks?.length ?? 0) > 0) {
               await get().migrateLocalToSupabase(workspaceId)
               const refreshed = await fetchWorkspaceTaskData(workspaceId)
@@ -984,12 +1031,24 @@ const useTaskStore = create(
             task.notes.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
           })
 
+          const localTasks = [...(localState.tasks ?? []), ...(localState.trashTasks ?? [])]
+          const mergedTasks = mergeRemoteTasks(assembled, localTasks, {
+            lastSyncedAt: localState.lastSyncedAt,
+            syncError: localState.syncError,
+          })
+
           set((state) => {
-            const sanitized = splitDeletedTasks(assembled, [])
+            const sanitized = splitDeletedTasks(mergedTasks.items, [])
             state.tasks = sanitized.tasks
             state.trashTasks = sanitized.trashTasks
           })
           markTaskSyncSuccess(set)
+
+          if (mergedTasks.preservedCount > 0) {
+            void get().migrateLocalToSupabase(workspaceId)
+              .then(() => markTaskSyncSuccess(set))
+              .catch((error) => reportTaskSyncError(set, error, 'reconcile local task data'))
+          }
         } catch (error) {
           reportTaskSyncError(set, error, 'load tasks from Supabase')
         } finally {

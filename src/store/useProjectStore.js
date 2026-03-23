@@ -212,6 +212,53 @@ const markProjectSyncSuccess = (set) => {
   })
 }
 
+const toTimestamp = (value) => {
+  if (!value) return 0
+  const ts = new Date(value).getTime()
+  return Number.isNaN(ts) ? 0 : ts
+}
+
+const getEntityTimestamp = (entity) =>
+  Math.max(
+    toTimestamp(entity?.updatedAt),
+    toTimestamp(entity?.createdAt),
+    toTimestamp(entity?.deletedAt)
+  )
+
+const shouldPreserveLocalEntity = (entity, lastSyncedAt, syncError) => {
+  if (!entity?.id) return false
+  if (syncError) return true
+  if (!lastSyncedAt) return true
+  return getEntityTimestamp(entity) >= toTimestamp(lastSyncedAt)
+}
+
+const mergeRemoteFirst = (remoteItems = [], localItems = [], { lastSyncedAt = null, syncError = '' } = {}) => {
+  const localById = new Map((localItems ?? []).map((item) => [item.id, item]))
+  const merged = []
+  const seenIds = new Set()
+  let preservedCount = 0
+
+  ;(remoteItems ?? []).forEach((remoteItem) => {
+    const localItem = localById.get(remoteItem.id)
+    if (localItem && shouldPreserveLocalEntity(localItem, lastSyncedAt, syncError) && getEntityTimestamp(localItem) > getEntityTimestamp(remoteItem)) {
+      merged.push(localItem)
+      preservedCount += 1
+    } else {
+      merged.push(remoteItem)
+    }
+    seenIds.add(remoteItem.id)
+  })
+
+  ;(localItems ?? []).forEach((localItem) => {
+    if (!localItem?.id || seenIds.has(localItem.id)) return
+    if (!shouldPreserveLocalEntity(localItem, lastSyncedAt, syncError)) return
+    merged.push(localItem)
+    preservedCount += 1
+  })
+
+  return { items: merged, preservedCount }
+}
+
 async function persistMilestoneRow(milestone) {
   const { error } = await supabase
     .from('milestones')
@@ -703,11 +750,11 @@ const useProjectStore = create(
         set((s) => { s.syncing = true })
 
         try {
+          const localState = get()
           let { programRows, projectRows, milestoneRows } = await fetchWorkspaceProjectData(workspaceId)
           const hasRemoteData = programRows.length > 0 || projectRows.length > 0 || milestoneRows.length > 0
 
           if (!hasRemoteData) {
-            const localState = get()
             const hasLocalData =
               (localState.programs?.length ?? 0) > 0 ||
               (localState.projects?.length ?? 0) > 0 ||
@@ -722,12 +769,29 @@ const useProjectStore = create(
             }
           }
 
+          const remotePrograms = programRows.map(fromProgramRow)
+          const remoteProjects = projectRows.map(fromProjectRow)
+          const remoteMilestones = milestoneRows.map(fromMilestoneRow)
+          const mergeOptions = {
+            lastSyncedAt: localState.lastSyncedAt,
+            syncError: localState.syncError,
+          }
+          const mergedPrograms = mergeRemoteFirst(remotePrograms, localState.programs ?? [], mergeOptions)
+          const mergedProjects = mergeRemoteFirst(remoteProjects, localState.projects ?? [], mergeOptions)
+          const mergedMilestones = mergeRemoteFirst(remoteMilestones, localState.milestones ?? [], mergeOptions)
+
           set((s) => {
-            s.programs = programRows.map(fromProgramRow)
-            s.projects = projectRows.map(fromProjectRow)
-            s.milestones = milestoneRows.map(fromMilestoneRow)
+            s.programs = mergedPrograms.items
+            s.projects = mergedProjects.items
+            s.milestones = mergedMilestones.items
           })
           markProjectSyncSuccess(set)
+
+          if (mergedPrograms.preservedCount > 0 || mergedProjects.preservedCount > 0 || mergedMilestones.preservedCount > 0) {
+            void get().migrateLocalToSupabase(workspaceId)
+              .then(() => markProjectSyncSuccess(set))
+              .catch((error) => reportProjectSyncError(set, error, 'reconcile local program data'))
+          }
         } catch (error) {
           reportProjectSyncError(set, error, 'load projects and milestones')
         } finally {
