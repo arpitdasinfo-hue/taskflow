@@ -125,6 +125,43 @@ const SignalButton = memo(function SignalButton({ label, value, tone = 'default'
   )
 })
 
+const InsightCard = memo(function InsightCard({
+  label,
+  title,
+  detail,
+  tone = 'default',
+  actionLabel = null,
+  onAction = null,
+}) {
+  const palette = METRIC_TONE[tone] ?? METRIC_TONE.default
+  return (
+    <div
+      className="rounded-[22px] px-4 py-4"
+      style={{ background: palette.background, border: `1px solid ${palette.border}` }}
+    >
+      <div className="text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>
+        {label}
+      </div>
+      <div className="mt-2 text-lg font-semibold leading-tight" style={{ color: palette.color }}>
+        {title}
+      </div>
+      <div className="mt-2 text-[11px] leading-6" style={{ color: 'var(--text-secondary)' }}>
+        {detail}
+      </div>
+      {actionLabel && onAction ? (
+        <button
+          type="button"
+          onClick={onAction}
+          className="mt-3 rounded-xl px-2.5 py-1.5 text-[11px] font-medium"
+          style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', color: 'var(--text-primary)' }}
+        >
+          {actionLabel}
+        </button>
+      ) : null}
+    </div>
+  )
+})
+
 const ExpandableSection = memo(function ExpandableSection({
   title,
   description = null,
@@ -183,23 +220,14 @@ const ProgramSelectorCard = memo(function ProgramSelectorCard({
   selected,
   children,
   onSelect,
-  onAddProject,
-  onOpenTasks,
-  onOpenBlocked,
-  onOpenOverdue,
-  onOpenMilestones,
-  onOpenPlanner,
-  onOpenGantt,
-  onShare,
-  onEdit,
 }) {
   const scopeConfig = PROGRAM_SCOPE_CONFIG[program.scope ?? 'professional'] ?? PROGRAM_SCOPE_CONFIG.professional
 
-  const quickSignals = [
-    { label: 'Open work', value: summary.openTasks, tone: 'accent', onClick: onOpenTasks },
-    { label: 'Blocked', value: summary.blockedTasks, tone: summary.blockedTasks > 0 ? 'warning' : 'default', onClick: onOpenBlocked },
-    { label: 'Next checkpoint', value: formatShortDate(summary.nextMilestone?.dueDate) ?? 'TBD', tone: summary.nextMilestone ? 'default' : 'warning', onClick: onOpenMilestones },
-    { label: 'Overdue', value: summary.overdueTasks, tone: summary.overdueTasks > 0 ? 'danger' : 'success', onClick: onOpenOverdue },
+  const scanSignals = [
+    { label: 'Open', value: summary.openTasks, tone: 'accent' },
+    { label: 'Blocked', value: summary.blockedTasks, tone: summary.blockedTasks > 0 ? 'warning' : 'default' },
+    { label: 'Next', value: formatShortDate(summary.nextMilestone?.dueDate) ?? 'TBD', tone: summary.nextMilestone ? 'default' : 'warning' },
+    { label: 'Risk', value: summary.risk.label, tone: toneForRisk(summary.risk.tone) },
   ]
 
   return (
@@ -262,7 +290,7 @@ const ProgramSelectorCard = memo(function ProgramSelectorCard({
             </div>
           ) : (
             <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-              {quickSignals.map((signal) => (
+              {scanSignals.map((signal) => (
                 <div
                   key={signal.label}
                   className="rounded-2xl px-3 py-3"
@@ -300,52 +328,7 @@ const ProgramSelectorCard = memo(function ProgramSelectorCard({
 
       {selected ? (
         <div className="mt-4 border-t border-white/8 pt-4">
-          <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-start">
-            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-              {quickSignals.map((signal) => (
-                <SignalButton
-                  key={signal.label}
-                  label={signal.label}
-                  value={signal.value}
-                  tone={signal.tone}
-                  onClick={signal.onClick}
-                />
-              ))}
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2 xl:justify-end">
-              <ActionButton accent onClick={onAddProject}>
-                <span className="inline-flex items-center gap-1.5">
-                  <FolderPlus size={12} />
-                  Add project
-                </span>
-              </ActionButton>
-              <ActionButton onClick={onOpenTasks}>Tasks</ActionButton>
-              <ActionButton onClick={onOpenPlanner}>Planner</ActionButton>
-              <ActionButton onClick={onOpenGantt}>
-                <span className="inline-flex items-center gap-1.5">
-                  <CalendarRange size={12} />
-                  Timeline
-                </span>
-              </ActionButton>
-              {onShare ? (
-                <ActionButton onClick={onShare}>
-                  <span className="inline-flex items-center gap-1.5">
-                    <Share2 size={12} />
-                    Share
-                  </span>
-                </ActionButton>
-              ) : null}
-              <ActionButton onClick={onEdit}>
-                <span className="inline-flex items-center gap-1.5">
-                  <Pencil size={12} />
-                  Edit
-                </span>
-              </ActionButton>
-            </div>
-          </div>
-
-          <div className="mt-4 space-y-3">
+          <div className="space-y-3">
             {children}
           </div>
         </div>
@@ -353,6 +336,68 @@ const ProgramSelectorCard = memo(function ProgramSelectorCard({
     </GlassCard>
   )
 })
+
+const getRecommendedAction = ({ summary, topLevelProjectCount }) => {
+  if (!summary) return null
+
+  if (topLevelProjectCount === 0) {
+    return {
+      tone: 'accent',
+      title: 'Build structure',
+      detail: 'Add the first project so ownership, milestones, and task drilldowns have a clear home.',
+      actionLabel: 'Add project',
+      kind: 'add-project',
+    }
+  }
+
+  if (summary.programMilestones.length === 0) {
+    return {
+      tone: 'warning',
+      title: 'Create a checkpoint',
+      detail: 'This program has no milestones yet, so delivery has no shared date anchor.',
+      actionLabel: 'Open milestones',
+      kind: 'open-milestones',
+    }
+  }
+
+  if (summary.overdueTasks > 0) {
+    return {
+      tone: 'danger',
+      title: 'Recover slipped work',
+      detail: `${summary.overdueTasks} overdue task${summary.overdueTasks === 1 ? '' : 's'} need replanning before the roadmap stays trustworthy.`,
+      actionLabel: 'Open overdue',
+      kind: 'open-overdue',
+    }
+  }
+
+  if (summary.blockedTasks > 0) {
+    return {
+      tone: 'warning',
+      title: 'Unblock delivery',
+      detail: `${summary.blockedTasks} blocked task${summary.blockedTasks === 1 ? '' : 's'} need a decision, dependency clear, or owner handoff.`,
+      actionLabel: 'Open blocked',
+      kind: 'open-blocked',
+    }
+  }
+
+  if (summary.unscheduledTasks > 0) {
+    return {
+      tone: 'warning',
+      title: 'Schedule the roadmap',
+      detail: `${summary.unscheduledTasks} task${summary.unscheduledTasks === 1 ? '' : 's'} still need dates to appear cleanly in timeline views.`,
+      actionLabel: 'Open unscheduled',
+      kind: 'open-unscheduled',
+    }
+  }
+
+  return {
+    tone: 'success',
+    title: 'Keep momentum',
+    detail: 'Delivery looks healthy. Review active work and the next checkpoint to keep the program moving.',
+    actionLabel: 'Open tasks',
+    kind: 'open-tasks',
+  }
+}
 
 const RiskRow = memo(function RiskRow({ label, value, detail, tone = 'default', onClick }) {
   const palette = METRIC_TONE[tone] ?? METRIC_TONE.default
@@ -697,6 +742,11 @@ const Projects = memo(function Projects() {
     new Date(milestone.dueDate) < new Date()
   ).length ?? 0
 
+  const recommendedAction = useMemo(
+    () => getRecommendedAction({ summary: programSummary, topLevelProjectCount: topLevelProjects.length }),
+    [programSummary, topLevelProjects.length]
+  )
+
   const openProgramTasks = (drilldown = null, programId = selectedProgram?.id ?? null) => {
     if (!programId) return
     clearTaskDrilldown()
@@ -769,6 +819,31 @@ const Projects = memo(function Projects() {
       setActiveProject(nextProjectId)
     }
     milestonesSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
+  const runRecommendedAction = () => {
+    if (!recommendedAction || !selectedProgram) return
+
+    switch (recommendedAction.kind) {
+      case 'add-project':
+        setProjectDrawer({ mode: 'create', lockedProgramId: selectedProgram.id })
+        break
+      case 'open-milestones':
+        focusMilestones(programSummary?.nextMilestone?.projectId ?? null)
+        break
+      case 'open-overdue':
+        openProgramTasks('overdue')
+        break
+      case 'open-blocked':
+        openProgramTasks('blocked')
+        break
+      case 'open-unscheduled':
+        openProgramTasks('unscheduled')
+        break
+      case 'open-tasks':
+      default:
+        openProgramTasks('open')
+    }
   }
 
   const handleProgramSubmit = (values) => {
@@ -899,21 +974,119 @@ const Projects = memo(function Projects() {
                   summary={summary}
                   selected={isSelected}
                   onSelect={() => focusProgram(program.id)}
-                  onAddProject={() => setProjectDrawer({ mode: 'create', lockedProgramId: program.id })}
-                  onOpenTasks={() => openProgramTasks('open', program.id)}
-                  onOpenBlocked={() => openProgramTasks('blocked', program.id)}
-                  onOpenOverdue={() => openProgramTasks('overdue', program.id)}
-                  onOpenMilestones={() => focusMilestones(summary.nextMilestone?.projectId ?? null)}
-                  onOpenPlanner={() => openPlanner()}
-                  onOpenGantt={() => openGantt()}
-                  onShare={(program.scope ?? 'professional') === 'professional' ? () => setShareProgram(program) : null}
-                  onEdit={() => setProgramDrawer({ mode: 'edit', program })}
                 >
                   {isSelected ? (
                     <>
                       <ExpandableSection
+                        title="Summary"
+                        description="Understand the program once, then move straight into the next action."
+                        actions={(
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => setProjectDrawer({ mode: 'create', lockedProgramId: program.id })}
+                              className="btn-accent px-3 py-2 text-xs"
+                            >
+                              <span className="inline-flex items-center gap-1.5">
+                                <FolderPlus size={12} />
+                                Add project
+                              </span>
+                            </button>
+                            <ActionButton onClick={() => openProgramTasks('open')}>Tasks</ActionButton>
+                            <ActionButton onClick={() => openPlanner()}>Planner</ActionButton>
+                            <ActionButton onClick={() => openGantt()}>
+                              <span className="inline-flex items-center gap-1.5">
+                                <CalendarRange size={12} />
+                                Timeline
+                              </span>
+                            </ActionButton>
+                            {(program.scope ?? 'professional') === 'professional' ? (
+                              <ActionButton onClick={() => setShareProgram(program)}>
+                                <span className="inline-flex items-center gap-1.5">
+                                  <Share2 size={12} />
+                                  Share
+                                </span>
+                              </ActionButton>
+                            ) : null}
+                            <ActionButton onClick={() => setProgramDrawer({ mode: 'edit', program })}>
+                              <span className="inline-flex items-center gap-1.5">
+                                <Pencil size={12} />
+                                Edit
+                              </span>
+                            </ActionButton>
+                          </>
+                        )}
+                        defaultOpen
+                      >
+                        <div className="grid gap-3 xl:grid-cols-3">
+                          <InsightCard
+                            label="Health"
+                            title={programSummary.risk.label}
+                            detail={programSummary.risk.detail}
+                            tone={toneForRisk(programSummary.risk.tone)}
+                            actionLabel={programSummary.overdueTasks > 0 ? 'Open overdue' : programSummary.blockedTasks > 0 ? 'Open blocked' : 'Open tasks'}
+                            onAction={() => {
+                              if (programSummary.overdueTasks > 0) openProgramTasks('overdue')
+                              else if (programSummary.blockedTasks > 0) openProgramTasks('blocked')
+                              else openProgramTasks('open')
+                            }}
+                          />
+                          <InsightCard
+                            label="Next checkpoint"
+                            title={programSummary.nextMilestone ? programSummary.nextMilestone.name : 'No checkpoint yet'}
+                            detail={programSummary.nextMilestone
+                              ? `Due ${formatShortDate(programSummary.nextMilestone.dueDate) ?? 'TBD'} in ${projectById.get(programSummary.nextMilestone.projectId)?.name ?? 'this program'}.`
+                              : 'Add the first milestone so the program has a visible delivery target.'}
+                            tone={programSummary.nextMilestone ? 'default' : 'warning'}
+                            actionLabel={programSummary.nextMilestone ? 'Open timeline' : 'Open milestones'}
+                            onAction={() => {
+                              if (programSummary.nextMilestone) openGantt()
+                              else focusMilestones()
+                            }}
+                          />
+                          {recommendedAction ? (
+                            <InsightCard
+                              label="Recommended next move"
+                              title={recommendedAction.title}
+                              detail={recommendedAction.detail}
+                              tone={recommendedAction.tone}
+                              actionLabel={recommendedAction.actionLabel}
+                              onAction={runRecommendedAction}
+                            />
+                          ) : null}
+                        </div>
+
+                        <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                          <SignalButton
+                            label="Open work"
+                            value={programSummary.openTasks}
+                            tone="accent"
+                            onClick={() => openProgramTasks('open')}
+                          />
+                          <SignalButton
+                            label="Blocked"
+                            value={programSummary.blockedTasks}
+                            tone={programSummary.blockedTasks > 0 ? 'warning' : 'default'}
+                            onClick={() => openProgramTasks('blocked')}
+                          />
+                          <SignalButton
+                            label="Overdue"
+                            value={programSummary.overdueTasks}
+                            tone={programSummary.overdueTasks > 0 ? 'danger' : 'success'}
+                            onClick={() => openProgramTasks('overdue')}
+                          />
+                          <SignalButton
+                            label="Unscheduled"
+                            value={programSummary.unscheduledTasks}
+                            tone={programSummary.unscheduledTasks > 0 ? 'warning' : 'default'}
+                            onClick={() => openProgramTasks('unscheduled')}
+                          />
+                        </div>
+                      </ExpandableSection>
+
+                      <ExpandableSection
                         title="Projects"
-                        description="Structure belongs here. Expand the program, review owners, and add sub-projects only where the hierarchy helps."
+                        description="Use structure for ownership and navigation, then jump into project-level execution only when needed."
                         actions={(
                           <button
                             type="button"
@@ -928,6 +1101,14 @@ const Projects = memo(function Projects() {
                         )}
                         defaultOpen
                       >
+                        <div className="mb-3 flex flex-wrap gap-2">
+                          <MetaChip tone="accent">{topLevelProjects.length} top-level</MetaChip>
+                          <MetaChip>{programProjects.length} total projects</MetaChip>
+                          <MetaChip tone={programProjects.length > topLevelProjects.length ? 'default' : 'success'}>
+                            {programProjects.length - topLevelProjects.length} sub-projects
+                          </MetaChip>
+                        </div>
+
                         {topLevelProjects.length === 0 ? (
                           <EmptyState
                             icon={FolderGit2}
@@ -972,7 +1153,7 @@ const Projects = memo(function Projects() {
                       <div ref={milestonesSectionRef}>
                         <ExpandableSection
                           title="Milestones"
-                          description="Keep checkpoints inside the program so upcoming dates and milestone edits stay together."
+                          description="Track upcoming checkpoints on the left and edit the selected project’s milestones on the right."
                           actions={(
                             <>
                               <ActionButton onClick={() => openProgramTasks('overdue')}>Overdue tasks</ActionButton>
@@ -1063,72 +1244,71 @@ const Projects = memo(function Projects() {
                       </div>
 
                       <ExpandableSection
-                        title="Delivery"
-                        description="Keep risks and recent updates inside the program so the screen leads to the next action."
+                        title="Risks"
+                        description="Surface the operational issues that need a decision, replan, or unblock."
                         actions={(
                           <>
                             <ActionButton onClick={() => openProgramTasks('open')}>Open tasks</ActionButton>
                             <ActionButton onClick={() => openPlanner()}>Planner</ActionButton>
                           </>
                         )}
+                        defaultOpen={programSummary.risk.tone === 'warning' || programSummary.risk.tone === 'danger'}
+                      >
+                        <div className="space-y-2">
+                          <RiskRow
+                            label="Blocked work"
+                            value={String(programSummary.blockedTasks)}
+                            detail="Open the task list with only blocked work in this program."
+                            tone={programSummary.blockedTasks > 0 ? 'warning' : 'default'}
+                            onClick={() => openProgramTasks('blocked')}
+                          />
+                          <RiskRow
+                            label="Overdue tasks"
+                            value={String(programSummary.overdueTasks)}
+                            detail="Review slipped deadlines before updating the roadmap."
+                            tone={programSummary.overdueTasks > 0 ? 'danger' : 'default'}
+                            onClick={() => openProgramTasks('overdue')}
+                          />
+                          <RiskRow
+                            label="Unscheduled tasks"
+                            value={String(programSummary.unscheduledTasks)}
+                            detail="Fill in start and due dates for work the roadmap still cannot place."
+                            tone={programSummary.unscheduledTasks > 0 ? 'warning' : 'default'}
+                            onClick={() => openProgramTasks('unscheduled')}
+                          />
+                          <RiskRow
+                            label="Critical tasks"
+                            value={String(programSummary.criticalTasks)}
+                            detail="Go straight to the highest-risk tasks in this program."
+                            tone={programSummary.criticalTasks > 0 ? 'danger' : 'default'}
+                            onClick={() => openProgramTasks('critical')}
+                          />
+                        </div>
+                      </ExpandableSection>
+
+                      <ExpandableSection
+                        title="Recent activity"
+                        description="Use the latest changes to restore context quickly without opening every project."
+                        actions={<ActionButton onClick={() => openProgramTasks('open')}>Open tasks</ActionButton>}
                         defaultOpen={false}
                       >
-                        <div className="grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
-                          <div className="space-y-2">
-                            <div className="text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>
-                              Needs attention
+                        <div className="space-y-2">
+                          {recentActivity.length ? (
+                            recentActivity.map((entry) => (
+                              <ActivityRow
+                                key={entry.id}
+                                entry={entry}
+                                onOpen={() => openActivityTask(entry)}
+                              />
+                            ))
+                          ) : (
+                            <div
+                              className="rounded-2xl px-3 py-4 text-sm"
+                              style={{ background: 'rgba(255,255,255,0.025)', border: '1px dashed rgba(255,255,255,0.1)', color: 'var(--text-secondary)' }}
+                            >
+                              No recent activity in this program yet.
                             </div>
-                            <RiskRow
-                              label="Blocked work"
-                              value={String(programSummary.blockedTasks)}
-                              detail="Open the task list with only blocked work in this program."
-                              tone={programSummary.blockedTasks > 0 ? 'warning' : 'default'}
-                              onClick={() => openProgramTasks('blocked')}
-                            />
-                            <RiskRow
-                              label="Overdue tasks"
-                              value={String(programSummary.overdueTasks)}
-                              detail="Review slipped deadlines before updating the roadmap."
-                              tone={programSummary.overdueTasks > 0 ? 'danger' : 'default'}
-                              onClick={() => openProgramTasks('overdue')}
-                            />
-                            <RiskRow
-                              label="Unscheduled tasks"
-                              value={String(programSummary.unscheduledTasks)}
-                              detail="Fill in start and due dates for work the roadmap still cannot place."
-                              tone={programSummary.unscheduledTasks > 0 ? 'warning' : 'default'}
-                              onClick={() => openProgramTasks('unscheduled')}
-                            />
-                            <RiskRow
-                              label="Critical tasks"
-                              value={String(programSummary.criticalTasks)}
-                              detail="Go straight to the highest-risk tasks in this program."
-                              tone={programSummary.criticalTasks > 0 ? 'danger' : 'default'}
-                              onClick={() => openProgramTasks('critical')}
-                            />
-                          </div>
-
-                          <div className="space-y-2">
-                            <div className="text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>
-                              Recent updates
-                            </div>
-                            {recentActivity.length ? (
-                              recentActivity.map((entry) => (
-                                <ActivityRow
-                                  key={entry.id}
-                                  entry={entry}
-                                  onOpen={() => openActivityTask(entry)}
-                                />
-                              ))
-                            ) : (
-                              <div
-                                className="rounded-2xl px-3 py-4 text-sm"
-                                style={{ background: 'rgba(255,255,255,0.025)', border: '1px dashed rgba(255,255,255,0.1)', color: 'var(--text-secondary)' }}
-                              >
-                                No recent activity in this program yet.
-                              </div>
-                            )}
-                          </div>
+                          )}
                         </div>
                       </ExpandableSection>
                     </>
