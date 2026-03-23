@@ -6,13 +6,12 @@ export const SHARE_STATUS = {
 }
 
 export const SHARE_MODULE_OPTIONS = [
-  { key: 'overview', label: 'Executive Summary' },
-  { key: 'analytics', label: 'Portfolio Summary' },
-  { key: 'gantt', label: 'Timeline View' },
-  { key: 'details', label: 'Context Notes' },
-  { key: 'projects', label: 'Delivery Overview' },
-  { key: 'tasks', label: 'Execution Watchlist' },
-  { key: 'milestones', label: 'Milestone Tracker' },
+  { key: 'overview', label: 'Summary' },
+  { key: 'analytics', label: 'Portfolio' },
+  { key: 'projects', label: 'Delivery' },
+  { key: 'tasks', label: 'Watchlist' },
+  { key: 'milestones', label: 'Milestones' },
+  { key: 'gantt', label: 'Timeline' },
   { key: 'dependencies', label: 'Dependency Signals' },
 ]
 
@@ -36,11 +35,10 @@ export const DEFAULT_SHARE_CONFIG = {
   modules: {
     overview: true,
     analytics: true,
-    gantt: false,
-    details: false,
     projects: true,
     tasks: false,
     milestones: true,
+    gantt: false,
     dependencies: false,
   },
   filters: {
@@ -56,12 +54,16 @@ const uniq = (items) => [...new Set((items ?? []).filter(Boolean))]
 
 export const normalizeShareConfig = (raw) => {
   const candidate = raw && typeof raw === 'object' ? raw : {}
+  const normalizedModules = {
+    ...DEFAULT_SHARE_CONFIG.modules,
+    ...(candidate.modules && typeof candidate.modules === 'object' ? candidate.modules : {}),
+  }
+
+  delete normalizedModules.details
+
   return {
     layout: candidate.layout === 'manager' ? 'manager' : DEFAULT_SHARE_CONFIG.layout,
-    modules: {
-      ...DEFAULT_SHARE_CONFIG.modules,
-      ...(candidate.modules && typeof candidate.modules === 'object' ? candidate.modules : {}),
-    },
+    modules: normalizedModules,
     filters: {
       includeCompleted: candidate?.filters?.includeCompleted ?? DEFAULT_SHARE_CONFIG.filters.includeCompleted,
       status: uniq(candidate?.filters?.status),

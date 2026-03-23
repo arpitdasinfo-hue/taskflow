@@ -316,7 +316,7 @@ const ShareModal = memo(function ShareModal({ resourceType, resourceId, resource
                 Share {resourceLabel} View
               </p>
               <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>
-                Share a leadership-ready view with configurable sections, filters, and timeline access.
+                Share a clean manager-ready view with configurable sections, filters, and optional timeline access.
               </p>
             </div>
             <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/10" style={{ color: 'var(--text-secondary)' }}>

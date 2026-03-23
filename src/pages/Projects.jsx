@@ -79,42 +79,6 @@ const toneForRisk = (tone) => {
   return 'default'
 }
 
-const MetricPill = memo(function MetricPill({
-  label,
-  value,
-  tone = 'default',
-  onClick = null,
-  compact = false,
-  stopPropagation = false,
-}) {
-  const palette = METRIC_TONE[tone] ?? METRIC_TONE.default
-  const Component = onClick ? 'button' : 'div'
-
-  return (
-    <Component
-      type={onClick ? 'button' : undefined}
-      onClick={onClick
-        ? (event) => {
-            if (stopPropagation) event.stopPropagation()
-            onClick(event)
-          }
-        : undefined}
-      className={`rounded-2xl px-3 ${compact ? 'py-2' : 'py-3'} ${onClick ? 'text-left transition-transform hover:-translate-y-0.5' : ''}`}
-      style={{
-        background: palette.background,
-        border: `1px solid ${palette.border}`,
-      }}
-    >
-      <div className="text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>
-        {label}
-      </div>
-      <div className={`mt-1 ${compact ? 'text-sm' : 'text-base'} font-semibold`} style={{ color: palette.color }}>
-        {value}
-      </div>
-    </Component>
-  )
-})
-
 const ActionButton = memo(function ActionButton({ children, onClick, accent = false }) {
   return (
     <button
@@ -142,37 +106,15 @@ const MetaChip = memo(function MetaChip({ children, tone = 'default' }) {
   )
 })
 
-const SignalChip = memo(function SignalChip({ label, value, tone = 'default', onClick = null }) {
-  const palette = METRIC_TONE[tone] ?? METRIC_TONE.default
-  const Component = onClick ? 'button' : 'div'
-
-  return (
-    <Component
-      type={onClick ? 'button' : undefined}
-      onClick={onClick ?? undefined}
-      className={`rounded-2xl px-3 py-2.5 min-w-[112px] text-left ${onClick ? 'transition-transform hover:-translate-y-0.5' : ''}`}
-      style={{ background: palette.background, color: palette.color, border: `1px solid ${palette.border}` }}
-    >
-      <div className="text-[10px] font-semibold uppercase tracking-[0.2em]" style={{ color: 'var(--text-secondary)' }}>
-        {label}
-      </div>
-      <div className="mt-1 text-sm font-semibold">{value}</div>
-    </Component>
-  )
-})
-
 const ProgramSelectorCard = memo(function ProgramSelectorCard({
   program,
   summary,
   selected,
   onSelect,
   onOpenTasks,
-  onOpenBlocked,
   onOpenMilestones,
-  onOpenRisk,
 }) {
   const scopeConfig = PROGRAM_SCOPE_CONFIG[program.scope ?? 'professional'] ?? PROGRAM_SCOPE_CONFIG.professional
-  const riskTone = toneForRisk(summary.risk.tone)
 
   const handleKeyDown = (event) => {
     if (event.key === 'Enter' || event.key === ' ') {
@@ -193,11 +135,11 @@ const ProgramSelectorCard = memo(function ProgramSelectorCard({
       style={{
         background: selected ? `${program.color}12` : 'rgba(255,255,255,0.024)',
         border: `1px solid ${selected ? `${program.color}55` : 'rgba(255,255,255,0.08)'}`,
-        boxShadow: selected ? `0 10px 28px ${program.color}18` : 'none',
+        boxShadow: selected ? `0 8px 24px ${program.color}18` : 'none',
       }}
     >
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
+      <div className="flex flex-col gap-3 xl:grid xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_auto] xl:items-center">
+        <div className="min-w-0">
           <div className="flex items-center gap-3">
             <div
               className="h-3 w-3 rounded-full flex-shrink-0"
@@ -215,147 +157,146 @@ const ProgramSelectorCard = memo(function ProgramSelectorCard({
                 >
                   {scopeConfig.label}
                 </span>
+                {selected ? <MetaChip tone="accent">Current focus</MetaChip> : null}
               </div>
               <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px]" style={{ color: 'var(--text-secondary)' }}>
                 <span>{summary.topLevelProjects.length} projects</span>
-                <span>{summary.programMilestones.length} milestones</span>
+                <span>{summary.openTasks} open tasks</span>
                 <span>{summary.scheduleLabel}</span>
               </div>
             </div>
           </div>
-          {program.description ? (
-            <p className="mt-3 line-clamp-2 text-sm leading-6" style={{ color: 'var(--text-secondary)' }}>
-              {program.description}
-            </p>
-          ) : null}
-          <div className="mt-4 flex flex-wrap gap-2">
-            <SignalChip label="Open" value={String(summary.openTasks)} tone="accent" onClick={onOpenTasks} />
-            <SignalChip label="Blocked" value={String(summary.blockedTasks)} tone={summary.blockedTasks > 0 ? 'warning' : 'default'} onClick={onOpenBlocked} />
-            <SignalChip label="Next" value={formatShortDate(summary.nextMilestone?.dueDate) ?? 'TBD'} onClick={onOpenMilestones} />
-            <SignalChip label="Risk" value={summary.risk.label} tone={riskTone} onClick={onOpenRisk} />
-          </div>
         </div>
-        <span
-          className="rounded-full px-3 py-1.5 text-[10px] font-semibold flex-shrink-0 self-start"
-          style={selected
-            ? { background: `${program.color}20`, color: program.color, border: `1px solid ${program.color}30` }
-            : { background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)', border: '1px solid rgba(255,255,255,0.08)' }}
-        >
-          {selected ? 'Focused' : 'Select'}
-        </span>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <MetaChip>{summary.programMilestones.length} milestones</MetaChip>
+          <MetaChip>{summary.nextMilestone ? `${summary.nextMilestone.name} · ${formatShortDate(summary.nextMilestone.dueDate) ?? 'TBD'}` : 'No checkpoint yet'}</MetaChip>
+          <MetaChip tone={toneForRisk(summary.risk.tone)}>{summary.risk.label}</MetaChip>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 xl:justify-end">
+          {!selected ? (
+            <ActionButton accent onClick={(event) => {
+              event.stopPropagation()
+              onSelect()
+            }}
+            >
+              Focus
+            </ActionButton>
+          ) : null}
+          <ActionButton onClick={(event) => {
+            event.stopPropagation()
+            onOpenTasks()
+          }}
+          >
+            Tasks
+          </ActionButton>
+          <ActionButton onClick={(event) => {
+            event.stopPropagation()
+            onOpenMilestones()
+          }}
+          >
+            Milestones
+          </ActionButton>
+        </div>
       </div>
     </GlassCard>
   )
 })
 
-const ProgramSummaryBar = memo(function ProgramSummaryBar({
+const ProgramHero = memo(function ProgramHero({
   program,
   summary,
+  standaloneProjectCount,
+  onCreateProgram,
+  onAddProject,
   onOpenTasks,
   onOpenBlocked,
   onOpenOverdue,
   onOpenPlanner,
   onOpenGantt,
-  onAddProject,
   onShare,
   onEdit,
-  onJumpStructure,
-  onJumpMilestones,
-  onJumpDelivery,
 }) {
   const scopeConfig = PROGRAM_SCOPE_CONFIG[program.scope ?? 'professional'] ?? PROGRAM_SCOPE_CONFIG.professional
 
   return (
-    <GlassCard
-      padding="p-4 md:p-5"
-      rounded="rounded-[28px]"
-      style={{ background: 'rgba(255,255,255,0.028)', border: '1px solid rgba(255,255,255,0.08)' }}
-    >
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-        <div className="min-w-0 flex-1">
-          <div className="text-[10px] font-semibold uppercase tracking-[0.24em]" style={{ color: 'var(--text-secondary)' }}>
-            Selected Program
-          </div>
-          <div className="flex items-center gap-3">
-            <div
-              className="h-3 w-3 rounded-full flex-shrink-0"
-              style={{ background: program.color, boxShadow: `0 0 12px ${program.color}55` }}
-            />
-            <div className="min-w-0">
-              <h2 className="text-[1.75rem] font-bold leading-tight" style={{ color: 'var(--text-primary)' }}>
-                {program.name}
-              </h2>
-            </div>
-          </div>
-          <p className="mt-3 max-w-3xl text-sm leading-7" style={{ color: 'var(--text-secondary)' }}>
-            {program.description || `Review structure, milestones, and delivery health for ${program.name}.`}
-          </p>
-          <div className="mt-4 flex flex-wrap items-center gap-2">
-            <ProgramStatusBadge status={program.status || 'planning'} />
-            <span
-              className="rounded-full px-2.5 py-1 text-[10px] font-semibold"
-              style={{ background: scopeConfig.background, color: scopeConfig.color }}
-            >
-              {scopeConfig.label}
+    <PageHero
+      eyebrow="Programs"
+      title={program.name}
+      description={program.description || `Use this workspace to shape structure, checkpoints, and delivery for ${program.name}.`}
+      minimal
+      stats={[
+        { label: 'Open work', value: summary.openTasks, tone: 'accent', onClick: onOpenTasks },
+        { label: 'Blocked', value: summary.blockedTasks, tone: summary.blockedTasks > 0 ? 'danger' : 'default', onClick: onOpenBlocked },
+        { label: 'Next checkpoint', value: formatShortDate(summary.nextMilestone?.dueDate) ?? 'TBD', onClick: onOpenGantt },
+        { label: 'Overdue', value: summary.overdueTasks, tone: summary.overdueTasks > 0 ? 'danger' : 'success', onClick: onOpenOverdue },
+      ]}
+      actions={(
+        <>
+          <button
+            type="button"
+            onClick={onCreateProgram}
+            className="btn-accent px-3 py-2 text-xs"
+          >
+            <span className="inline-flex items-center gap-1.5">
+              <Plus size={12} />
+              New program
             </span>
-            <MetaChip>{summary.scheduleLabel}</MetaChip>
-            <MetaChip>{summary.topLevelProjects.length} projects</MetaChip>
-            <MetaChip>{summary.programMilestones.length} milestones</MetaChip>
-            <MetaChip tone={toneForRisk(summary.risk.tone)}>{summary.risk.label}</MetaChip>
-          </div>
-          <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-            <MetricPill label="Open work" value={String(summary.openTasks)} tone="accent" onClick={onOpenTasks} />
-            <MetricPill label="Blocked" value={String(summary.blockedTasks)} tone={summary.blockedTasks > 0 ? 'warning' : 'default'} onClick={onOpenBlocked} />
-            <MetricPill label="Next milestone" value={formatShortDate(summary.nextMilestone?.dueDate) ?? 'TBD'} onClick={onJumpMilestones} />
-            <MetricPill label="Overdue" value={String(summary.overdueTasks)} tone={summary.overdueTasks > 0 ? 'danger' : 'default'} onClick={onOpenOverdue} />
-          </div>
+          </button>
+          <ActionButton onClick={onAddProject}>
+            <span className="inline-flex items-center gap-1.5">
+              <FolderPlus size={12} />
+              Add project
+            </span>
+          </ActionButton>
+          <ActionButton onClick={onOpenTasks}>Open tasks</ActionButton>
+        </>
+      )}
+    >
+      <div className="space-y-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <ProgramStatusBadge status={program.status || 'planning'} />
+          <span
+            className="rounded-full px-2.5 py-1 text-[10px] font-semibold"
+            style={{ background: scopeConfig.background, color: scopeConfig.color }}
+          >
+            {scopeConfig.label}
+          </span>
+          <MetaChip>{summary.scheduleLabel}</MetaChip>
+          <MetaChip>{summary.topLevelProjects.length} projects</MetaChip>
+          <MetaChip>{summary.programMilestones.length} milestones</MetaChip>
+          <MetaChip tone={toneForRisk(summary.risk.tone)}>{summary.risk.label}</MetaChip>
+          {standaloneProjectCount > 0 ? (
+            <MetaChip>{standaloneProjectCount} standalone outside programs</MetaChip>
+          ) : null}
         </div>
 
-        <div className="xl:w-[420px] xl:flex-shrink-0">
-          <div className="rounded-[24px] px-4 py-4" style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.08)' }}>
-            <div className="text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>
-              Attention now
-            </div>
-            <div className="mt-2 text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
-              {summary.risk.label}
-            </div>
-            <div className="mt-1 text-[12px] leading-6" style={{ color: 'var(--text-secondary)' }}>
-              {summary.risk.detail}
-            </div>
-            <div className="mt-4 flex flex-wrap gap-2">
-              <ActionButton accent onClick={onOpenTasks}>Open tasks</ActionButton>
-              <ActionButton onClick={onOpenPlanner}>Planner</ActionButton>
-              <ActionButton onClick={onOpenGantt}>Gantt</ActionButton>
-              <ActionButton onClick={onAddProject}>
-                <span className="inline-flex items-center gap-1.5">
-                  <FolderPlus size={12} />
-                  Add project
-                </span>
-              </ActionButton>
-              {onShare ? (
-                <ActionButton onClick={onShare}>
-                  <span className="inline-flex items-center gap-1.5">
-                    <Share2 size={12} />
-                    Share
-                  </span>
-                </ActionButton>
-              ) : null}
-              <ActionButton onClick={onEdit}>
-                <span className="inline-flex items-center gap-1.5">
-                  <Pencil size={12} />
-                  Edit
-                </span>
-              </ActionButton>
-            </div>
-            <div className="mt-4 flex flex-wrap gap-2">
-              <ActionButton onClick={onJumpStructure}>Projects</ActionButton>
-              <ActionButton onClick={onJumpMilestones}>Milestones</ActionButton>
-              <ActionButton onClick={onJumpDelivery}>Delivery</ActionButton>
-            </div>
-          </div>
+        <div className="flex flex-wrap gap-2">
+          <ActionButton onClick={onOpenPlanner}>Planner</ActionButton>
+          <ActionButton onClick={onOpenGantt}>
+            <span className="inline-flex items-center gap-1.5">
+              <CalendarRange size={12} />
+              Timeline
+            </span>
+          </ActionButton>
+          {onShare ? (
+            <ActionButton onClick={onShare}>
+              <span className="inline-flex items-center gap-1.5">
+                <Share2 size={12} />
+                Share
+              </span>
+            </ActionButton>
+          ) : null}
+          <ActionButton onClick={onEdit}>
+            <span className="inline-flex items-center gap-1.5">
+              <Pencil size={12} />
+              Edit
+            </span>
+          </ActionButton>
         </div>
       </div>
-    </GlassCard>
+    </PageHero>
   )
 })
 
@@ -545,16 +486,16 @@ const ProjectTreeRow = memo(function ProjectTreeRow({
                 <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px]" style={{ color: 'var(--text-secondary)' }}>
                   <span>{summary.scheduleLabel}</span>
                   <span>{summary.childProjects.length} child {summary.childProjects.length === 1 ? 'project' : 'projects'}</span>
-                  <span>{summary.scopedMilestones.length} milestones</span>
+                  <span>{summary.openTasks} open tasks</span>
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-            <MetricPill label="Open" value={String(summary.openTasks)} tone="accent" onClick={() => onOpenTasks(project.id)} />
-            <MetricPill label="Next Milestone" value={formatShortDate(summary.nextMilestone?.dueDate) ?? 'TBD'} />
-            <MetricPill label="Risk" value={summary.risk.label} tone={toneForRisk(summary.risk.tone)} onClick={() => onOpenTasks(project.id)} />
+          <div className="flex flex-wrap items-center gap-2">
+            <MetaChip>{summary.scopedMilestones.length} milestones</MetaChip>
+            <MetaChip>{summary.nextMilestone ? `${summary.nextMilestone.name} · ${formatShortDate(summary.nextMilestone.dueDate) ?? 'TBD'}` : 'No checkpoint yet'}</MetaChip>
+            <MetaChip tone={toneForRisk(summary.risk.tone)}>{summary.risk.label}</MetaChip>
           </div>
 
           <div className="flex flex-wrap items-center gap-2 xl:justify-end">
@@ -630,9 +571,7 @@ const Projects = memo(function Projects() {
   const [projectDrawer, setProjectDrawer] = useState(null)
   const [shareProgram, setShareProgram] = useState(null)
   const [milestoneProjectId, setMilestoneProjectId] = useState('')
-  const structureSectionRef = useRef(null)
   const milestonesSectionRef = useRef(null)
-  const deliverySectionRef = useRef(null)
 
   const summaryById = useMemo(
     () => new Map(programs.map((program) => [program.id, buildProgramSummary({ program, projects, tasks, milestones })])),
@@ -655,19 +594,20 @@ const Projects = memo(function Projects() {
   }, [activeProgramId, activeProjectId, programById, programs, projectById])
 
   const programSummary = selectedProgram ? summaryById.get(selectedProgram.id) ?? null : null
-  const programProjects = programSummary?.programProjects ?? []
-  const topLevelProjects = programSummary?.topLevelProjects ?? []
+  const programProjects = useMemo(() => programSummary?.programProjects ?? [], [programSummary])
+  const topLevelProjects = useMemo(() => programSummary?.topLevelProjects ?? [], [programSummary])
   const projectSummaryById = useMemo(
     () => new Map(programProjects.map((project) => [project.id, buildProjectSummary({ project, allProjects: programProjects, tasks, milestones })])),
     [milestones, programProjects, tasks]
   )
 
-  const selectedProjectInProgram = programProjects.some((project) => project.id === activeProjectId)
-    ? activeProjectId
-    : (milestoneProjectId || topLevelProjects[0]?.id || programProjects[0]?.id || null)
+  const selectedProjectInProgram = useMemo(
+    () => (programProjects.some((project) => project.id === activeProjectId)
+      ? activeProjectId
+      : (milestoneProjectId || topLevelProjects[0]?.id || programProjects[0]?.id || null)),
+    [activeProjectId, milestoneProjectId, programProjects, topLevelProjects]
+  )
 
-  const topLevelProjectCount = projects.filter((project) => !project.parentId).length
-  const activeRiskCount = [...summaryById.values()].filter((summary) => summary.risk.tone === 'danger' || summary.risk.tone === 'warning').length
   const standaloneProjectCount = projects.filter((project) => !project.programId).length
 
   useEffect(() => {
@@ -777,14 +717,6 @@ const Projects = memo(function Projects() {
     milestonesSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
-  const focusStructure = () => {
-    structureSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  }
-
-  const focusDelivery = () => {
-    deliverySectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  }
-
   const handleProgramSubmit = (values) => {
     if (programDrawer?.mode === 'edit' && programDrawer.program) {
       updateProgram(programDrawer.program.id, values)
@@ -860,167 +792,134 @@ const Projects = memo(function Projects() {
   return (
     <div className="flex-1 overflow-y-auto px-4 md:px-6 pb-24 md:pb-8">
       <div className="space-y-4 py-2">
-        <PageHero
-          eyebrow="Programs"
-          title="Programs"
-          description={standaloneProjectCount > 0
-            ? `${standaloneProjectCount} standalone project${standaloneProjectCount === 1 ? '' : 's'} still sit outside a program. Use this workspace to focus on delivery-critical program work.`
-            : 'Choose a program, inspect delivery health, and jump straight into the next action.'}
-          minimal
-          stats={[
-            { label: 'Programs', value: programs.length, tone: 'accent' },
-            { label: 'Projects', value: topLevelProjectCount },
-            { label: 'At risk', value: activeRiskCount, tone: activeRiskCount > 0 ? 'danger' : 'success' },
-            ...(standaloneProjectCount > 0 ? [{ label: 'Standalone', value: standaloneProjectCount }] : []),
-          ]}
-          actions={(
-            <button
-              type="button"
-              onClick={() => setProgramDrawer({ mode: 'create' })}
-              className="btn-accent px-3 py-2 text-xs"
-            >
-              <span className="inline-flex items-center gap-1.5">
-                <Plus size={12} />
-                New program
-              </span>
-            </button>
-          )}
-        />
-
-        <SectionShell
-          eyebrow="Workspace"
-          title="Choose a program, then move fast"
-          description="Choose the program first. Everything below stays aligned under that selection."
-          compact
-        >
-          <div className="space-y-3">
-            {programs.map((program) => {
-              const summary = summaryById.get(program.id)
-              if (!summary) return null
-              return (
-                <ProgramSelectorCard
-                  key={program.id}
-                  program={program}
-                  summary={summary}
-                  selected={selectedProgram?.id === program.id}
-                  onSelect={() => focusProgram(program.id)}
-                  onOpenTasks={() => openProgramTasks('open', program.id)}
-                  onOpenBlocked={() => openProgramTasks('blocked', program.id)}
-                  onOpenMilestones={() => {
-                    focusProgram(program.id)
-                    focusMilestones(summary.nextMilestone?.projectId ?? null)
-                  }}
-                  onOpenRisk={() => {
-                    focusProgram(program.id)
-                    const riskDrilldown = summary.overdueTasks > 0 ? 'overdue' : summary.blockedTasks > 0 ? 'blocked' : 'open'
-                    openProgramTasks(riskDrilldown, program.id)
-                  }}
-                />
-              )
-            })}
-          </div>
-        </SectionShell>
-
         {selectedProgram && programSummary ? (
           <>
-            <ProgramSummaryBar
+            <ProgramHero
               program={selectedProgram}
               summary={programSummary}
+              standaloneProjectCount={standaloneProjectCount}
+              onCreateProgram={() => setProgramDrawer({ mode: 'create' })}
+              onAddProject={() => setProjectDrawer({ mode: 'create', lockedProgramId: selectedProgram.id })}
               onOpenTasks={() => openProgramTasks('open')}
               onOpenBlocked={() => openProgramTasks('blocked')}
               onOpenOverdue={() => openProgramTasks('overdue')}
               onOpenPlanner={() => openPlanner()}
               onOpenGantt={() => openGantt()}
-              onAddProject={() => setProjectDrawer({ mode: 'create', lockedProgramId: selectedProgram.id })}
               onShare={(selectedProgram.scope ?? 'professional') === 'professional' ? () => setShareProgram(selectedProgram) : null}
               onEdit={() => setProgramDrawer({ mode: 'edit', program: selectedProgram })}
-              onJumpStructure={focusStructure}
-              onJumpMilestones={() => focusMilestones(programSummary.nextMilestone?.projectId ?? null)}
-              onJumpDelivery={focusDelivery}
             />
 
-            <div ref={structureSectionRef}>
-              <SectionShell
-                eyebrow={selectedProgram.name}
-                title="Projects"
-                description="Projects and sub-projects stay directly under the selected program."
-                compact
-                actions={(
-                  <button
-                    type="button"
-                    onClick={() => setProjectDrawer({ mode: 'create', lockedProgramId: selectedProgram.id })}
-                    className="btn-accent px-3 py-2 text-xs"
-                  >
-                    <span className="inline-flex items-center gap-1.5">
-                      <FolderPlus size={12} />
-                      Add project
-                    </span>
-                  </button>
-                )}
-              >
-                {topLevelProjects.length === 0 ? (
-                  <EmptyState
-                    icon={FolderGit2}
-                    title="No projects in this program yet"
-                    description="Create the first project, then split into sub-projects only when the hierarchy helps execution."
-                    action={(
-                      <button
-                        type="button"
-                        onClick={() => setProjectDrawer({ mode: 'create', lockedProgramId: selectedProgram.id })}
-                        className="btn-accent px-4 py-2 text-sm"
-                      >
-                        Add first project
-                      </button>
-                    )}
-                  />
-                ) : (
-                  <div className="space-y-3">
-                    {topLevelProjects.map((project) => (
-                      <ProjectTreeRow
-                        key={project.id}
-                        project={project}
-                        summaryById={projectSummaryById}
-                        selectedProjectId={selectedProjectInProgram}
-                        onSelect={(projectId) => {
-                          setActiveProject(projectId)
-                          setMilestoneProjectId(projectId)
-                        }}
-                        onOpenTasks={(projectId) => openProjectTasks(projectId, 'open')}
-                        onOpenGantt={(projectId) => openGantt(projectId)}
-                        onAddChild={(projectId) => setProjectDrawer({
-                          mode: 'create',
-                          lockedProgramId: selectedProgram.id,
-                          initialValues: { parentId: projectId, programId: selectedProgram.id },
-                        })}
-                        onEdit={(projectToEdit) => setProjectDrawer({ mode: 'edit', project: projectToEdit })}
-                      />
-                    ))}
-                  </div>
-                )}
-              </SectionShell>
-            </div>
+            <SectionShell
+              eyebrow="Workspace"
+              title="Switch program"
+              description="Choose the program to work in. The rest of the page always stays aligned under this selection."
+              compact
+            >
+              <div className="space-y-3">
+                {programs.map((program) => {
+                  const summary = summaryById.get(program.id)
+                  if (!summary) return null
+                  return (
+                    <ProgramSelectorCard
+                      key={program.id}
+                      program={program}
+                      summary={summary}
+                      selected={selectedProgram?.id === program.id}
+                      onSelect={() => focusProgram(program.id)}
+                      onOpenTasks={() => openProgramTasks('open', program.id)}
+                      onOpenMilestones={() => {
+                        focusProgram(program.id)
+                        focusMilestones(summary.nextMilestone?.projectId ?? null)
+                      }}
+                    />
+                  )
+                })}
+              </div>
+            </SectionShell>
+
+            <SectionShell
+              eyebrow={selectedProgram.name}
+              title="Projects"
+              description="Use structure only where it helps ownership and navigation. Go to Tasks or Timeline when you need execution detail."
+              compact
+              actions={(
+                <button
+                  type="button"
+                  onClick={() => setProjectDrawer({ mode: 'create', lockedProgramId: selectedProgram.id })}
+                  className="btn-accent px-3 py-2 text-xs"
+                >
+                  <span className="inline-flex items-center gap-1.5">
+                    <FolderPlus size={12} />
+                    Add project
+                  </span>
+                </button>
+              )}
+            >
+              {topLevelProjects.length === 0 ? (
+                <EmptyState
+                  icon={FolderGit2}
+                  title="No projects in this program yet"
+                  description="Create the first project, then split into sub-projects only when the hierarchy helps execution."
+                  action={(
+                    <button
+                      type="button"
+                      onClick={() => setProjectDrawer({ mode: 'create', lockedProgramId: selectedProgram.id })}
+                      className="btn-accent px-4 py-2 text-sm"
+                    >
+                      Add first project
+                    </button>
+                  )}
+                />
+              ) : (
+                <div className="space-y-3">
+                  {topLevelProjects.map((project) => (
+                    <ProjectTreeRow
+                      key={project.id}
+                      project={project}
+                      summaryById={projectSummaryById}
+                      selectedProjectId={selectedProjectInProgram}
+                      onSelect={(projectId) => {
+                        setActiveProject(projectId)
+                        setMilestoneProjectId(projectId)
+                      }}
+                      onOpenTasks={(projectId) => openProjectTasks(projectId, 'open')}
+                      onOpenGantt={(projectId) => openGantt(projectId)}
+                      onAddChild={(projectId) => setProjectDrawer({
+                        mode: 'create',
+                        lockedProgramId: selectedProgram.id,
+                        initialValues: { parentId: projectId, programId: selectedProgram.id },
+                      })}
+                      onEdit={(projectToEdit) => setProjectDrawer({ mode: 'edit', project: projectToEdit })}
+                    />
+                  ))}
+                </div>
+              )}
+            </SectionShell>
 
             <div ref={milestonesSectionRef}>
               <SectionShell
                 eyebrow={selectedProgram.name}
                 title="Milestones"
-                description="Milestones stay aligned under the selected program and the selected project."
+                description="Track upcoming checkpoints on the left and manage the selected project's milestones on the right."
                 compact
                 actions={(
-                  <ActionButton onClick={() => openGantt()}>
-                    <span className="inline-flex items-center gap-1.5">
-                      <CalendarRange size={12} />
-                      Open gantt
-                    </span>
-                  </ActionButton>
+                  <>
+                    <ActionButton onClick={() => openProgramTasks('overdue')}>Overdue tasks</ActionButton>
+                    <ActionButton onClick={() => openGantt()}>
+                      <span className="inline-flex items-center gap-1.5">
+                        <CalendarRange size={12} />
+                        Open timeline
+                      </span>
+                    </ActionButton>
+                  </>
                 )}
               >
                 <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
                   <div className="space-y-3">
-                    <div className="grid gap-2 sm:grid-cols-3">
-                      <MetricPill label="Milestones" value={String(programSummary.programMilestones.length)} tone="accent" onClick={() => focusMilestones()} />
-                      <MetricPill label="Overdue" value={String(overdueMilestones)} tone={overdueMilestones > 0 ? 'danger' : 'default'} onClick={() => openProgramTasks('overdue')} />
-                      <MetricPill label="Completed" value={String(programSummary.completedMilestones)} tone="success" />
+                    <div className="flex flex-wrap gap-2">
+                      <MetaChip tone="accent">{programSummary.programMilestones.length} milestones</MetaChip>
+                      <MetaChip tone={overdueMilestones > 0 ? 'danger' : 'default'}>{overdueMilestones} overdue</MetaChip>
+                      <MetaChip tone="success">{programSummary.completedMilestones} completed</MetaChip>
                     </div>
 
                     {programSummary.programMilestones.length ? (
@@ -1056,7 +955,7 @@ const Projects = memo(function Projects() {
                     {programProjects.length ? (
                       <>
                         <div className="text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>
-                          Manage project milestones
+                          Edit selected project
                         </div>
                         <select
                           value={milestoneProjectId}
@@ -1071,6 +970,9 @@ const Projects = memo(function Projects() {
                             <option key={project.id} value={project.id}>{project.name}</option>
                           ))}
                         </select>
+                        <div className="mt-3 text-[11px] leading-6" style={{ color: 'var(--text-secondary)' }}>
+                          Add the next checkpoint here instead of scattering milestone edits across multiple views.
+                        </div>
                         {milestoneProjectId ? (
                           <MilestonePanel
                             projectId={milestoneProjectId}
@@ -1088,66 +990,76 @@ const Projects = memo(function Projects() {
               </SectionShell>
             </div>
 
-            <div ref={deliverySectionRef}>
-              <SectionShell
-                eyebrow={selectedProgram.name}
-                title="Delivery"
-                description="Risks and recent activity stay grouped under the same selected program."
-                compact
-              >
-                <div className="grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
-                  <div className="space-y-2">
-                    <RiskRow
-                      label="Blocked work"
-                      value={String(programSummary.blockedTasks)}
-                      detail="Open the task list with only blocked work in this program."
-                      tone={programSummary.blockedTasks > 0 ? 'warning' : 'default'}
-                      onClick={() => openProgramTasks('blocked')}
-                    />
-                    <RiskRow
-                      label="Overdue tasks"
-                      value={String(programSummary.overdueTasks)}
-                      detail="Review slipped deadlines before updating the roadmap."
-                      tone={programSummary.overdueTasks > 0 ? 'danger' : 'default'}
-                      onClick={() => openProgramTasks('overdue')}
-                    />
-                    <RiskRow
-                      label="Unscheduled tasks"
-                      value={String(programSummary.unscheduledTasks)}
-                      detail="Fill in start and due dates for work the roadmap still cannot place."
-                      tone={programSummary.unscheduledTasks > 0 ? 'warning' : 'default'}
-                      onClick={() => openProgramTasks('unscheduled')}
-                    />
-                    <RiskRow
-                      label="Critical tasks"
-                      value={String(programSummary.criticalTasks)}
-                      detail="Go straight to the highest-risk tasks in this program."
-                      tone={programSummary.criticalTasks > 0 ? 'danger' : 'default'}
-                      onClick={() => openProgramTasks('critical')}
-                    />
+            <SectionShell
+              eyebrow={selectedProgram.name}
+              title="Delivery"
+              description="Risks and recent activity stay grouped under the same selected program."
+              compact
+              actions={(
+                <>
+                  <ActionButton onClick={() => openProgramTasks('open')}>Open tasks</ActionButton>
+                  <ActionButton onClick={() => openPlanner()}>Planner</ActionButton>
+                </>
+              )}
+            >
+              <div className="grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
+                <div className="space-y-2">
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>
+                    Needs attention
                   </div>
-
-                  <div className="space-y-2">
-                    {recentActivity.length ? (
-                      recentActivity.map((entry) => (
-                        <ActivityRow
-                          key={entry.id}
-                          entry={entry}
-                          onOpen={() => openActivityTask(entry)}
-                        />
-                      ))
-                    ) : (
-                      <div
-                        className="rounded-2xl px-3 py-4 text-sm"
-                        style={{ background: 'rgba(255,255,255,0.025)', border: '1px dashed rgba(255,255,255,0.1)', color: 'var(--text-secondary)' }}
-                      >
-                        No recent activity in this program yet.
-                      </div>
-                    )}
-                  </div>
+                  <RiskRow
+                    label="Blocked work"
+                    value={String(programSummary.blockedTasks)}
+                    detail="Open the task list with only blocked work in this program."
+                    tone={programSummary.blockedTasks > 0 ? 'warning' : 'default'}
+                    onClick={() => openProgramTasks('blocked')}
+                  />
+                  <RiskRow
+                    label="Overdue tasks"
+                    value={String(programSummary.overdueTasks)}
+                    detail="Review slipped deadlines before updating the roadmap."
+                    tone={programSummary.overdueTasks > 0 ? 'danger' : 'default'}
+                    onClick={() => openProgramTasks('overdue')}
+                  />
+                  <RiskRow
+                    label="Unscheduled tasks"
+                    value={String(programSummary.unscheduledTasks)}
+                    detail="Fill in start and due dates for work the roadmap still cannot place."
+                    tone={programSummary.unscheduledTasks > 0 ? 'warning' : 'default'}
+                    onClick={() => openProgramTasks('unscheduled')}
+                  />
+                  <RiskRow
+                    label="Critical tasks"
+                    value={String(programSummary.criticalTasks)}
+                    detail="Go straight to the highest-risk tasks in this program."
+                    tone={programSummary.criticalTasks > 0 ? 'danger' : 'default'}
+                    onClick={() => openProgramTasks('critical')}
+                  />
                 </div>
-              </SectionShell>
-            </div>
+
+                <div className="space-y-2">
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>
+                    Recent updates
+                  </div>
+                  {recentActivity.length ? (
+                    recentActivity.map((entry) => (
+                      <ActivityRow
+                        key={entry.id}
+                        entry={entry}
+                        onOpen={() => openActivityTask(entry)}
+                      />
+                    ))
+                  ) : (
+                    <div
+                      className="rounded-2xl px-3 py-4 text-sm"
+                      style={{ background: 'rgba(255,255,255,0.025)', border: '1px dashed rgba(255,255,255,0.1)', color: 'var(--text-secondary)' }}
+                    >
+                      No recent activity in this program yet.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </SectionShell>
           </>
         ) : null}
       </div>

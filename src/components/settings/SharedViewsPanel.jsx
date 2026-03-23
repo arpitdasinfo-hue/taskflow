@@ -101,7 +101,7 @@ const SharedViewsPanel = memo(function SharedViewsPanel() {
             Shared view links
           </p>
           <p className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>
-            {activeCount} active view links. Links stay valid until you disable or revoke them.
+            {activeCount} active shared views. Links stay valid until you disable or revoke them.
           </p>
         </div>
         <button
@@ -126,7 +126,7 @@ const SharedViewsPanel = memo(function SharedViewsPanel() {
           className="rounded-xl p-4 text-xs"
           style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', color: 'var(--text-secondary)' }}
         >
-          No shared links yet. Create your first shared view from a program/project share button or by using "Workspace Link".
+          No shared links yet. Create your first manager-ready shared view from a program/project share button or by using "Workspace Link".
         </div>
       ) : (
         <div className="space-y-2">
