@@ -182,7 +182,6 @@ const Dashboard = memo(function Dashboard() {
   const selectTask = useSettingsStore((state) => state.selectTask)
   const setTaskDrilldown = useSettingsStore((state) => state.setTaskDrilldown)
   const clearTaskDrilldown = useSettingsStore((state) => state.clearTaskDrilldown)
-  const setAnalyticsInsight = useSettingsStore((state) => state.setAnalyticsInsight)
   const clearAnalyticsInsight = useSettingsStore((state) => state.clearAnalyticsInsight)
   const { programs, projects, milestones, tasks } = useWorkspaceScopedData()
   const commitments = usePlanningStore((state) => state.commitments)
@@ -299,9 +298,10 @@ const Dashboard = memo(function Dashboard() {
     setPage('projects')
   }
 
-  const openAnalytics = (insight) => {
+  const openProgramDetail = (programId = null) => {
     clearTaskDrilldown()
-    setAnalyticsInsight(insight)
+    clearAnalyticsInsight()
+    if (programId) setActiveProgram(programId)
     setPage('program-dashboard')
   }
 
@@ -340,8 +340,8 @@ const Dashboard = memo(function Dashboard() {
         stats={[
           { label: 'Open work', value: openTasks.length, tone: 'accent', onClick: () => openTasksView('open') },
           { label: 'This week', value: weekCommitments.length, tone: 'default', onClick: openPlanner },
-          { label: 'Next launch', value: nextMilestone ? formatShortDate(nextMilestone.dueDate) : 'None', tone: nextMilestone ? 'success' : 'default', onClick: () => openAnalytics('launch') },
-          { label: 'Risk', value: flaggedPrograms.length > 0 ? `${flaggedPrograms.length} flagged` : 'Stable', tone: flaggedPrograms.length > 0 ? 'danger' : 'success', onClick: () => openAnalytics('flagged') },
+          { label: 'Next launch', value: nextMilestone ? formatShortDate(nextMilestone.dueDate) : 'None', tone: nextMilestone ? 'success' : 'default', onClick: () => openProgramDetail(nextMilestone?.programId ?? programs[0]?.id ?? null) },
+          { label: 'Risk', value: flaggedPrograms.length > 0 ? `${flaggedPrograms.length} flagged` : 'Stable', tone: flaggedPrograms.length > 0 ? 'danger' : 'success', onClick: () => openProgramDetail(flaggedPrograms[0]?.id ?? programs[0]?.id ?? null) },
         ]}
         actions={(
           <div className="flex flex-wrap items-center gap-2">
@@ -405,8 +405,8 @@ const Dashboard = memo(function Dashboard() {
           title="Upcoming milestones"
           compact
           actions={
-            <button type="button" onClick={() => openAnalytics('launch')} className="text-xs font-medium" style={{ color: 'var(--accent)' }}>
-              Open analytics
+            <button type="button" onClick={() => openProgramDetail(nextMilestone?.programId ?? programs[0]?.id ?? null)} className="text-xs font-medium" style={{ color: 'var(--accent)' }}>
+              Open program
             </button>
           }
         >
@@ -422,7 +422,7 @@ const Dashboard = memo(function Dashboard() {
                 onOpen={() => {
                   if (milestone.programId) setActiveProgram(milestone.programId)
                   if (milestone.projectId) setActiveProject(milestone.projectId)
-                  setPage('projects')
+                  setPage('program-dashboard')
                 }}
               />
             ))}
@@ -492,8 +492,8 @@ const Dashboard = memo(function Dashboard() {
           title="Which programs need attention"
           compact
           actions={
-            <button type="button" onClick={() => openAnalytics('flagged')} className="text-xs font-medium" style={{ color: 'var(--accent)' }}>
-              Open analytics
+            <button type="button" onClick={() => openProgramDetail(flaggedPrograms[0]?.id ?? programs[0]?.id ?? null)} className="text-xs font-medium" style={{ color: 'var(--accent)' }}>
+              Open program
             </button>
           }
         >
@@ -505,7 +505,7 @@ const Dashboard = memo(function Dashboard() {
                 stats={allStats[program.id]}
                 onOpen={() => {
                   setActiveProgram(program.id)
-                  setPage('projects')
+                  setPage('program-dashboard')
                 }}
               />
             ))}

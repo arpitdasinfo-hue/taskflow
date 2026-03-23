@@ -21,6 +21,7 @@ import useTaskStore from '../store/useTaskStore'
 import usePlanningStore from '../store/usePlanningStore'
 import useWorkspaceScopedData from '../hooks/useWorkspaceScopedData'
 import useToastStore from '../store/useToastStore'
+import { getTaskProgramId } from '../lib/taskScope'
 import {
   PLANNING_BUCKET_COLORS,
   PLANNING_BUCKET_LABELS,
@@ -410,6 +411,10 @@ const Today = memo(function Today() {
   const carryForwardPeriod = usePlanningStore((state) => state.carryForwardPeriod)
   const syncScheduledCommitments = usePlanningStore((state) => state.syncScheduledCommitments)
   const selectTask = useSettingsStore((state) => state.selectTask)
+  const activeProjectId = useSettingsStore((state) => state.activeProjectId)
+  const activeProgramId = useSettingsStore((state) => state.activeProgramId)
+  const setActiveProject = useSettingsStore((state) => state.setActiveProject)
+  const setActiveProgram = useSettingsStore((state) => state.setActiveProgram)
   const { tasks: scopedTasks, programById, projectById, workspaceViewScope } = useWorkspaceScopedData()
 
   const todayBounds = getPeriodBounds('day')
@@ -417,7 +422,19 @@ const Today = memo(function Today() {
   const monthBounds = getPeriodBounds('month')
   const previousWeekBounds = getPreviousPeriodBounds('week')
   const previousMonthBounds = getPreviousPeriodBounds('month')
-  const taskById = useMemo(() => new Map(scopedTasks.filter((task) => !task.deletedAt).map((task) => [task.id, task])), [scopedTasks])
+  const planningTasks = useMemo(() => {
+    if (activeProjectId) {
+      return scopedTasks.filter((task) => task.projectId === activeProjectId)
+    }
+
+    if (activeProgramId) {
+      return scopedTasks.filter((task) => getTaskProgramId(task, projectById) === activeProgramId)
+    }
+
+    return scopedTasks
+  }, [activeProgramId, activeProjectId, projectById, scopedTasks])
+
+  const taskById = useMemo(() => new Map(planningTasks.filter((task) => !task.deletedAt).map((task) => [task.id, task])), [planningTasks])
 
   useEffect(() => {
     syncScheduledCommitments()
@@ -490,6 +507,11 @@ const Today = memo(function Today() {
 
   const activePeriodMeta = PERIOD_META[activePeriod]
   const activePeriodBounds = activePeriod === 'day' ? todayBounds : activePeriod === 'week' ? weekBounds : monthBounds
+  const activeProgram = activeProgramId ? programById.get(activeProgramId) ?? null : null
+  const activeProject = activeProjectId ? projectById.get(activeProjectId) ?? null : null
+  const plannerScopeLabel = activeProject
+    ? `${activeProgram?.name ? `${activeProgram.name} · ` : ''}${activeProject.name}`
+    : (activeProgram?.name ?? '')
   const periodCommitmentCount = useMemo(
     () => ({
       day: entriesByDroppable['day:focus'].length,
@@ -514,7 +536,7 @@ const Today = memo(function Today() {
 
   const candidateTasks = useMemo(() => {
     const normalizedQuery = candidateQuery.trim().toLowerCase()
-    const activeTasks = scopedTasks.filter((task) => !task.deletedAt && task.status !== 'done')
+    const activeTasks = planningTasks.filter((task) => !task.deletedAt && task.status !== 'done')
 
     const filtered = activeTasks.filter((task) => {
       if (!normalizedQuery) return true
@@ -540,7 +562,7 @@ const Today = memo(function Today() {
         context: resolveTaskContext(task, projectById, programById),
         projectName: task.projectId ? (projectById.get(task.projectId)?.name ?? 'Program task') : 'Program task',
       }))
-  }, [candidateQuery, scopedTasks, projectById, programById])
+  }, [candidateQuery, planningTasks, projectById, programById])
 
   const summary = useMemo(() => {
     const dayCount = entriesByDroppable['day:focus'].length
@@ -834,6 +856,27 @@ const Today = memo(function Today() {
                   <Sparkles size={13} />
                   {format(new Date(), 'EEEE, MMM d')}
                 </div>
+                {plannerScopeLabel ? (
+                  <>
+                    <span
+                      className="inline-flex items-center rounded-xl px-3 py-2 text-xs font-medium"
+                      style={{ background: 'rgba(var(--accent-rgb),0.12)', border: '1px solid rgba(var(--accent-rgb),0.18)', color: 'var(--accent)' }}
+                    >
+                      Scope: {plannerScopeLabel}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveProject(null)
+                        setActiveProgram(null)
+                      }}
+                      className="rounded-xl px-3 py-2 text-xs font-medium"
+                      style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: 'var(--text-secondary)' }}
+                    >
+                      Clear scope
+                    </button>
+                  </>
+                ) : null}
               </div>
             </div>
 
