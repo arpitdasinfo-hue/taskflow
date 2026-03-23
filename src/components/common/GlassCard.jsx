@@ -9,12 +9,14 @@ const GlassCard = memo(function GlassCard({
   padding = 'p-4',
   rounded = 'rounded-2xl',
   style,
+  ...props
 }) {
   return (
     <div
       className={`glass ${rounded} ${padding} ${hover ? 'glass-hover cursor-pointer' : ''} ${active ? 'glass-active' : ''} ${className}`}
       onClick={onClick}
       style={style}
+      {...props}
     >
       {children}
     </div>
