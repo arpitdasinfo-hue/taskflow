@@ -19,6 +19,7 @@ import useTaskStore from '../store/useTaskStore'
 import { useFilteredTasks } from '../hooks/useFilteredTasks'
 import useWorkspaceScopedData from '../hooks/useWorkspaceScopedData'
 import { getTaskProgramId } from '../lib/taskScope'
+import { collectProjectDescendantIds } from '../lib/programWorkspace'
 import useToastStore from '../store/useToastStore'
 import {
   TASK_PRIORITY_COLOR,
@@ -386,15 +387,19 @@ const Tasks = memo(function Tasks() {
   }, [activeProgramId, activeProjectId, projectById])
 
   const filteredTasks = useMemo(() => {
+    const scopedProjectIds = filterProjectId ? collectProjectDescendantIds(projects, filterProjectId) : null
     return !filterProgramId && !filterProjectId
       ? tasks
       : tasks.filter((task) => {
           const taskProgramId = getTaskProgramId(task, projectById)
           if (filterProgramId && taskProgramId !== filterProgramId) return false
-          if (filterProjectId && task.projectId !== filterProjectId) return false
+          if (filterProjectId) {
+            if (!task.projectId) return false
+            if (!scopedProjectIds?.has(task.projectId)) return false
+          }
           return true
         })
-  }, [tasks, projectById, filterProgramId, filterProjectId])
+  }, [tasks, projects, projectById, filterProgramId, filterProjectId])
 
   const tasksByStatus = useMemo(() => {
     const grouped = { todo: [], 'in-progress': [], review: [], done: [], blocked: [] }
@@ -507,7 +512,10 @@ const Tasks = memo(function Tasks() {
                 onChange={(event) => {
                   const nextProjectId = event.target.value
                   setFilterProjectId(nextProjectId)
-                  if (!nextProjectId) return
+                  if (!nextProjectId) {
+                    setActiveProject(null)
+                    return
+                  }
                   const project = projectById.get(nextProjectId)
                   if (project?.programId && project.programId !== filterProgramId) {
                     setFilterProgramId(project.programId)
@@ -537,6 +545,7 @@ const Tasks = memo(function Tasks() {
                   onClick={() => {
                     setFilterProgramId('')
                     setFilterProjectId('')
+                    setActiveProject(null)
                     setActiveProgram(null)
                   }}
                   className="px-3 py-2 rounded-xl text-xs"
