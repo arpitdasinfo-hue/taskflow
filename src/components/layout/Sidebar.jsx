@@ -2,7 +2,7 @@ import { memo, useEffect, useMemo, useState } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import {
   LayoutDashboard, ListTodo, CalendarClock, Settings2, FolderKanban,
-  Zap, ChevronLeft, ChevronRight, Folder, ChevronDown, GanttChart, LogOut, Trash2, BriefcaseBusiness, House, Activity,
+  Zap, ChevronLeft, ChevronRight, Folder, ChevronDown, BarChart3, GanttChart, LogOut, Trash2, BriefcaseBusiness, House, Activity,
 } from 'lucide-react'
 import useSettingsStore from '../../store/useSettingsStore'
 import useAuthStore from '../../store/useAuthStore'
@@ -18,6 +18,7 @@ const NAV_ITEMS = [
   { id: 'tasks',             label: 'All Tasks',  icon: ListTodo        },
   { id: 'today',             label: 'Planner',    icon: CalendarClock   },
   { id: 'projects',          label: 'Programs',   icon: FolderKanban    },
+  { id: 'program-dashboard', label: 'Analytics',  icon: BarChart3       },
   { id: 'timeline',          label: 'Gantt Chart', icon: GanttChart     },
   { id: 'activity',          label: 'Activity',   icon: Activity        },
   { id: 'trash',             label: 'Trash',      icon: Trash2          },
@@ -294,7 +295,7 @@ const Sidebar = memo(function Sidebar() {
       <nav className="px-2 space-y-0.5 mb-2">
         {NAV_ITEMS.map(({ id, label, icon: Icon }) => {
           const isActive = id === 'projects'
-            ? activePage === 'projects' || activePage === 'program-dashboard'
+            ? activePage === 'projects'
             : activePage === id && !activeProjectId && !activeProgramId
           const badge = id === 'today' && overdue > 0 ? overdue
             : id === 'tasks' && inProgress > 0 ? inProgress

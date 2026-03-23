@@ -1,1355 +1,1547 @@
-import { memo, useEffect, useMemo, useRef, useState } from 'react'
-import { formatDistanceToNow } from 'date-fns'
+import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
+import { createPortal } from 'react-dom'
 import {
-  ArrowRight,
-  CalendarRange,
-  ChevronDown,
-  FolderGit2,
-  FolderKanban,
-  FolderPlus,
-  Pencil,
-  Plus,
-  Share2,
+  Plus, Folder, FolderOpen, CheckCircle2, Clock, AlertTriangle,
+  Trash2, Check, X, ChevronDown, ChevronRight, LayoutList, Kanban,
+  Calendar, GitBranch, MoreHorizontal, Share2, GripVertical,
 } from 'lucide-react'
-import EmptyState from '../components/common/EmptyState'
 import GlassCard from '../components/common/GlassCard'
-import PageHero from '../components/common/PageHero'
-import { ProgramStatusBadge } from '../components/common/ProgramStatusBadge'
-import MilestonePanel from '../components/projects/MilestonePanel'
-import ProgramFormDrawer from '../components/projects/ProgramFormDrawer'
-import ProjectFormDrawer from '../components/projects/ProjectFormDrawer'
+import InfoTooltip from '../components/common/InfoTooltip'
+import { InlineDateChip, InlineStatusChip } from '../components/common/InlineFieldChips'
+import ColorPalettePicker from '../components/common/ColorPalettePicker'
 import ShareModal from '../components/ShareModal'
+import { ProgramStatusBadge, STATUS_CONFIG, STATUS_OPTIONS } from '../components/common/ProgramStatusBadge'
+import MilestonePanel from '../components/projects/MilestonePanel'
+import useProjectStore, { PROJECT_COLORS, PROGRAM_SCOPE_CONFIG, PROGRAM_SCOPE_OPTIONS } from '../store/useProjectStore'
+import useTaskStore from '../store/useTaskStore'
+import useSettingsStore from '../store/useSettingsStore'
+import { sortTasksByStartDate } from '../lib/taskSort'
+import { taskMatchesProgram } from '../lib/taskScope'
 import useWorkspaceScopedData from '../hooks/useWorkspaceScopedData'
 import {
-  buildProgramSummary,
-  buildProjectSummary,
-  collectProjectDescendantIds,
-  formatShortDate,
-} from '../lib/programWorkspace'
-import useActivityStore from '../store/useActivityStore'
-import useProjectStore, { PROGRAM_SCOPE_CONFIG } from '../store/useProjectStore'
-import useSettingsStore from '../store/useSettingsStore'
+  createCollapseVariants,
+  createFadeUpVariants,
+  createStaggerContainer,
+  MOTION_SPRINGS,
+} from '../lib/motion'
 
-const METRIC_TONE = {
-  default: {
-    background: 'rgba(255,255,255,0.04)',
-    border: 'rgba(255,255,255,0.08)',
-    color: 'var(--text-primary)',
-  },
-  accent: {
-    background: 'rgba(var(--accent-rgb),0.12)',
-    border: 'rgba(var(--accent-rgb),0.2)',
-    color: 'var(--accent)',
-  },
-  success: {
-    background: 'rgba(16,185,129,0.12)',
-    border: 'rgba(16,185,129,0.18)',
-    color: '#34d399',
-  },
-  warning: {
-    background: 'rgba(245,158,11,0.12)',
-    border: 'rgba(245,158,11,0.18)',
-    color: '#fbbf24',
-  },
-  danger: {
-    background: 'rgba(239,68,68,0.12)',
-    border: 'rgba(239,68,68,0.18)',
-    color: '#f87171',
-  },
+void motion
+
+const PRIORITY_COLOR = { critical: '#ef4444', high: '#f97316', medium: '#f59e0b', low: '#94a3b8' }
+const STATUS_LABEL = { todo: 'To Do', 'in-progress': 'Active', review: 'Review', done: 'Done', blocked: 'Blocked' }
+const STATUS_COLOR = { todo: '#94a3b8', 'in-progress': '#22d3ee', review: '#f59e0b', done: '#10b981', blocked: '#ef4444' }
+const DND_MIME = 'application/x-taskflow-dnd'
+let activeDragPayload = null
+
+const writeDragPayload = (event, payload) => {
+  activeDragPayload = payload
+  const raw = JSON.stringify(payload)
+  event.dataTransfer.setData(DND_MIME, raw)
+  event.dataTransfer.setData('text/plain', raw)
+  event.dataTransfer.effectAllowed = 'move'
 }
 
-const PROJECT_STATUS_META = {
-  active: { label: 'Active', color: '#22d3ee', background: 'rgba(34,211,238,0.14)' },
-  'on-hold': { label: 'On Hold', color: '#f59e0b', background: 'rgba(245,158,11,0.14)' },
-  completed: { label: 'Completed', color: '#10b981', background: 'rgba(16,185,129,0.14)' },
+const readDragPayload = (event) => {
+  const raw = event.dataTransfer.getData(DND_MIME) || event.dataTransfer.getData('text/plain')
+  if (!raw) return activeDragPayload
+  try {
+    return JSON.parse(raw)
+  } catch {
+    return activeDragPayload
+  }
 }
 
-const STATUS_LABEL = {
-  status: 'Status',
-  priority: 'Priority',
-  title: 'Title',
-  dueDate: 'Due date',
-  startDate: 'Start date',
+const createsProjectCycle = (projects, movingProjectId, nextParentId) => {
+  let cursorId = nextParentId
+  while (cursorId) {
+    if (cursorId === movingProjectId) return true
+    const cursor = projects.find((project) => project.id === cursorId)
+    cursorId = cursor?.parentId ?? null
+  }
+  return false
 }
 
-const toneForRisk = (tone) => {
-  if (tone === 'danger') return 'danger'
-  if (tone === 'warning') return 'warning'
-  if (tone === 'success') return 'success'
-  return 'default'
+const formatShortDate = (value) => {
+  if (!value) return null
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return null
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
-const ActionButton = memo(function ActionButton({ children, onClick, accent = false }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="rounded-2xl px-3 py-2 text-xs font-medium"
-      style={accent
-        ? { background: 'rgba(var(--accent-rgb),0.16)', color: 'var(--accent)', border: '1px solid rgba(var(--accent-rgb),0.2)' }
-        : { background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)', border: '1px solid rgba(255,255,255,0.08)' }}
-    >
-      {children}
-    </button>
-  )
-})
-
-const MetaChip = memo(function MetaChip({ children, tone = 'default' }) {
-  const palette = METRIC_TONE[tone] ?? METRIC_TONE.default
-  return (
-    <span
-      className="rounded-full px-2.5 py-1 text-[10px] font-semibold"
-      style={{ background: palette.background, color: palette.color, border: `1px solid ${palette.border}` }}
-    >
-      {children}
-    </span>
-  )
-})
-
-const SignalButton = memo(function SignalButton({ label, value, tone = 'default', onClick }) {
-  const palette = METRIC_TONE[tone] ?? METRIC_TONE.default
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="rounded-[22px] px-3 py-3 text-left transition-transform hover:-translate-y-0.5"
-      style={{ background: palette.background, border: `1px solid ${palette.border}` }}
-    >
-      <div className="text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>
-        {label}
-      </div>
-      <div className="mt-2 text-2xl font-bold leading-none" style={{ color: palette.color }}>
-        {value}
-      </div>
-    </button>
-  )
-})
-
-const InsightCard = memo(function InsightCard({
-  label,
-  title,
-  detail,
-  tone = 'default',
-  actionLabel = null,
-  onAction = null,
-}) {
-  const palette = METRIC_TONE[tone] ?? METRIC_TONE.default
-  return (
-    <div
-      className="rounded-[22px] px-4 py-4"
-      style={{ background: palette.background, border: `1px solid ${palette.border}` }}
-    >
-      <div className="text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>
-        {label}
-      </div>
-      <div className="mt-2 text-lg font-semibold leading-tight" style={{ color: palette.color }}>
-        {title}
-      </div>
-      <div className="mt-2 text-[11px] leading-6" style={{ color: 'var(--text-secondary)' }}>
-        {detail}
-      </div>
-      {actionLabel && onAction ? (
-        <button
-          type="button"
-          onClick={onAction}
-          className="mt-3 rounded-xl px-2.5 py-1.5 text-[11px] font-medium"
-          style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', color: 'var(--text-primary)' }}
-        >
-          {actionLabel}
-        </button>
-      ) : null}
-    </div>
-  )
-})
-
-const ExpandableSection = memo(function ExpandableSection({
-  title,
-  description = null,
-  actions = null,
-  defaultOpen = true,
-  children,
-}) {
-  const [open, setOpen] = useState(defaultOpen)
-
-  return (
-    <div
-      className="rounded-[24px] px-4 py-4"
-      style={{ background: 'rgba(255,255,255,0.022)', border: '1px solid rgba(255,255,255,0.08)' }}
-    >
-      <button
-        type="button"
-        onClick={() => setOpen((value) => !value)}
-        className="flex w-full items-start justify-between gap-3 text-left"
-      >
-        <div className="min-w-0">
-          <div className="text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>
-            {title}
-          </div>
-          {description ? (
-            <div className="mt-1 text-[11px] leading-6" style={{ color: 'var(--text-secondary)' }}>
-              {description}
-            </div>
-          ) : null}
-        </div>
-        <span
-          className="inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-[10px] font-semibold"
-          style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)' }}
-        >
-          {open ? 'Collapse' : 'Expand'}
-          <ChevronDown size={12} className={open ? 'rotate-180 transition-transform' : 'transition-transform'} />
-        </span>
-      </button>
-
-      {open ? (
-        <div className="mt-4 border-t border-white/8 pt-4">
-          {actions ? (
-            <div className="mb-3 flex items-center gap-2 flex-wrap">
-              {actions}
-            </div>
-          ) : null}
-          {children}
-        </div>
-      ) : null}
-    </div>
-  )
-})
-
-const ProgramSelectorCard = memo(function ProgramSelectorCard({
-  program,
-  summary,
-  selected,
-  children,
-  onSelect,
-}) {
-  const scopeConfig = PROGRAM_SCOPE_CONFIG[program.scope ?? 'professional'] ?? PROGRAM_SCOPE_CONFIG.professional
-
-  const scanSignals = [
-    { label: 'Open', value: summary.openTasks, tone: 'accent' },
-    { label: 'Blocked', value: summary.blockedTasks, tone: summary.blockedTasks > 0 ? 'warning' : 'default' },
-    { label: 'Next', value: formatShortDate(summary.nextMilestone?.dueDate) ?? 'TBD', tone: summary.nextMilestone ? 'default' : 'warning' },
-    { label: 'Risk', value: summary.risk.label, tone: toneForRisk(summary.risk.tone) },
-  ]
-
-  return (
-    <GlassCard
-      padding="p-4"
-      rounded="rounded-[28px]"
-      className="transition-colors"
-      style={{
-        background: selected ? `${program.color}12` : 'rgba(255,255,255,0.024)',
-        border: `1px solid ${selected ? `${program.color}55` : 'rgba(255,255,255,0.08)'}`,
-        boxShadow: selected ? `0 8px 24px ${program.color}18` : 'none',
-      }}
-    >
-      <button
-        type="button"
-        onClick={onSelect}
-        className="w-full text-left"
-      >
-        <div className="flex flex-col gap-4 xl:grid xl:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_auto] xl:items-center">
-          <div className="min-w-0">
-            <div className="flex items-start gap-3">
-              <div
-                className="mt-1 h-3 w-3 rounded-full flex-shrink-0"
-                style={{ background: program.color, boxShadow: `0 0 12px ${program.color}55` }}
-              />
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <h3 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
-                    {program.name}
-                  </h3>
-                  <ProgramStatusBadge status={program.status || 'planning'} />
-                  <span
-                    className="rounded-full px-2 py-0.5 text-[10px] font-semibold"
-                    style={{ background: scopeConfig.background, color: scopeConfig.color }}
-                  >
-                    {scopeConfig.label}
-                  </span>
-                  {selected ? <MetaChip tone="accent">Expanded</MetaChip> : null}
-                </div>
-                {program.description ? (
-                  <div className="mt-2 text-sm leading-6" style={{ color: 'var(--text-secondary)' }}>
-                    {program.description}
-                  </div>
-                ) : null}
-                <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px]" style={{ color: 'var(--text-secondary)' }}>
-                  <span>{summary.topLevelProjects.length} projects</span>
-                  <span>{summary.programMilestones.length} milestones</span>
-                  <span>{summary.scheduleLabel}</span>
-                  <span>{summary.risk.detail}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {selected ? (
-            <div className="flex flex-wrap items-center gap-2">
-              <MetaChip>{summary.openTasks} open work</MetaChip>
-              <MetaChip>{summary.nextMilestone ? `${summary.nextMilestone.name} · ${formatShortDate(summary.nextMilestone.dueDate) ?? 'TBD'}` : 'No checkpoint yet'}</MetaChip>
-              <MetaChip tone={toneForRisk(summary.risk.tone)}>{summary.risk.label}</MetaChip>
-            </div>
-          ) : (
-            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-              {scanSignals.map((signal) => (
-                <div
-                  key={signal.label}
-                  className="rounded-2xl px-3 py-3"
-                  style={{
-                    background: (METRIC_TONE[signal.tone] ?? METRIC_TONE.default).background,
-                    border: `1px solid ${(METRIC_TONE[signal.tone] ?? METRIC_TONE.default).border}`,
-                  }}
-                >
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>
-                    {signal.label}
-                  </div>
-                  <div className="mt-2 text-xl font-bold leading-none" style={{ color: (METRIC_TONE[signal.tone] ?? METRIC_TONE.default).color }}>
-                    {signal.value}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          <div className="flex items-center justify-start gap-2 xl:justify-end">
-            <span
-              className="rounded-full px-2.5 py-1 text-[10px] font-semibold"
-              style={{ background: selected ? 'rgba(var(--accent-rgb),0.14)' : 'rgba(255,255,255,0.05)', color: selected ? 'var(--accent)' : 'var(--text-secondary)' }}
-            >
-              {selected ? 'Working here' : 'Expand'}
-            </span>
-            <ChevronDown
-              size={16}
-              className={selected ? 'rotate-180 transition-transform' : 'transition-transform'}
-              style={{ color: 'var(--text-secondary)' }}
-            />
-          </div>
-        </div>
-      </button>
-
-      {selected ? (
-        <div className="mt-4 border-t border-white/8 pt-4">
-          <div className="space-y-3">
-            {children}
-          </div>
-        </div>
-      ) : null}
-    </GlassCard>
-  )
-})
-
-const getRecommendedAction = ({ summary, topLevelProjectCount }) => {
-  if (!summary) return null
-
-  if (topLevelProjectCount === 0) {
-    return {
-      tone: 'accent',
-      title: 'Build structure',
-      detail: 'Add the first project so ownership, milestones, and task drilldowns have a clear home.',
-      actionLabel: 'Add project',
-      kind: 'add-project',
-    }
+const collectProjectTreeIds = (projects, projectId) => {
+  const ids = [projectId]
+  for (let index = 0; index < ids.length; index += 1) {
+    const currentId = ids[index]
+    projects.forEach((project) => {
+      if (project.parentId === currentId && !ids.includes(project.id)) ids.push(project.id)
+    })
   }
+  return ids
+}
 
-  if (summary.programMilestones.length === 0) {
-    return {
-      tone: 'warning',
-      title: 'Create a checkpoint',
-      detail: 'This program has no milestones yet, so delivery has no shared date anchor.',
-      actionLabel: 'Open milestones',
-      kind: 'open-milestones',
-    }
-  }
+const buildScheduleWindow = (...collections) => {
+  const starts = []
+  const dues = []
 
-  if (summary.overdueTasks > 0) {
-    return {
-      tone: 'danger',
-      title: 'Recover slipped work',
-      detail: `${summary.overdueTasks} overdue task${summary.overdueTasks === 1 ? '' : 's'} need replanning before the roadmap stays trustworthy.`,
-      actionLabel: 'Open overdue',
-      kind: 'open-overdue',
+  collections.flat().forEach((item) => {
+    if (!item) return
+    if (item.startDate) {
+      const start = new Date(item.startDate)
+      if (!Number.isNaN(start.getTime())) starts.push(start)
     }
-  }
+    if (item.dueDate) {
+      const due = new Date(item.dueDate)
+      if (!Number.isNaN(due.getTime())) dues.push(due)
+    }
+  })
 
-  if (summary.blockedTasks > 0) {
-    return {
-      tone: 'warning',
-      title: 'Unblock delivery',
-      detail: `${summary.blockedTasks} blocked task${summary.blockedTasks === 1 ? '' : 's'} need a decision, dependency clear, or owner handoff.`,
-      actionLabel: 'Open blocked',
-      kind: 'open-blocked',
-    }
-  }
-
-  if (summary.unscheduledTasks > 0) {
-    return {
-      tone: 'warning',
-      title: 'Schedule the roadmap',
-      detail: `${summary.unscheduledTasks} task${summary.unscheduledTasks === 1 ? '' : 's'} still need dates to appear cleanly in timeline views.`,
-      actionLabel: 'Open unscheduled',
-      kind: 'open-unscheduled',
-    }
-  }
+  starts.sort((a, b) => a - b)
+  dues.sort((a, b) => a - b)
 
   return {
-    tone: 'success',
-    title: 'Keep momentum',
-    detail: 'Delivery looks healthy. Review active work and the next checkpoint to keep the program moving.',
-    actionLabel: 'Open tasks',
-    kind: 'open-tasks',
+    startDate: starts[0] ? starts[0].toISOString() : null,
+    dueDate: dues[dues.length - 1] ? dues[dues.length - 1].toISOString() : null,
   }
 }
 
-const RiskRow = memo(function RiskRow({ label, value, detail, tone = 'default', onClick }) {
-  const palette = METRIC_TONE[tone] ?? METRIC_TONE.default
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="w-full rounded-2xl px-3 py-3 text-left transition-colors hover:bg-white/5"
-      style={{ background: 'rgba(255,255,255,0.025)', border: `1px solid ${palette.border}` }}
-    >
-      <div className="flex items-center justify-between gap-3">
-        <div className="min-w-0">
-          <div className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
-            {label}
-          </div>
-          <div className="mt-1 text-[11px]" style={{ color: 'var(--text-secondary)' }}>
-            {detail}
-          </div>
-        </div>
-        <div className="flex items-center gap-2 flex-shrink-0">
-          <span
-            className="rounded-full px-2 py-1 text-[10px] font-semibold"
-            style={{ background: palette.background, color: palette.color }}
-          >
-            {value}
-          </span>
-          <ArrowRight size={12} style={{ color: 'var(--text-secondary)' }} />
-        </div>
-      </div>
-    </button>
-  )
-})
-
-const formatActivityValue = (field, value) => {
-  if (value == null) return '—'
-  if ((field === 'dueDate' || field === 'startDate') && value) {
-    return formatShortDate(value) ?? String(value)
-  }
-  return String(value)
+const formatWindowLabel = (startDate, dueDate) => {
+  const startLabel = formatShortDate(startDate)
+  const dueLabel = formatShortDate(dueDate)
+  if (startLabel && dueLabel) return `${startLabel} - ${dueLabel}`
+  if (startLabel) return `Starts ${startLabel}`
+  if (dueLabel) return `Due ${dueLabel}`
+  return 'No schedule set'
 }
 
-const describeActivity = (entry) => {
-  if (entry.action === 'created') return `"${entry.entityTitle}" was created`
-  if (entry.action === 'deleted') return `"${entry.entityTitle}" was moved to trash`
-  if (entry.action === 'status_changed') {
-    return `"${entry.entityTitle}" status: ${formatActivityValue('status', entry.oldValue)} -> ${formatActivityValue('status', entry.newValue)}`
-  }
-  if (entry.action === 'updated' && entry.field) {
-    return `"${entry.entityTitle}" ${STATUS_LABEL[entry.field] ?? entry.field}: ${formatActivityValue(entry.field, entry.oldValue)} -> ${formatActivityValue(entry.field, entry.newValue)}`
-  }
-  return `"${entry.entityTitle}" was updated`
+const sortMilestones = (milestones) => (
+  [...milestones].sort((left, right) => {
+    const leftTs = left.dueDate ? new Date(left.dueDate).getTime() : Number.MAX_SAFE_INTEGER
+    const rightTs = right.dueDate ? new Date(right.dueDate).getTime() : Number.MAX_SAFE_INTEGER
+    return leftTs - rightTs
+  })
+)
+
+const getHealthMeta = ({ total, done, blocked, overdue, unscheduled }) => {
+  if (total === 0) return { label: 'Planning', color: '#94a3b8', background: 'rgba(148,163,184,0.14)', detail: 'No active work yet' }
+  if (done === total) return { label: 'Complete', color: '#10b981', background: 'rgba(16,185,129,0.14)', detail: 'All tasks closed' }
+  if (overdue > 0) return { label: 'At risk', color: '#ef4444', background: 'rgba(239,68,68,0.16)', detail: `${overdue} overdue` }
+  if (blocked > 0) return { label: 'Needs attention', color: '#f97316', background: 'rgba(249,115,22,0.16)', detail: `${blocked} blocked` }
+  if (unscheduled > 0) return { label: 'Needs dates', color: '#f59e0b', background: 'rgba(245,158,11,0.16)', detail: `${unscheduled} unscheduled` }
+  return { label: 'On track', color: '#22d3ee', background: 'rgba(34,211,238,0.16)', detail: 'Healthy delivery rhythm' }
 }
 
-const ActivityRow = memo(function ActivityRow({ entry, onOpen }) {
-  return (
-    <div
-      className="rounded-2xl px-3 py-3"
-      style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.08)' }}
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="text-sm" style={{ color: 'var(--text-primary)' }}>
-            {describeActivity(entry)}
-          </div>
-          <div className="mt-1 text-[11px]" style={{ color: 'var(--text-secondary)' }}>
-            {formatDistanceToNow(new Date(entry.timestamp), { addSuffix: true })}
-          </div>
-        </div>
-        {onOpen ? (
-          <button
-            type="button"
-            onClick={onOpen}
-            className="rounded-xl px-2 py-1 text-[11px]"
-            style={{ background: 'rgba(var(--accent-rgb),0.14)', color: 'var(--accent)', border: '1px solid rgba(var(--accent-rgb),0.18)' }}
-          >
-            Open
-          </button>
-        ) : null}
-      </div>
-    </div>
-  )
-})
-
-const MilestoneRow = memo(function MilestoneRow({ milestone, projectLabel, projectColor, onOpenProject }) {
-  const isCompleted = milestone.status === 'completed'
-  const isOverdue = milestone.dueDate && new Date(milestone.dueDate) < new Date() && !isCompleted
-
-  return (
-    <button
-      type="button"
-      onClick={onOpenProject}
-      className="w-full rounded-2xl px-3 py-3 text-left transition-colors hover:bg-white/5"
-      style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.08)' }}
-    >
-      <div className="flex items-start gap-3">
-        <span className="mt-1 text-[11px]" style={{ color: projectColor }}>◆</span>
-        <div className="min-w-0 flex-1">
-          <div
-            className="text-sm font-medium"
-            style={{
-              color: isCompleted ? 'var(--text-secondary)' : 'var(--text-primary)',
-              textDecoration: isCompleted ? 'line-through' : 'none',
-            }}
-          >
-            {milestone.name}
-          </div>
-          <div className="mt-1 text-[11px]" style={{ color: 'var(--text-secondary)' }}>
-            {projectLabel}
-          </div>
-        </div>
-        <div className="flex items-center gap-2 flex-shrink-0">
-          <span
-            className="rounded-full px-2 py-1 text-[10px] font-semibold"
-            style={{
-              background: isOverdue ? 'rgba(239,68,68,0.12)' : 'rgba(255,255,255,0.05)',
-              color: isOverdue ? '#fca5a5' : 'var(--text-secondary)',
-            }}
-          >
-            {formatShortDate(milestone.dueDate) ?? 'No date'}
-          </span>
-          <ArrowRight size={12} style={{ color: 'var(--text-secondary)' }} />
-        </div>
-      </div>
-    </button>
-  )
-})
-
-const ProjectTreeRow = memo(function ProjectTreeRow({
-  project,
-  summaryById,
-  selectedProjectId,
-  onSelect,
-  onOpenTasks,
-  onOpenGantt,
-  onAddChild,
-  onEdit,
-  level = 0,
-}) {
-  const summary = summaryById.get(project.id)
-  const statusMeta = PROJECT_STATUS_META[project.status ?? 'active'] ?? PROJECT_STATUS_META.active
-  const selected = selectedProjectId === project.id
-
-  if (!summary) return null
-
-  return (
-    <div className="space-y-2">
-      <div
-        onClick={() => onSelect(project.id)}
-        className="rounded-[26px] px-4 py-4 transition-colors cursor-pointer"
-        style={{
-          marginLeft: `${level * 18}px`,
-          background: selected ? `${project.color}12` : 'rgba(255,255,255,0.024)',
-          border: `1px solid ${selected ? `${project.color}55` : 'rgba(255,255,255,0.08)'}`,
-        }}
-      >
-        <div className="flex flex-col gap-4 xl:grid xl:grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)_auto] xl:items-center">
-          <div className="min-w-0">
-            <div className="flex items-start gap-3">
-              <div className="mt-1 h-3 w-3 rounded-full flex-shrink-0" style={{ background: project.color, boxShadow: `0 0 10px ${project.color}55` }} />
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-                    {project.name}
-                  </div>
-                  <span
-                    className="rounded-full px-2 py-0.5 text-[10px] font-semibold"
-                    style={{ background: statusMeta.background, color: statusMeta.color }}
-                  >
-                    {statusMeta.label}
-                  </span>
-                  {level > 0 ? (
-                    <span
-                      className="rounded-full px-2 py-0.5 text-[10px] font-semibold"
-                      style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)' }}
-                    >
-                      Sub-project
-                    </span>
-                  ) : null}
-                </div>
-                {project.description ? (
-                  <div className="mt-2 text-sm leading-6" style={{ color: 'var(--text-secondary)' }}>
-                    {project.description}
-                  </div>
-                ) : null}
-                <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px]" style={{ color: 'var(--text-secondary)' }}>
-                  <span>{summary.scheduleLabel}</span>
-                  <span>{summary.childProjects.length} child {summary.childProjects.length === 1 ? 'project' : 'projects'}</span>
-                  <span>{summary.openTasks} open tasks</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <MetaChip>{summary.scopedMilestones.length} milestones</MetaChip>
-            <MetaChip>{summary.nextMilestone ? `${summary.nextMilestone.name} · ${formatShortDate(summary.nextMilestone.dueDate) ?? 'TBD'}` : 'No checkpoint yet'}</MetaChip>
-            <MetaChip tone={toneForRisk(summary.risk.tone)}>{summary.risk.label}</MetaChip>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2 xl:justify-end">
-            <ActionButton onClick={(event) => {
-              event.stopPropagation()
-              onOpenTasks(project.id)
-            }}
-            >
-              Tasks
-            </ActionButton>
-            <ActionButton onClick={(event) => {
-              event.stopPropagation()
-              onOpenGantt(project.id)
-            }}
-            >
-              Gantt
-            </ActionButton>
-            <ActionButton onClick={(event) => {
-              event.stopPropagation()
-              onAddChild(project.id)
-            }}
-            >
-              Add sub-project
-            </ActionButton>
-            <ActionButton onClick={(event) => {
-              event.stopPropagation()
-              onEdit(project)
-            }}
-            >
-              Edit
-            </ActionButton>
-          </div>
-        </div>
-      </div>
-
-      {summary.childProjects.map((childProject) => (
-        <ProjectTreeRow
-          key={childProject.id}
-          project={childProject}
-          summaryById={summaryById}
-          selectedProjectId={selectedProjectId}
-          onSelect={onSelect}
-          onOpenTasks={onOpenTasks}
-          onOpenGantt={onOpenGantt}
-          onAddChild={onAddChild}
-          onEdit={onEdit}
-          level={level + 1}
-        />
-      ))}
-    </div>
-  )
-})
-
-const Projects = memo(function Projects() {
-  const { programs, projects, milestones, tasks, programById, projectById, workspaceViewScope } = useWorkspaceScopedData()
-  const activities = useActivityStore((state) => state.activities)
-  const addProgram = useProjectStore((state) => state.addProgram)
-  const updateProgram = useProjectStore((state) => state.updateProgram)
-  const deleteProgram = useProjectStore((state) => state.deleteProgram)
-  const addProject = useProjectStore((state) => state.addProject)
-  const updateProject = useProjectStore((state) => state.updateProject)
-  const deleteProject = useProjectStore((state) => state.deleteProject)
-  const activeProgramId = useSettingsStore((state) => state.activeProgramId)
-  const activeProjectId = useSettingsStore((state) => state.activeProjectId)
-  const setActiveProgram = useSettingsStore((state) => state.setActiveProgram)
-  const setActiveProject = useSettingsStore((state) => state.setActiveProject)
-  const setPage = useSettingsStore((state) => state.setPage)
-  const selectTask = useSettingsStore((state) => state.selectTask)
-  const clearTaskDrilldown = useSettingsStore((state) => state.clearTaskDrilldown)
-  const setTaskDrilldown = useSettingsStore((state) => state.setTaskDrilldown)
-  const setGanttConfig = useSettingsStore((state) => state.setGanttConfig)
-  const [programDrawer, setProgramDrawer] = useState(null)
-  const [projectDrawer, setProjectDrawer] = useState(null)
-  const [shareProgram, setShareProgram] = useState(null)
-  const [milestoneProjectId, setMilestoneProjectId] = useState('')
-  const milestonesSectionRef = useRef(null)
-
-  const summaryById = useMemo(
-    () => new Map(programs.map((program) => [program.id, buildProgramSummary({ program, projects, tasks, milestones })])),
-    [milestones, programs, projects, tasks]
-  )
-
-  const selectedProgram = useMemo(() => {
-    if (!programs.length) return null
-
-    if (activeProjectId) {
-      const activeProject = projectById.get(activeProjectId)
-      if (activeProject?.programId) return programById.get(activeProject.programId) ?? programs[0]
-    }
-
-    if (activeProgramId && programById.has(activeProgramId)) {
-      return programById.get(activeProgramId)
-    }
-
-    return programs[0]
-  }, [activeProgramId, activeProjectId, programById, programs, projectById])
-
-  const programSummary = selectedProgram ? summaryById.get(selectedProgram.id) ?? null : null
-  const programProjects = useMemo(() => programSummary?.programProjects ?? [], [programSummary])
-  const topLevelProjects = useMemo(() => programSummary?.topLevelProjects ?? [], [programSummary])
-  const projectSummaryById = useMemo(
-    () => new Map(programProjects.map((project) => [project.id, buildProjectSummary({ project, allProjects: programProjects, tasks, milestones })])),
-    [milestones, programProjects, tasks]
-  )
-
-  const selectedProjectInProgram = useMemo(
-    () => (programProjects.some((project) => project.id === activeProjectId)
-      ? activeProjectId
-      : (milestoneProjectId || topLevelProjects[0]?.id || programProjects[0]?.id || null)),
-    [activeProjectId, milestoneProjectId, programProjects, topLevelProjects]
-  )
-
-  const standaloneProjectCount = projects.filter((project) => !project.programId).length
-
-  useEffect(() => {
-    if (!selectedProgram) return
-    if (activeProgramId !== selectedProgram.id && !activeProjectId) {
-      setActiveProgram(selectedProgram.id)
-    }
-  }, [activeProgramId, activeProjectId, selectedProgram, setActiveProgram])
-
-  useEffect(() => {
-    if (!programProjects.length) {
-      setMilestoneProjectId('')
-      return
-    }
-
-    if (selectedProjectInProgram && programProjects.some((project) => project.id === selectedProjectInProgram)) {
-      setMilestoneProjectId(selectedProjectInProgram)
-      return
-    }
-
-    setMilestoneProjectId(topLevelProjects[0]?.id ?? programProjects[0]?.id ?? '')
-  }, [programProjects, selectedProjectInProgram, topLevelProjects])
-
-  const recentActivity = useMemo(() => {
-    if (!programSummary) return []
-    const taskIds = new Set(programSummary.programTasks.map((task) => task.id))
-    return activities.filter((entry) => entry.taskId && taskIds.has(entry.taskId)).slice(0, 6)
-  }, [activities, programSummary])
-
-  const overdueMilestones = programSummary?.programMilestones.filter((milestone) =>
-    milestone.status !== 'completed' &&
-    milestone.dueDate &&
-    new Date(milestone.dueDate) < new Date()
-  ).length ?? 0
-
-  const recommendedAction = useMemo(
-    () => getRecommendedAction({ summary: programSummary, topLevelProjectCount: topLevelProjects.length }),
-    [programSummary, topLevelProjects.length]
-  )
-
-  const openProgramTasks = (drilldown = null, programId = selectedProgram?.id ?? null) => {
-    if (!programId) return
-    clearTaskDrilldown()
-    setActiveProject(null)
-    setActiveProgram(programId)
-    if (drilldown) setTaskDrilldown(drilldown)
-    setPage('tasks')
+const Editable = memo(function Editable({ value, onSave, className, style, maxLength = 60 }) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(value)
+  const commit = () => {
+    if (draft.trim()) onSave(draft.trim())
+    setEditing(false)
   }
 
-  const openProjectTasks = (projectId, drilldown = null) => {
-    clearTaskDrilldown()
-    setActiveProject(projectId)
-    if (drilldown) setTaskDrilldown(drilldown)
-    setPage('tasks')
-  }
-
-  const openPlanner = (projectId = null) => {
-    clearTaskDrilldown()
-    if (projectId) {
-      setActiveProject(projectId)
-    } else if (selectedProgram) {
-      setActiveProject(null)
-      setActiveProgram(selectedProgram.id)
-    }
-    setPage('today')
-  }
-
-  const openGantt = (projectId = null) => {
-    if (!selectedProgram) return
-    clearTaskDrilldown()
-    if (projectId) setActiveProject(projectId)
-    else {
-      setActiveProject(null)
-      setActiveProgram(selectedProgram.id)
-    }
-    setGanttConfig({
-      viewMode: 'roadmap',
-      onlyDelayed: false,
-      onlyCritical: false,
-      onlyDependencyRisk: false,
-      filteredProgramIds: [selectedProgram.id],
-      filteredProjectIds: projectId ? [projectId] : [],
-      filteredSubProjectIds: [],
-      expandedProjectIds: projectId ? [...collectProjectDescendantIds(programProjects, projectId)] : programProjects.map((project) => project.id),
-    })
-    setPage('timeline')
-  }
-
-  const openActivityTask = (entry) => {
-    if (!entry?.taskId) return
-    const task = programSummary?.programTasks.find((candidate) => candidate.id === entry.taskId)
-    if (task?.projectId) setActiveProject(task.projectId)
-    else if (selectedProgram) {
-      setActiveProject(null)
-      setActiveProgram(selectedProgram.id)
-    }
-    setPage('tasks')
-    selectTask(entry.taskId)
-  }
-
-  const focusProgram = (programId) => {
-    setActiveProject(null)
-    setActiveProgram(programId)
-  }
-
-  const focusMilestones = (projectId = null) => {
-    const nextProjectId = projectId ?? selectedProjectInProgram ?? topLevelProjects[0]?.id ?? programProjects[0]?.id ?? null
-    if (nextProjectId) {
-      setMilestoneProjectId(nextProjectId)
-      setActiveProject(nextProjectId)
-    }
-    milestonesSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  }
-
-  const runRecommendedAction = () => {
-    if (!recommendedAction || !selectedProgram) return
-
-    switch (recommendedAction.kind) {
-      case 'add-project':
-        setProjectDrawer({ mode: 'create', lockedProgramId: selectedProgram.id })
-        break
-      case 'open-milestones':
-        focusMilestones(programSummary?.nextMilestone?.projectId ?? null)
-        break
-      case 'open-overdue':
-        openProgramTasks('overdue')
-        break
-      case 'open-blocked':
-        openProgramTasks('blocked')
-        break
-      case 'open-unscheduled':
-        openProgramTasks('unscheduled')
-        break
-      case 'open-tasks':
-      default:
-        openProgramTasks('open')
-    }
-  }
-
-  const handleProgramSubmit = (values) => {
-    if (programDrawer?.mode === 'edit' && programDrawer.program) {
-      updateProgram(programDrawer.program.id, values)
-    } else {
-      const created = addProgram(values)
-      setActiveProgram(created.id)
-      setPage('projects')
-    }
-    setProgramDrawer(null)
-  }
-
-  const handleProgramDelete = () => {
-    if (!programDrawer?.program) return
-    const shouldDelete = window.confirm(`Delete "${programDrawer.program.name}" and detach its projects?`)
-    if (!shouldDelete) return
-    deleteProgram(programDrawer.program.id)
-    if (activeProgramId === programDrawer.program.id) {
-      setActiveProgram(null)
-      setActiveProject(null)
-    }
-    setProgramDrawer(null)
-  }
-
-  const handleProjectSubmit = (values) => {
-    if (projectDrawer?.mode === 'edit' && projectDrawer.project) {
-      updateProject(projectDrawer.project.id, values)
-      if (values.parentId) setMilestoneProjectId(values.parentId)
-      else setMilestoneProjectId(projectDrawer.project.id)
-    } else {
-      const created = addProject(values)
-      setMilestoneProjectId(created.id)
-      setActiveProject(created.id)
-    }
-    setProjectDrawer(null)
-  }
-
-  const handleProjectDelete = () => {
-    if (!projectDrawer?.project) return
-    const shouldDelete = window.confirm(`Delete "${projectDrawer.project.name}" and its sub-projects?`)
-    if (!shouldDelete) return
-    deleteProject(projectDrawer.project.id)
-    if (activeProjectId === projectDrawer.project.id) setActiveProject(null)
-    setProjectDrawer(null)
-  }
-
-  const projectParentsForDrawer = useMemo(() => {
-    if (!projectDrawer?.project) return programProjects
-    const blockedIds = collectProjectDescendantIds(programProjects, projectDrawer.project.id)
-    return programProjects.filter((project) => !blockedIds.has(project.id))
-  }, [programProjects, projectDrawer])
-
-  const pageStats = useMemo(() => {
-    const trackedProjectCount = projects.filter((project) => project.programId).length
-    const programsNeedingAttention = programs.filter((program) => {
-      const summary = summaryById.get(program.id)
-      return summary && (summary.risk.tone === 'warning' || summary.risk.tone === 'danger')
-    }).length
-
-    return [
-      { label: 'Programs', value: programs.length },
-      { label: 'Projects', value: trackedProjectCount },
-      {
-        label: 'Needs attention',
-        value: programsNeedingAttention,
-        tone: programsNeedingAttention > 0 ? 'danger' : 'success',
-      },
-      ...(standaloneProjectCount > 0 ? [{ label: 'Standalone', value: standaloneProjectCount }] : []),
-    ]
-  }, [programs, projects, standaloneProjectCount, summaryById])
-
-  if (!programs.length) {
+  if (editing) {
     return (
-      <div className="flex-1 overflow-y-auto px-4 md:px-6 pb-24 md:pb-8">
-        <EmptyState
-          icon={FolderKanban}
-          title="No programs yet"
-          description="Create the first program, then manage structure, milestones, and delivery from this one workspace."
-          action={(
-            <button
-              type="button"
-              onClick={() => setProgramDrawer({ mode: 'create' })}
-              className="btn-accent px-4 py-2 text-sm"
-            >
-              Create first program
-            </button>
-          )}
-        />
-      </div>
+      <input
+        autoFocus
+        value={draft}
+        onChange={(event) => setDraft(event.target.value)}
+        onClick={(event) => event.stopPropagation()}
+        onBlur={commit}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') commit()
+          if (event.key === 'Escape') setEditing(false)
+        }}
+        className={`${className} bg-transparent border-b`}
+        style={{ ...style, borderColor: 'var(--accent)', outline: 'none' }}
+        maxLength={maxLength}
+      />
     )
   }
 
   return (
-    <div className="flex-1 overflow-y-auto px-4 md:px-6 pb-24 md:pb-8">
-      <div className="space-y-4 py-2">
-        <PageHero
-          eyebrow="Programs"
-          title="Programs"
-          description="Expand one workstream to manage structure, milestones, and delivery in the same place."
-          minimal
-          actions={(
-            <button
-              type="button"
-              onClick={() => setProgramDrawer({ mode: 'create' })}
-              className="btn-accent px-3 py-2 text-xs"
-            >
-              <span className="inline-flex items-center gap-1.5">
-                <Plus size={12} />
-                New program
-              </span>
-            </button>
-          )}
-          stats={pageStats}
-        />
+    <span
+      className={`${className} cursor-text hover:opacity-80`}
+      style={style}
+      onClick={(event) => {
+        event.stopPropagation()
+        setDraft(value)
+        setEditing(true)
+      }}
+      title="Click to rename"
+    >
+      {value}
+    </span>
+  )
+})
 
-        {selectedProgram && programSummary ? (
-          <div className="space-y-3">
-            {programs.map((program) => {
-              const summary = summaryById.get(program.id)
-              if (!summary) return null
-              const isSelected = selectedProgram.id === program.id
+const ColorDot = memo(function ColorDot({ color, onChange }) {
+  const [open, setOpen] = useState(false)
+  const [menuPos, setMenuPos] = useState({ top: 0, left: 0 })
+  const buttonRef = useRef(null)
+  const menuRef = useRef(null)
 
-              return (
-                <ProgramSelectorCard
-                  key={program.id}
-                  program={program}
-                  summary={summary}
-                  selected={isSelected}
-                  onSelect={() => focusProgram(program.id)}
-                >
-                  {isSelected ? (
-                    <>
-                      <ExpandableSection
-                        title="Summary"
-                        description="Understand the program once, then move straight into the next action."
-                        actions={(
-                          <>
-                            <button
-                              type="button"
-                              onClick={() => setProjectDrawer({ mode: 'create', lockedProgramId: program.id })}
-                              className="btn-accent px-3 py-2 text-xs"
-                            >
-                              <span className="inline-flex items-center gap-1.5">
-                                <FolderPlus size={12} />
-                                Add project
-                              </span>
-                            </button>
-                            <ActionButton onClick={() => openProgramTasks('open')}>Tasks</ActionButton>
-                            <ActionButton onClick={() => openPlanner()}>Planner</ActionButton>
-                            <ActionButton onClick={() => openGantt()}>
-                              <span className="inline-flex items-center gap-1.5">
-                                <CalendarRange size={12} />
-                                Timeline
-                              </span>
-                            </ActionButton>
-                            {(program.scope ?? 'professional') === 'professional' ? (
-                              <ActionButton onClick={() => setShareProgram(program)}>
-                                <span className="inline-flex items-center gap-1.5">
-                                  <Share2 size={12} />
-                                  Share
-                                </span>
-                              </ActionButton>
-                            ) : null}
-                            <ActionButton onClick={() => setProgramDrawer({ mode: 'edit', program })}>
-                              <span className="inline-flex items-center gap-1.5">
-                                <Pencil size={12} />
-                                Edit
-                              </span>
-                            </ActionButton>
-                          </>
-                        )}
-                        defaultOpen
-                      >
-                        <div className="grid gap-3 xl:grid-cols-3">
-                          <InsightCard
-                            label="Health"
-                            title={programSummary.risk.label}
-                            detail={programSummary.risk.detail}
-                            tone={toneForRisk(programSummary.risk.tone)}
-                            actionLabel={programSummary.overdueTasks > 0 ? 'Open overdue' : programSummary.blockedTasks > 0 ? 'Open blocked' : 'Open tasks'}
-                            onAction={() => {
-                              if (programSummary.overdueTasks > 0) openProgramTasks('overdue')
-                              else if (programSummary.blockedTasks > 0) openProgramTasks('blocked')
-                              else openProgramTasks('open')
-                            }}
-                          />
-                          <InsightCard
-                            label="Next checkpoint"
-                            title={programSummary.nextMilestone ? programSummary.nextMilestone.name : 'No checkpoint yet'}
-                            detail={programSummary.nextMilestone
-                              ? `Due ${formatShortDate(programSummary.nextMilestone.dueDate) ?? 'TBD'} in ${projectById.get(programSummary.nextMilestone.projectId)?.name ?? 'this program'}.`
-                              : 'Add the first milestone so the program has a visible delivery target.'}
-                            tone={programSummary.nextMilestone ? 'default' : 'warning'}
-                            actionLabel={programSummary.nextMilestone ? 'Open timeline' : 'Open milestones'}
-                            onAction={() => {
-                              if (programSummary.nextMilestone) openGantt()
-                              else focusMilestones()
-                            }}
-                          />
-                          {recommendedAction ? (
-                            <InsightCard
-                              label="Recommended next move"
-                              title={recommendedAction.title}
-                              detail={recommendedAction.detail}
-                              tone={recommendedAction.tone}
-                              actionLabel={recommendedAction.actionLabel}
-                              onAction={runRecommendedAction}
-                            />
-                          ) : null}
-                        </div>
+  useLayoutEffect(() => {
+    if (!open || typeof window === 'undefined' || !buttonRef.current) return
 
-                        <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-                          <SignalButton
-                            label="Open work"
-                            value={programSummary.openTasks}
-                            tone="accent"
-                            onClick={() => openProgramTasks('open')}
-                          />
-                          <SignalButton
-                            label="Blocked"
-                            value={programSummary.blockedTasks}
-                            tone={programSummary.blockedTasks > 0 ? 'warning' : 'default'}
-                            onClick={() => openProgramTasks('blocked')}
-                          />
-                          <SignalButton
-                            label="Overdue"
-                            value={programSummary.overdueTasks}
-                            tone={programSummary.overdueTasks > 0 ? 'danger' : 'success'}
-                            onClick={() => openProgramTasks('overdue')}
-                          />
-                          <SignalButton
-                            label="Unscheduled"
-                            value={programSummary.unscheduledTasks}
-                            tone={programSummary.unscheduledTasks > 0 ? 'warning' : 'default'}
-                            onClick={() => openProgramTasks('unscheduled')}
-                          />
-                        </div>
-                      </ExpandableSection>
+    const updatePosition = () => {
+      if (!buttonRef.current) return
+      const rect = buttonRef.current.getBoundingClientRect()
+      const menuWidth = menuRef.current?.offsetWidth ?? 178
+      const menuHeight = menuRef.current?.offsetHeight ?? 180
+      const viewportPadding = 8
+      const gap = 8
 
-                      <ExpandableSection
-                        title="Projects"
-                        description="Use structure for ownership and navigation, then jump into project-level execution only when needed."
-                        actions={(
-                          <button
-                            type="button"
-                            onClick={() => setProjectDrawer({ mode: 'create', lockedProgramId: program.id })}
-                            className="btn-accent px-3 py-2 text-xs"
-                          >
-                            <span className="inline-flex items-center gap-1.5">
-                              <FolderPlus size={12} />
-                              Add project
-                            </span>
-                          </button>
-                        )}
-                        defaultOpen
-                      >
-                        <div className="mb-3 flex flex-wrap gap-2">
-                          <MetaChip tone="accent">{topLevelProjects.length} top-level</MetaChip>
-                          <MetaChip>{programProjects.length} total projects</MetaChip>
-                          <MetaChip tone={programProjects.length > topLevelProjects.length ? 'default' : 'success'}>
-                            {programProjects.length - topLevelProjects.length} sub-projects
-                          </MetaChip>
-                        </div>
+      let left = rect.left
+      let top = rect.bottom + gap
 
-                        {topLevelProjects.length === 0 ? (
-                          <EmptyState
-                            icon={FolderGit2}
-                            title="No projects in this program yet"
-                            description="Create the first project, then split into sub-projects only when the hierarchy helps execution."
-                            action={(
-                              <button
-                                type="button"
-                                onClick={() => setProjectDrawer({ mode: 'create', lockedProgramId: program.id })}
-                                className="btn-accent px-4 py-2 text-sm"
-                              >
-                                Add first project
-                              </button>
-                            )}
-                          />
-                        ) : (
-                          <div className="space-y-3">
-                            {topLevelProjects.map((project) => (
-                              <ProjectTreeRow
-                                key={project.id}
-                                project={project}
-                                summaryById={projectSummaryById}
-                                selectedProjectId={selectedProjectInProgram}
-                                onSelect={(projectId) => {
-                                  setActiveProject(projectId)
-                                  setMilestoneProjectId(projectId)
-                                }}
-                                onOpenTasks={(projectId) => openProjectTasks(projectId, 'open')}
-                                onOpenGantt={(projectId) => openGantt(projectId)}
-                                onAddChild={(projectId) => setProjectDrawer({
-                                  mode: 'create',
-                                  lockedProgramId: program.id,
-                                  initialValues: { parentId: projectId, programId: program.id },
-                                })}
-                                onEdit={(projectToEdit) => setProjectDrawer({ mode: 'edit', project: projectToEdit })}
-                              />
-                            ))}
-                          </div>
-                        )}
-                      </ExpandableSection>
+      if (left + menuWidth > window.innerWidth - viewportPadding) left = window.innerWidth - menuWidth - viewportPadding
+      if (left < viewportPadding) left = viewportPadding
+      if (top + menuHeight > window.innerHeight - viewportPadding) top = rect.top - menuHeight - gap
+      if (top < viewportPadding) top = viewportPadding
 
-                      <div ref={milestonesSectionRef}>
-                        <ExpandableSection
-                          title="Milestones"
-                          description="Track upcoming checkpoints on the left and edit the selected project’s milestones on the right."
-                          actions={(
-                            <>
-                              <ActionButton onClick={() => openProgramTasks('overdue')}>Overdue tasks</ActionButton>
-                              <ActionButton onClick={() => openGantt()}>
-                                <span className="inline-flex items-center gap-1.5">
-                                  <CalendarRange size={12} />
-                                  Open timeline
-                                </span>
-                              </ActionButton>
-                            </>
-                          )}
-                          defaultOpen
-                        >
-                          <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
-                            <div className="space-y-3">
-                              <div className="flex flex-wrap gap-2">
-                                <MetaChip tone="accent">{programSummary.programMilestones.length} milestones</MetaChip>
-                                <MetaChip tone={overdueMilestones > 0 ? 'danger' : 'default'}>{overdueMilestones} overdue</MetaChip>
-                                <MetaChip tone="success">{programSummary.completedMilestones} completed</MetaChip>
-                              </div>
+      setMenuPos({ top, left })
+    }
 
-                              {programSummary.programMilestones.length ? (
-                                <div className="space-y-2">
-                                  {programSummary.programMilestones.slice(0, 8).map((milestone) => {
-                                    const milestoneProject = milestone.projectId ? projectById.get(milestone.projectId) : null
-                                    return (
-                                      <MilestoneRow
-                                        key={milestone.id}
-                                        milestone={milestone}
-                                        projectLabel={milestoneProject?.name ?? 'Project'}
-                                        projectColor={milestoneProject?.color ?? program.color}
-                                        onOpenProject={() => {
-                                          if (!milestoneProject) return
-                                          setActiveProject(milestoneProject.id)
-                                          setMilestoneProjectId(milestoneProject.id)
-                                        }}
-                                      />
-                                    )
-                                  })}
-                                </div>
-                              ) : (
-                                <div
-                                  className="rounded-2xl px-3 py-4 text-sm"
-                                  style={{ background: 'rgba(255,255,255,0.025)', border: '1px dashed rgba(255,255,255,0.1)', color: 'var(--text-secondary)' }}
-                                >
-                                  No milestones yet. Pick a project on the right and add the first checkpoint.
-                                </div>
-                              )}
-                            </div>
+    updatePosition()
+    window.addEventListener('resize', updatePosition)
+    window.addEventListener('scroll', updatePosition, true)
+    return () => {
+      window.removeEventListener('resize', updatePosition)
+      window.removeEventListener('scroll', updatePosition, true)
+    }
+  }, [open])
 
-                            <div className="rounded-[26px] px-4 py-4" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                              {programProjects.length ? (
-                                <>
-                                  <div className="text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>
-                                    Edit selected project
-                                  </div>
-                                  <select
-                                    value={milestoneProjectId}
-                                    onChange={(event) => {
-                                      setMilestoneProjectId(event.target.value)
-                                      setActiveProject(event.target.value || null)
-                                    }}
-                                    className="mt-3 w-full rounded-2xl px-3 py-2 text-xs"
-                                    style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-primary)' }}
-                                  >
-                                    {programProjects.map((project) => (
-                                      <option key={project.id} value={project.id}>{project.name}</option>
-                                    ))}
-                                  </select>
-                                  <div className="mt-3 text-[11px] leading-6" style={{ color: 'var(--text-secondary)' }}>
-                                    Add the next checkpoint here instead of scattering milestone edits across multiple views.
-                                  </div>
-                                  {milestoneProjectId ? (
-                                    <MilestonePanel
-                                      projectId={milestoneProjectId}
-                                      projectColor={projectById.get(milestoneProjectId)?.color ?? program.color}
-                                    />
-                                  ) : null}
-                                </>
-                              ) : (
-                                <div className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-                                  Add a project first before you manage milestones.
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </ExpandableSection>
-                      </div>
+  useEffect(() => {
+    if (!open) return undefined
+    const handleMouseDown = (event) => {
+      const target = event.target
+      if (buttonRef.current?.contains(target) || menuRef.current?.contains(target)) return
+      setOpen(false)
+    }
+    document.addEventListener('mousedown', handleMouseDown)
+    return () => document.removeEventListener('mousedown', handleMouseDown)
+  }, [open])
 
-                      <ExpandableSection
-                        title="Risks"
-                        description="Surface the operational issues that need a decision, replan, or unblock."
-                        actions={(
-                          <>
-                            <ActionButton onClick={() => openProgramTasks('open')}>Open tasks</ActionButton>
-                            <ActionButton onClick={() => openPlanner()}>Planner</ActionButton>
-                          </>
-                        )}
-                        defaultOpen={programSummary.risk.tone === 'warning' || programSummary.risk.tone === 'danger'}
-                      >
-                        <div className="space-y-2">
-                          <RiskRow
-                            label="Blocked work"
-                            value={String(programSummary.blockedTasks)}
-                            detail="Open the task list with only blocked work in this program."
-                            tone={programSummary.blockedTasks > 0 ? 'warning' : 'default'}
-                            onClick={() => openProgramTasks('blocked')}
-                          />
-                          <RiskRow
-                            label="Overdue tasks"
-                            value={String(programSummary.overdueTasks)}
-                            detail="Review slipped deadlines before updating the roadmap."
-                            tone={programSummary.overdueTasks > 0 ? 'danger' : 'default'}
-                            onClick={() => openProgramTasks('overdue')}
-                          />
-                          <RiskRow
-                            label="Unscheduled tasks"
-                            value={String(programSummary.unscheduledTasks)}
-                            detail="Fill in start and due dates for work the roadmap still cannot place."
-                            tone={programSummary.unscheduledTasks > 0 ? 'warning' : 'default'}
-                            onClick={() => openProgramTasks('unscheduled')}
-                          />
-                          <RiskRow
-                            label="Critical tasks"
-                            value={String(programSummary.criticalTasks)}
-                            detail="Go straight to the highest-risk tasks in this program."
-                            tone={programSummary.criticalTasks > 0 ? 'danger' : 'default'}
-                            onClick={() => openProgramTasks('critical')}
-                          />
-                        </div>
-                      </ExpandableSection>
-
-                      <ExpandableSection
-                        title="Recent activity"
-                        description="Use the latest changes to restore context quickly without opening every project."
-                        actions={<ActionButton onClick={() => openProgramTasks('open')}>Open tasks</ActionButton>}
-                        defaultOpen={false}
-                      >
-                        <div className="space-y-2">
-                          {recentActivity.length ? (
-                            recentActivity.map((entry) => (
-                              <ActivityRow
-                                key={entry.id}
-                                entry={entry}
-                                onOpen={() => openActivityTask(entry)}
-                              />
-                            ))
-                          ) : (
-                            <div
-                              className="rounded-2xl px-3 py-4 text-sm"
-                              style={{ background: 'rgba(255,255,255,0.025)', border: '1px dashed rgba(255,255,255,0.1)', color: 'var(--text-secondary)' }}
-                            >
-                              No recent activity in this program yet.
-                            </div>
-                          )}
-                        </div>
-                      </ExpandableSection>
-                    </>
-                  ) : null}
-                </ProgramSelectorCard>
-              )
-            })}
+  return (
+    <div className="relative flex-shrink-0" onClick={(event) => event.stopPropagation()}>
+      <button
+        ref={buttonRef}
+        onClick={(event) => {
+          event.stopPropagation()
+          setOpen((current) => !current)
+        }}
+        className="w-5 h-5 rounded-full p-[2px] hover:scale-105 transition-transform"
+        style={{
+          background: 'rgba(255,255,255,0.04)',
+          border: open ? `1px solid ${color}` : '1px solid rgba(255,255,255,0.16)',
+          boxShadow: open ? `0 0 0 2px ${color}33` : 'none',
+        }}
+        title="Change color"
+      >
+        <span className="w-full h-full rounded-full block" style={{ background: color }} />
+      </button>
+      {open && typeof document !== 'undefined' && createPortal(
+        <>
+          <div className="fixed inset-0 z-[90]" onClick={() => setOpen(false)} />
+          <div
+            ref={menuRef}
+            className="fixed z-[100] w-[178px]"
+            style={{ top: `${menuPos.top}px`, left: `${menuPos.left}px`, boxShadow: '0 16px 48px rgba(0,0,0,0.6)' }}
+          >
+            <ColorPalettePicker
+              colors={PROJECT_COLORS}
+              value={color}
+              compact
+              onChange={(next) => {
+                if (!next) return
+                onChange(next)
+                setOpen(false)
+              }}
+            />
           </div>
-        ) : null}
+        </>,
+        document.body
+      )}
+    </div>
+  )
+})
+
+const ActionMenu = memo(function ActionMenu({ label, icon: Icon = MoreHorizontal, items, iconOnly = false, accent = false }) {
+  const [open, setOpen] = useState(false)
+
+  return (
+    <div className="relative" onClick={(event) => event.stopPropagation()}>
+      <button
+        type="button"
+        onClick={(event) => {
+          event.stopPropagation()
+          setOpen((current) => !current)
+        }}
+        className={`inline-flex items-center gap-1.5 rounded-xl transition-colors ${iconOnly ? 'p-2' : 'px-3 py-2 text-xs font-semibold'}`}
+        style={accent
+          ? { background: 'rgba(var(--accent-rgb),0.14)', color: 'var(--accent)', border: '1px solid rgba(var(--accent-rgb),0.18)' }
+          : { background: 'rgba(255,255,255,0.04)', color: 'var(--text-secondary)', border: '1px solid rgba(255,255,255,0.08)' }}
+      >
+        <Icon size={13} />
+        {!iconOnly && label}
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div
+            className="absolute top-full right-0 mt-1 z-50 rounded-2xl overflow-hidden"
+            style={{ background: '#ffffff', border: '1px solid rgba(15,23,42,0.12)', boxShadow: '0 16px 48px rgba(15,23,42,0.18)', minWidth: '180px' }}
+          >
+            {items.map((item) => (
+              <button
+                key={item.label}
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation()
+                  setOpen(false)
+                  item.onClick()
+                }}
+                className="w-full text-left px-3 py-2.5 text-xs transition-colors hover:bg-slate-100"
+                style={item.tone === 'danger' ? { color: '#dc2626' } : { color: '#334155' }}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  )
+})
+
+const CompactStat = memo(function CompactStat({ label, value, tone = 'default' }) {
+  const palette = tone === 'success'
+    ? { background: 'rgba(16,185,129,0.1)', border: 'rgba(16,185,129,0.16)', color: '#34d399' }
+    : tone === 'accent'
+      ? { background: 'rgba(var(--accent-rgb),0.12)', border: 'rgba(var(--accent-rgb),0.18)', color: 'var(--accent)' }
+      : { background: 'rgba(255,255,255,0.035)', border: 'rgba(255,255,255,0.07)', color: 'var(--text-primary)' }
+
+  return (
+    <div
+      className="min-w-[84px] rounded-2xl px-3 py-1.5"
+      style={{ background: palette.background, border: `1px solid ${palette.border}` }}
+    >
+      <div className="text-[10px] font-semibold uppercase tracking-[0.24em]" style={{ color: 'var(--text-secondary)' }}>
+        {label}
+      </div>
+      <div className="mt-1 text-base font-bold leading-none" style={{ color: palette.color }}>
+        {value}
+      </div>
+    </div>
+  )
+})
+
+const MilestonePreviewStrip = memo(function MilestonePreviewStrip({ label, milestones, accentColor, onToggle, expanded }) {
+  const visibleMilestones = sortMilestones(milestones).slice(0, 2)
+  const nextMilestone = visibleMilestones.find((milestone) => milestone.status !== 'completed') ?? visibleMilestones[0] ?? null
+
+  return (
+    <div className="flex flex-col gap-1.5 rounded-2xl px-3 py-2" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>{label}</p>
+          <p className="text-[10px] mt-1 truncate" style={{ color: 'var(--text-secondary)' }}>
+            {milestones.length > 0
+              ? nextMilestone
+                ? `Next ${formatShortDate(nextMilestone.dueDate) ?? 'milestone'} · ${nextMilestone.name}`
+                : `${milestones.length} milestone${milestones.length === 1 ? '' : 's'} in this workstream`
+              : 'No milestones pinned yet'}
+          </p>
+        </div>
+        {onToggle && (
+          <button
+            type="button"
+            onClick={onToggle}
+            className="text-[11px] px-2.5 py-1.5 rounded-full transition-colors"
+            style={{ background: 'rgba(255,255,255,0.05)', color: expanded ? accentColor : 'var(--text-secondary)', border: `1px solid ${expanded ? `${accentColor}22` : 'rgba(255,255,255,0.08)'}` }}
+          >
+            {expanded ? 'Hide' : milestones.length > 0 ? 'View all' : 'Add'}
+          </button>
+        )}
+      </div>
+        {visibleMilestones.length > 0 && (
+        <div className="flex flex-wrap gap-1">
+          {visibleMilestones.map((milestone) => (
+            <div
+              key={milestone.id}
+              className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px]"
+              style={{ background: 'rgba(255,255,255,0.035)', color: 'var(--text-primary)', border: '1px solid rgba(255,255,255,0.05)' }}
+            >
+              <span style={{ color: accentColor }}>◆</span>
+              <span className="font-medium max-w-[154px] truncate">{milestone.name}</span>
+              {milestone.dueDate && (
+                <span style={{ color: 'var(--text-secondary)' }}>{formatShortDate(milestone.dueDate)}</span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+})
+
+const ProgramMilestonesOverview = memo(function ProgramMilestonesOverview({ milestones, projects, accentColor }) {
+  const visibleMilestones = useMemo(() => sortMilestones(milestones).slice(0, 2), [milestones])
+  const projectMap = useMemo(
+    () => new Map(projects.map((project) => [project.id, project])),
+    [projects]
+  )
+
+  const totalCount = milestones.length
+  const completedCount = milestones.filter((milestone) => milestone.status === 'completed').length
+  const upcomingCount = milestones.filter((milestone) => milestone.status !== 'completed').length
+  const hiddenCount = Math.max(0, totalCount - visibleMilestones.length)
+  const nextMilestone = sortMilestones(milestones).find((milestone) => milestone.status !== 'completed') ?? null
+
+  return (
+    <div
+      className="rounded-2xl px-3 py-2"
+      style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>
+              Milestones
+            </p>
+            <InfoTooltip text="Program milestones are rolled up from the milestones inside its projects and sub-projects." />
+          </div>
+          <p className="text-[10px] mt-1" style={{ color: 'var(--text-secondary)' }}>
+            {totalCount > 0
+              ? nextMilestone
+                ? `Next ${formatShortDate(nextMilestone.dueDate) ?? 'milestone'} · ${nextMilestone.name}`
+                : `${upcomingCount} upcoming, ${completedCount} completed`
+              : 'No project milestones yet'}
+          </p>
+        </div>
+        <div className="flex items-center gap-3 text-[10px]" style={{ color: 'var(--text-secondary)' }}>
+          <span>{totalCount} total</span>
+          <span>{upcomingCount} upcoming</span>
+          <span>{completedCount} done</span>
+        </div>
       </div>
 
-      <ProgramFormDrawer
-        open={Boolean(programDrawer)}
-        mode={programDrawer?.mode ?? 'create'}
-        initialValues={programDrawer?.program ?? null}
-        defaultScope={workspaceViewScope}
-        onClose={() => setProgramDrawer(null)}
-        onSubmit={handleProgramSubmit}
-        onDelete={programDrawer?.mode === 'edit' ? handleProgramDelete : null}
-      />
+      {visibleMilestones.length > 0 ? (
+        <div className="mt-2 space-y-1">
+          {visibleMilestones.map((milestone) => {
+            const project = projectMap.get(milestone.projectId)
+            const isCompleted = milestone.status === 'completed'
+            const dueDate = milestone.dueDate ? new Date(milestone.dueDate) : null
+            const isOverdue = dueDate && dueDate < new Date() && !isCompleted
+            const projectColor = project?.color || accentColor
 
-      <ProjectFormDrawer
-        open={Boolean(projectDrawer)}
-        mode={projectDrawer?.mode ?? 'create'}
-        initialValues={projectDrawer?.project ?? projectDrawer?.initialValues ?? null}
-        lockedProgramId={projectDrawer?.lockedProgramId ?? selectedProgram?.id ?? null}
-        programOptions={programs}
-        parentOptions={projectDrawer?.mode === 'edit' ? projectParentsForDrawer : programProjects}
-        onClose={() => setProjectDrawer(null)}
-        onSubmit={handleProjectSubmit}
-        onDelete={projectDrawer?.mode === 'edit' ? handleProjectDelete : null}
-      />
-
-      {shareProgram ? (
-        <ShareModal
-          resourceType="program"
-          resourceId={shareProgram.id}
-          resourceName={shareProgram.name}
-          onClose={() => setShareProgram(null)}
-        />
+            return (
+              <div
+                key={milestone.id}
+                className="flex items-center gap-2.5 rounded-xl px-2.5 py-1.5"
+                style={{ background: 'rgba(255,255,255,0.018)', border: '1px solid rgba(255,255,255,0.035)' }}
+              >
+                <span style={{ color: projectColor }} className="text-[11px] flex-shrink-0">◆</span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span
+                      className="text-[11px] font-medium truncate"
+                      style={{
+                        color: isCompleted ? 'var(--text-secondary)' : 'var(--text-primary)',
+                        textDecoration: isCompleted ? 'line-through' : 'none',
+                      }}
+                    >
+                      {milestone.name}
+                    </span>
+                    {project && (
+                      <span className="text-[10px]" style={{ color: projectColor }}>{project.name}</span>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  {milestone.dueDate ? (
+                    <span
+                      className="text-[10px] px-2 py-1 rounded-full"
+                      style={{
+                        background: isOverdue ? 'rgba(239,68,68,0.12)' : 'rgba(255,255,255,0.05)',
+                        color: isOverdue ? '#fca5a5' : 'var(--text-secondary)',
+                      }}
+                    >
+                      {formatShortDate(milestone.dueDate)}
+                    </span>
+                  ) : (
+                    <span className="text-[10px] px-2 py-1 rounded-full" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)' }}>
+                      No date
+                    </span>
+                  )}
+                  <span
+                    className="text-[10px] px-2 py-1 rounded-full"
+                    style={isCompleted
+                      ? { background: 'rgba(16,185,129,0.14)', color: '#34d399' }
+                      : isOverdue
+                        ? { background: 'rgba(239,68,68,0.14)', color: '#f87171' }
+                          : { background: 'rgba(255,255,255,0.06)', color: 'var(--text-secondary)' }}
+                  >
+                    {isCompleted ? 'Done' : isOverdue ? 'Late' : 'Upcoming'}
+                  </span>
+                </div>
+              </div>
+            )
+          })}
+          {hiddenCount > 0 && (
+            <div className="pt-1 text-[10px]" style={{ color: 'var(--text-secondary)' }}>
+              +{hiddenCount} more milestone{hiddenCount === 1 ? '' : 's'} in this program
+            </div>
+          )}
+        </div>
       ) : null}
+    </div>
+  )
+})
+
+const TaskRow = memo(function TaskRow({ task, onDragStart, onDragOver, onDrop }) {
+  const selectTask = useSettingsStore((state) => state.selectTask)
+  const updateTask = useTaskStore((state) => state.updateTask)
+  const now = new Date()
+  const isOverdue = task.dueDate && new Date(task.dueDate) < now && task.status !== 'done'
+
+  const updateDateField = (field, nextValue) => {
+    updateTask(task.id, { [field]: nextValue ? new Date(nextValue).toISOString() : null })
+  }
+
+  return (
+    <div
+      draggable
+      onDragStart={(event) => onDragStart?.(event, task)}
+      onDragOver={(event) => onDragOver?.(event, task)}
+      onDrop={(event) => onDrop?.(event, task)}
+      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-colors hover:bg-white/5 group"
+      style={{ border: '1px solid rgba(255,255,255,0.04)' }}
+    >
+      <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: PRIORITY_COLOR[task.priority] }} />
+      <button
+        type="button"
+        onClick={() => selectTask(task.id)}
+        className="flex-1 min-w-0 bg-transparent border-0 p-0 text-left"
+      >
+        <span
+          className="block text-sm truncate"
+          style={{
+            color: task.status === 'done' ? 'var(--text-secondary)' : 'var(--text-primary)',
+            textDecoration: task.status === 'done' ? 'line-through' : 'none',
+          }}
+        >
+          {task.title}
+        </span>
+      </button>
+      <div className="hidden md:flex items-center gap-2 flex-shrink-0">
+        <InlineDateChip label="Start" value={task.startDate} onChange={(nextValue) => updateDateField('startDate', nextValue)} />
+        <InlineDateChip label="Due" value={task.dueDate} tone={isOverdue ? 'danger' : 'default'} onChange={(nextValue) => updateDateField('dueDate', nextValue)} />
+      </div>
+      {task.subtasks?.length > 0 && (
+        <span className="text-[10px] flex-shrink-0" style={{ color: 'var(--text-secondary)' }}>
+          {task.subtasks.filter((subtask) => subtask.completed).length}/{task.subtasks.length}
+        </span>
+      )}
+      <InlineStatusChip value={task.status} onChange={(nextStatus) => updateTask(task.id, { status: nextStatus })} labels={STATUS_LABEL} colors={STATUS_COLOR} />
+    </div>
+  )
+})
+
+const KanbanCard = memo(function KanbanCard({ task }) {
+  const selectTask = useSettingsStore((state) => state.selectTask)
+  return (
+    <button
+      type="button"
+      onClick={() => selectTask(task.id)}
+      className="w-full text-left p-2.5 rounded-xl transition-colors hover:bg-white/5"
+      style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}
+    >
+      <div className="flex items-start gap-1.5 mb-1.5">
+        <span className="w-1.5 h-1.5 rounded-full flex-shrink-0 mt-1" style={{ background: PRIORITY_COLOR[task.priority] }} />
+        <span className="text-xs leading-snug" style={{ color: 'var(--text-primary)' }}>{task.title}</span>
+      </div>
+      {task.subtasks?.length > 0 && (
+        <div className="text-[10px]" style={{ color: 'var(--text-secondary)' }}>
+          {task.subtasks.filter((subtask) => subtask.completed).length}/{task.subtasks.length} subtasks
+        </div>
+      )}
+    </button>
+  )
+})
+
+const KANBAN_COLS = [
+  { id: 'todo', label: 'To Do', color: '#94a3b8' },
+  { id: 'in-progress', label: 'In Progress', color: '#22d3ee' },
+  { id: 'review', label: 'Review', color: '#f59e0b' },
+  { id: 'done', label: 'Done', color: '#10b981' },
+  { id: 'blocked', label: 'Blocked', color: '#ef4444' },
+]
+
+const ProjectPanel = memo(function ProjectPanel({ project, depth = 0 }) {
+  const moveTask = useTaskStore((state) => state.moveTask)
+  const updateProject = useProjectStore((state) => state.updateProject)
+  const moveProject = useProjectStore((state) => state.moveProject)
+  const deleteProject = useProjectStore((state) => state.deleteProject)
+  const addProject = useProjectStore((state) => state.addProject)
+  const { tasks, programs, milestones, projects: allProjects } = useWorkspaceScopedData()
+  const activeProjectId = useSettingsStore((state) => state.activeProjectId)
+  const setActiveProject = useSettingsStore((state) => state.setActiveProject)
+
+  const [view, setView] = useState('list')
+  const [expanded, setExpanded] = useState(() => activeProjectId === project.id)
+  const [showWork, setShowWork] = useState(() => activeProjectId === project.id)
+  const [addingSub, setAddingSub] = useState(false)
+  const [subName, setSubName] = useState('')
+  const [subColor, setSubColor] = useState(project.color)
+  const [showMilestones, setShowMilestones] = useState(false)
+  const [showMovePicker, setShowMovePicker] = useState(false)
+  const [showShare, setShowShare] = useState(false)
+  const [deleteArmed, setDeleteArmed] = useState(false)
+
+  const childProjects = useMemo(() => allProjects.filter((candidate) => candidate.parentId === project.id), [allProjects, project.id])
+  const parentProgram = useMemo(
+    () => programs.find((program) => program.id === project.programId) ?? null,
+    [programs, project.programId]
+  )
+  const canShareProject = !parentProgram || parentProgram.scope !== 'personal'
+  const projectTreeIds = useMemo(() => collectProjectTreeIds(allProjects, project.id), [allProjects, project.id])
+  const directTasks = useMemo(() => sortTasksByStartDate(tasks.filter((task) => task.projectId === project.id)), [tasks, project.id])
+  const allProjectTasks = useMemo(() => sortTasksByStartDate(tasks.filter((task) => task.projectId && projectTreeIds.includes(task.projectId))), [tasks, projectTreeIds])
+  const projectMilestones = useMemo(() => sortMilestones(milestones.filter((milestone) => milestone.projectId === project.id)), [milestones, project.id])
+
+  const total = allProjectTasks.length
+  const done = allProjectTasks.filter((task) => task.status === 'done').length
+  const inProgress = allProjectTasks.filter((task) => task.status === 'in-progress' || task.status === 'review').length
+  const blocked = allProjectTasks.filter((task) => task.status === 'blocked').length
+  const now = new Date()
+  const overdue = allProjectTasks.filter((task) => task.dueDate && new Date(task.dueDate) < now && task.status !== 'done').length
+  const unscheduled = allProjectTasks.filter((task) => !task.startDate && !task.dueDate).length
+  const completion = total ? Math.round((done / total) * 100) : 0
+  const health = getHealthMeta({ total, done, blocked, overdue, unscheduled })
+  const scheduleWindow = buildScheduleWindow(project, childProjects, allProjectTasks, projectMilestones)
+  const windowLabel = formatWindowLabel(scheduleWindow.startDate, scheduleWindow.dueDate)
+  const reduceMotion = useReducedMotion()
+  const collapseVariants = useMemo(() => createCollapseVariants(reduceMotion), [reduceMotion])
+
+  useEffect(() => {
+    if (activeProjectId === project.id) {
+      setExpanded(true)
+      setShowWork(true)
+    }
+  }, [activeProjectId, project.id])
+
+  const submitSubProject = () => {
+    if (!subName.trim()) return
+    addProject({ name: subName.trim(), color: subColor, programId: project.programId, parentId: project.id })
+    setSubName('')
+    setAddingSub(false)
+  }
+
+  const openTaskComposer = () => {
+    setActiveProject(project.id)
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('taskflow:quick-add', {
+          detail: { type: 'task', projectId: project.id, programId: project.programId ?? '' },
+        })
+      )
+    }
+  }
+
+  const toggleExpanded = () => {
+    setExpanded((current) => !current)
+    setActiveProject(project.id)
+  }
+
+  const handleProjectDragStart = (event) => {
+    event.stopPropagation()
+    writeDragPayload(event, {
+      type: 'project',
+      id: project.id,
+      programId: project.programId ?? null,
+      parentId: project.parentId ?? null,
+    })
+  }
+
+  const handleProjectDragOver = (event) => {
+    const payload = readDragPayload(event)
+    if (!payload) return
+    if (payload.type === 'project' || payload.type === 'task') {
+      event.preventDefault()
+      event.dataTransfer.dropEffect = 'move'
+    }
+  }
+
+  const handleProjectDrop = (event) => {
+    const payload = readDragPayload(event)
+    if (!payload) return
+
+    if (payload.type === 'project' && payload.id !== project.id) {
+      event.preventDefault()
+      event.stopPropagation()
+      const nextParentId = project.parentId ?? null
+      if (createsProjectCycle(allProjects, payload.id, nextParentId)) return
+      moveProject(payload.id, {
+        programId: project.programId ?? null,
+        parentId: nextParentId,
+        beforeProjectId: project.id,
+      })
+      return
+    }
+
+    if (payload.type === 'task' && payload.id) {
+      event.preventDefault()
+      event.stopPropagation()
+      moveTask(payload.id, { projectId: project.id })
+    }
+  }
+
+  const handleTaskDragStart = (event, task) => {
+    event.stopPropagation()
+    writeDragPayload(event, {
+      type: 'task',
+      id: task.id,
+      projectId: task.projectId ?? null,
+    })
+  }
+
+  const handleTaskDragOver = (event, task) => {
+    const payload = readDragPayload(event)
+    if (!payload || payload.type !== 'task' || payload.id === task.id) return
+    event.preventDefault()
+    event.stopPropagation()
+    event.dataTransfer.dropEffect = 'move'
+  }
+
+  const handleTaskDrop = (event, task) => {
+    const payload = readDragPayload(event)
+    if (!payload || payload.type !== 'task' || payload.id === task.id) return
+    event.preventDefault()
+    event.stopPropagation()
+    moveTask(payload.id, { projectId: project.id, beforeTaskId: task.id })
+  }
+
+  return (
+    <motion.div
+      layout={!reduceMotion}
+      className="rounded-[24px] overflow-hidden"
+      data-project-id={project.id}
+      onDragOver={handleProjectDragOver}
+      onDrop={handleProjectDrop}
+      style={{
+        border: depth > 0 ? '1px solid rgba(255,255,255,0.06)' : '1px solid rgba(255,255,255,0.08)',
+        background: depth > 0 ? 'rgba(255,255,255,0.012)' : 'rgba(255,255,255,0.018)',
+        boxShadow: expanded ? `0 12px 30px ${project.color}0b` : 'none',
+      }}
+    >
+      <div
+        onClick={toggleExpanded}
+        className="group cursor-pointer px-3.5 py-2.5"
+        style={{ background: expanded ? 'rgba(255,255,255,0.025)' : 'rgba(255,255,255,0.015)', borderBottom: expanded ? '1px solid rgba(255,255,255,0.05)' : 'none' }}
+      >
+        <div className="flex items-start gap-3">
+          <button type="button" onClick={(event) => { event.stopPropagation(); toggleExpanded() }} style={{ color: 'var(--text-secondary)' }}>
+            {expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
+          </button>
+          <button
+            type="button"
+            draggable
+            onDragStart={handleProjectDragStart}
+            onClick={(event) => event.stopPropagation()}
+            className="p-0.5 rounded hover:bg-white/8 cursor-grab active:cursor-grabbing"
+            style={{ color: 'var(--text-secondary)' }}
+            title="Drag to reorder or move project"
+          >
+            <GripVertical size={12} />
+          </button>
+          <ColorDot color={project.color} onChange={(nextColor) => updateProject(project.id, { color: nextColor })} />
+
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              {depth > 0 && <GitBranch size={10} style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />}
+              <Editable value={project.name} onSave={(name) => updateProject(project.id, { name })} className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }} />
+              {depth > 0 && (
+                <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--text-secondary)' }}>
+                  Sub-project
+                </span>
+              )}
+              <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: health.background, color: health.color }}>
+                {health.label}
+              </span>
+              <InfoTooltip text={project.description} />
+            </div>
+            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px]" style={{ color: 'var(--text-secondary)' }}>
+              <span>{windowLabel}</span>
+              <span>{total} task{total === 1 ? '' : 's'}</span>
+              {childProjects.length > 0 && <span>{childProjects.length} sub-project{childProjects.length === 1 ? '' : 's'}</span>}
+              {projectMilestones.length > 0 && <span>{projectMilestones.length} milestone{projectMilestones.length === 1 ? '' : 's'}</span>}
+            </div>
+          </div>
+
+          <div className="hidden xl:flex items-center gap-3 min-w-[220px]" onClick={(event) => event.stopPropagation()}>
+            <div className="flex-1 min-w-[120px]">
+              <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.07)' }}>
+                <div className="h-full rounded-full transition-all duration-700" style={{ width: `${completion}%`, background: `linear-gradient(90deg, ${project.color}88, ${project.color})` }} />
+              </div>
+              <div className="flex justify-between mt-1 text-[10px]" style={{ color: 'var(--text-secondary)' }}>
+                <span>{done}/{total || 0} done</span>
+                <span style={{ color: project.color }}>{completion}%</span>
+              </div>
+            </div>
+            <span className="text-[10px]" style={{ color: 'var(--text-secondary)' }}>
+              {inProgress} active
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2" onClick={(event) => event.stopPropagation()}>
+            <ActionMenu
+              iconOnly
+              items={[
+                { label: showMovePicker ? 'Hide move picker' : 'Move to program…', onClick: () => setShowMovePicker((current) => !current) },
+                ...(canShareProject ? [{ label: showShare ? 'Hide share link' : 'Share project', onClick: () => setShowShare(true) }] : []),
+                { label: deleteArmed ? 'Cancel delete' : 'Delete project', onClick: () => setDeleteArmed((current) => !current), tone: 'danger' },
+              ]}
+            />
+          </div>
+        </div>
+      </div>
+
+      {showMovePicker && (
+          <motion.div className="px-3.5 pb-2" variants={collapseVariants} initial="initial" animate="animate" exit="exit">
+          <select
+            value={project.programId ?? ''}
+            onChange={(event) => {
+              moveProject(project.id, { programId: event.target.value || null, parentId: project.parentId ?? null })
+              setShowMovePicker(false)
+            }}
+            className="w-full text-xs px-2.5 py-2 rounded-xl"
+            style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-primary)' }}
+          >
+            <option value="">Unassigned</option>
+            {programs.map((programOption) => (
+              <option key={programOption.id} value={programOption.id}>{programOption.name}</option>
+            ))}
+          </select>
+        </motion.div>
+      )}
+
+      {deleteArmed && (
+        <motion.div className="px-3.5 pb-3" variants={collapseVariants} initial="initial" animate="animate" exit="exit">
+          <div className="flex items-center justify-between gap-3 rounded-2xl px-3 py-2.5" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.16)' }}>
+            <span className="text-[11px]" style={{ color: '#fca5a5' }}>Delete this project and its nested work?</span>
+            <div className="flex items-center gap-2">
+              <button type="button" onClick={() => setDeleteArmed(false)} className="text-[11px] px-2 py-1 rounded-lg" style={{ color: 'var(--text-secondary)', background: 'rgba(255,255,255,0.08)' }}>Cancel</button>
+              <button type="button" onClick={() => deleteProject(project.id)} className="text-[11px] px-2 py-1 rounded-lg" style={{ color: '#fff', background: '#dc2626' }}>Delete</button>
+            </div>
+          </div>
+        </motion.div>
+      )}
+
+      <AnimatePresence initial={false}>
+      {expanded && (
+        <motion.div
+          variants={collapseVariants}
+          initial="initial"
+          animate="animate"
+          exit="exit"
+          className="overflow-hidden"
+        >
+        <div className="px-3.5 pb-3 pt-2 space-y-2" style={{ background: 'rgba(255,255,255,0.018)' }}>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px]" style={{ color: 'var(--text-secondary)' }}>
+            <span><strong style={{ color: 'var(--text-primary)' }}>{done}</strong> of {total} done</span>
+            <span><strong style={{ color: 'var(--text-primary)' }}>{inProgress}</strong> active</span>
+            <span><strong style={{ color: health.color }}>{health.label}</strong></span>
+            <span>{windowLabel}</span>
+            {unscheduled > 0 && <span><strong style={{ color: '#fca5a5' }}>{unscheduled}</strong> need dates</span>}
+          </div>
+
+          <MilestonePreviewStrip
+            label="Milestones"
+            milestones={projectMilestones}
+            accentColor={project.color}
+            expanded={showMilestones}
+            onToggle={() => setShowMilestones((current) => !current)}
+          />
+
+          <AnimatePresence initial={false}>
+          {showMilestones && (
+            <motion.div
+              variants={collapseVariants}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              className="overflow-hidden rounded-2xl px-3 py-3"
+              style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.05)' }}
+            >
+              <MilestonePanel projectId={project.id} projectColor={project.color} />
+            </motion.div>
+          )}
+          </AnimatePresence>
+
+          {childProjects.length > 0 && (
+            <div className="rounded-2xl px-3 py-2.5" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
+              <div className="flex items-center justify-between gap-3 mb-2">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>Sub-projects</p>
+                <span className="text-[10px]" style={{ color: 'var(--text-secondary)' }}>{childProjects.length}</span>
+              </div>
+              <div className="space-y-2">
+                {childProjects.map((childProject) => (
+                  <ProjectPanel key={childProject.id} project={childProject} depth={depth + 1} />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {depth === 0 && (
+            <div className="rounded-2xl px-3.5 py-2.5" style={{ background: 'rgba(255,255,255,0.018)', border: '1px solid rgba(255,255,255,0.04)' }}>
+              {addingSub ? (
+                <div className="space-y-2.5">
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>Add sub-project</p>
+                  </div>
+                  <input
+                    autoFocus
+                    value={subName}
+                    onChange={(event) => setSubName(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') submitSubProject()
+                      if (event.key === 'Escape') setAddingSub(false)
+                    }}
+                    placeholder="Sub-project name…"
+                    maxLength={60}
+                    className="w-full text-xs px-2.5 py-2 rounded-xl bg-transparent border"
+                    style={{ borderColor: 'rgba(var(--accent-rgb),0.3)', color: 'var(--text-primary)' }}
+                  />
+                  <ColorPalettePicker colors={PROJECT_COLORS} value={subColor} compact onChange={(next) => next && setSubColor(next)} />
+                  <div className="flex gap-2">
+                    <button type="button" onClick={submitSubProject} className="flex-1 btn-accent py-1.5 text-xs">Create sub-project</button>
+                    <button type="button" onClick={() => setAddingSub(false)} className="btn-ghost py-1.5 text-xs px-3">Cancel</button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setAddingSub(true)}
+                  className="flex items-center gap-2 text-[11px] px-2 py-1.5 rounded-xl transition-colors hover:bg-white/5"
+                  style={{ color: 'var(--text-secondary)' }}
+                >
+                  <Plus size={12} /> Add sub-project
+                </button>
+              )}
+            </div>
+          )}
+
+          <div className="rounded-2xl px-3 py-2.5" style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.05)' }}>
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-2.5">
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>Work items</p>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                {directTasks.length > 0 && showWork && (
+                  <div className="flex items-center gap-0.5 rounded-xl p-0.5" style={{ background: 'rgba(255,255,255,0.06)' }}>
+                    {[['list', LayoutList], ['board', Kanban]].map(([nextView, Icon]) => (
+                      <button
+                        key={nextView}
+                        type="button"
+                        onClick={() => setView(nextView)}
+                        className="p-1.5 rounded-lg transition-colors"
+                        style={view === nextView ? { background: 'var(--accent)', color: '#fff' } : { color: 'var(--text-secondary)' }}
+                      >
+                        <Icon size={12} />
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <button type="button" onClick={() => setShowWork((current) => !current)} className="text-[11px] px-2.5 py-2 rounded-xl" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)' }}>
+                  {showWork ? 'Hide tasks' : 'Show tasks'}
+                </button>
+                <button type="button" onClick={openTaskComposer} className="text-[11px] px-2.5 py-2 rounded-xl" style={{ background: `${project.color}18`, color: project.color }}>
+                  Add task
+                </button>
+              </div>
+            </div>
+
+            {showWork ? (
+              directTasks.length === 0 ? (
+                <div className="rounded-2xl px-3 py-3 text-center text-[11px]" style={{ background: 'rgba(255,255,255,0.02)', border: '1px dashed rgba(255,255,255,0.08)', color: 'var(--text-secondary)' }}>
+                  No direct tasks yet.
+                </div>
+              ) : view === 'list' ? (
+                <div className="space-y-1">
+                  {directTasks.map((task) => (
+                    <TaskRow key={task.id} task={task} onDragStart={handleTaskDragStart} onDragOver={handleTaskDragOver} onDrop={handleTaskDrop} />
+                  ))}
+                </div>
+              ) : (
+                <div className="flex gap-2 overflow-x-auto pb-2 snap-x">
+                  {KANBAN_COLS.map((column) => {
+                    const columnTasks = directTasks.filter((task) => task.status === column.id)
+                    return (
+                      <div key={column.id} className="flex-shrink-0 w-[220px] snap-start">
+                        <div className="flex items-center gap-1.5 mb-1.5 px-1">
+                          <span className="w-1.5 h-1.5 rounded-full" style={{ background: column.color }} />
+                          <span className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: column.color }}>{column.label}</span>
+                          <span className="text-[10px] ml-auto" style={{ color: 'var(--text-secondary)' }}>{columnTasks.length}</span>
+                        </div>
+                        <div className="space-y-1.5 min-h-[40px]">
+                          {columnTasks.map((task) => <KanbanCard key={task.id} task={task} />)}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )
+            ) : (
+              <div className="rounded-2xl px-3 py-4 text-center" style={{ background: 'rgba(255,255,255,0.02)', border: '1px dashed rgba(255,255,255,0.08)', color: 'var(--text-secondary)' }}>
+                {directTasks.length > 0 ? `${directTasks.length} direct task${directTasks.length === 1 ? '' : 's'} tucked under this project.` : 'No direct tasks here yet.'}
+              </div>
+            )}
+          </div>
+        </div>
+        </motion.div>
+      )}
+      </AnimatePresence>
+
+      {canShareProject && showShare && (
+        <ShareModal resourceType="project" resourceId={project.id} resourceName={project.name} onClose={() => setShowShare(false)} />
+      )}
+    </motion.div>
+  )
+})
+
+const ProgramSection = memo(function ProgramSection({ program, projects, expanded, onToggle }) {
+  const updateProgram = useProjectStore((state) => state.updateProgram)
+  const moveProgram = useProjectStore((state) => state.moveProgram)
+  const deleteProgram = useProjectStore((state) => state.deleteProgram)
+  const addProject = useProjectStore((state) => state.addProject)
+  const moveProject = useProjectStore((state) => state.moveProject)
+  const { milestones, tasks } = useWorkspaceScopedData()
+  const [addingProject, setAddingProject] = useState(false)
+  const [newProjName, setNewProjName] = useState('')
+  const [newProjColor, setNewProjColor] = useState(PROJECT_COLORS[0])
+  const [showStatusPicker, setShowStatusPicker] = useState(false)
+  const [showShare, setShowShare] = useState(false)
+  const [deleteArmed, setDeleteArmed] = useState(false)
+
+  const topLevelProjects = projects.filter((project) => !project.parentId)
+  const projectMilestones = useMemo(() => sortMilestones(milestones.filter((milestone) => projects.some((project) => project.id === milestone.projectId))), [milestones, projects])
+
+  const programDirectTasks = useMemo(() => sortTasksByStartDate(tasks.filter((task) => !task.projectId && taskMatchesProgram(task, program.id, projects))), [tasks, program.id, projects])
+  const allTasks = useMemo(() => tasks.filter((task) => taskMatchesProgram(task, program.id, projects)), [tasks, program.id, projects])
+
+  const totalTasks = allTasks.length
+  const doneTasks = allTasks.filter((task) => task.status === 'done').length
+  const inProgress = allTasks.filter((task) => task.status === 'in-progress' || task.status === 'review').length
+  const blocked = allTasks.filter((task) => task.status === 'blocked').length
+  const now = new Date()
+  const overdue = allTasks.filter((task) => task.dueDate && new Date(task.dueDate) < now && task.status !== 'done').length
+  const unscheduled = allTasks.filter((task) => !task.startDate && !task.dueDate).length
+  const health = getHealthMeta({ total: totalTasks, done: doneTasks, blocked, overdue, unscheduled })
+  const scopeConfig = PROGRAM_SCOPE_CONFIG[program.scope ?? 'professional'] ?? PROGRAM_SCOPE_CONFIG.professional
+  const canShareProgram = (program.scope ?? 'professional') !== 'personal'
+  const scheduleWindow = buildScheduleWindow(program, projects, allTasks, projectMilestones)
+  const windowLabel = formatWindowLabel(scheduleWindow.startDate, scheduleWindow.dueDate)
+  const reduceMotion = useReducedMotion()
+  const collapseVariants = useMemo(() => createCollapseVariants(reduceMotion), [reduceMotion])
+
+  const submitProject = () => {
+    if (!newProjName.trim()) return
+    addProject({ name: newProjName.trim(), color: newProjColor, programId: program.id })
+    setNewProjName('')
+    setAddingProject(false)
+  }
+
+  const handleProgramDragStart = (event) => {
+    event.stopPropagation()
+    writeDragPayload(event, { type: 'program', id: program.id })
+  }
+
+  const handleProgramDragOver = (event) => {
+    const payload = readDragPayload(event)
+    if (!payload) return
+    if (payload.type === 'program' && payload.id !== program.id) {
+      event.preventDefault()
+      event.dataTransfer.dropEffect = 'move'
+    }
+    if (payload.type === 'project') {
+      event.preventDefault()
+      event.dataTransfer.dropEffect = 'move'
+    }
+  }
+
+  const handleProgramDrop = (event) => {
+    const payload = readDragPayload(event)
+    if (!payload) return
+
+    if (payload.type === 'program' && payload.id !== program.id) {
+      event.preventDefault()
+      event.stopPropagation()
+      moveProgram(payload.id, program.id)
+      return
+    }
+
+    if (payload.type === 'project') {
+      event.preventDefault()
+      event.stopPropagation()
+      moveProject(payload.id, { programId: program.id, parentId: null })
+      return
+    }
+  }
+
+  return (
+    <motion.div className="mb-4 rounded-[26px] overflow-hidden" layout={!reduceMotion} data-program-id={program.id} onDragOver={handleProgramDragOver} onDrop={handleProgramDrop} style={{ border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.02)' }}>
+      <div className="px-4 md:px-5 py-3" style={{ background: expanded ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.02)', borderBottom: expanded ? '1px solid rgba(255,255,255,0.06)' : 'none' }}>
+        <div className="flex items-start gap-3">
+          <button type="button" onClick={onToggle} style={{ color: 'var(--text-secondary)' }}>
+            {expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
+          </button>
+          <button
+            type="button"
+            draggable
+            onDragStart={handleProgramDragStart}
+            onClick={(event) => event.stopPropagation()}
+            className="p-0.5 rounded hover:bg-white/8 cursor-grab active:cursor-grabbing"
+            style={{ color: 'var(--text-secondary)' }}
+            title="Drag to reorder program"
+          >
+            <GripVertical size={13} />
+          </button>
+          <div className="w-3 h-3 rounded flex-shrink-0 mt-1" style={{ background: program.color, boxShadow: `0 0 8px ${program.color}60` }} />
+
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <Editable value={program.name} onSave={(name) => updateProgram(program.id, { name })} className="text-base font-bold" style={{ color: 'var(--text-primary)' }} />
+              <div className="relative">
+                <button type="button" onClick={() => setShowStatusPicker((current) => !current)}>
+                  <ProgramStatusBadge status={program.status || 'planning'} />
+                </button>
+                {showStatusPicker && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setShowStatusPicker(false)} />
+                    <div className="absolute top-full left-0 mt-1 z-50 rounded-xl overflow-hidden" style={{ background: '#ffffff', border: '1px solid rgba(15,23,42,0.12)', boxShadow: '0 16px 48px rgba(15,23,42,0.18)', minWidth: '140px' }}>
+                      {STATUS_OPTIONS.map((value) => {
+                        const config = STATUS_CONFIG[value]
+                        const active = (program.status || 'planning') === value
+                        return (
+                          <button
+                            key={value}
+                            type="button"
+                            onClick={() => {
+                              updateProgram(program.id, { status: value })
+                              setShowStatusPicker(false)
+                            }}
+                            className="w-full flex items-center gap-2 px-3 py-2 text-xs text-left hover:bg-slate-100 transition-colors"
+                            style={active ? { color: config.color, background: `${config.color}12` } : { color: '#334155' }}
+                          >
+                            <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: config.color }} />
+                            {config.label}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </>
+                )}
+              </div>
+              <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: health.background, color: health.color }}>{health.label}</span>
+              <InfoTooltip text={program.description} />
+            </div>
+            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px]" style={{ color: 'var(--text-secondary)' }}>
+              <span style={{ color: scopeConfig.color }}>{scopeConfig.label}</span>
+              <span>{windowLabel}</span>
+              <span>{topLevelProjects.length} project{topLevelProjects.length === 1 ? '' : 's'}</span>
+              <span>{totalTasks} task{totalTasks === 1 ? '' : 's'}</span>
+              {projectMilestones.length > 0 && <span>{projectMilestones.length} milestone{projectMilestones.length === 1 ? '' : 's'}</span>}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2" onClick={(event) => event.stopPropagation()}>
+            <ActionMenu
+              label="Add"
+              icon={Plus}
+              accent
+              items={[
+                { label: 'Add project', onClick: () => setAddingProject(true) },
+              ]}
+            />
+            <ActionMenu
+              iconOnly
+              items={[
+                ...(canShareProgram ? [{ label: 'Share program', onClick: () => setShowShare(true) }] : []),
+                { label: deleteArmed ? 'Cancel delete' : 'Delete program', onClick: () => setDeleteArmed((current) => !current), tone: 'danger' },
+              ]}
+            />
+          </div>
+        </div>
+      </div>
+
+      {deleteArmed && (
+        <motion.div className="px-4 md:px-5 py-3" variants={collapseVariants} initial="initial" animate="animate" exit="exit">
+          <div className="flex items-center justify-between gap-3 rounded-2xl px-3 py-2.5" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.16)' }}>
+            <span className="text-[11px]" style={{ color: '#fca5a5' }}>Delete this program and unassign its projects?</span>
+            <div className="flex items-center gap-2">
+              <button type="button" onClick={() => setDeleteArmed(false)} className="text-[11px] px-2 py-1 rounded-lg" style={{ color: 'var(--text-secondary)', background: 'rgba(255,255,255,0.08)' }}>Cancel</button>
+              <button type="button" onClick={() => deleteProgram(program.id)} className="text-[11px] px-2 py-1 rounded-lg" style={{ color: '#fff', background: '#dc2626' }}>Delete</button>
+            </div>
+          </div>
+        </motion.div>
+      )}
+
+      <AnimatePresence initial={false}>
+      {expanded && (
+        <motion.div
+          variants={collapseVariants}
+          initial="initial"
+          animate="animate"
+          exit="exit"
+          className="overflow-hidden"
+        >
+        <div className="px-4 md:px-5 pb-3 pt-2.5 space-y-2.5">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px]" style={{ color: 'var(--text-secondary)' }}>
+            <span><strong style={{ color: 'var(--text-primary)' }}>{topLevelProjects.length}</strong> active projects</span>
+            <span><strong style={{ color: 'var(--text-primary)' }}>{doneTasks}</strong> of {totalTasks} done</span>
+            <span><strong style={{ color: 'var(--text-primary)' }}>{inProgress}</strong> in flow</span>
+            <span><strong style={{ color: health.color }}>{health.label}</strong></span>
+            {unscheduled > 0 && <span><strong style={{ color: '#fca5a5' }}>{unscheduled}</strong> need dates</span>}
+          </div>
+          <ProgramMilestonesOverview milestones={projectMilestones} projects={projects} accentColor={program.color} />
+
+          {addingProject && (
+            <div className="rounded-2xl p-3" style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.08)' }}>
+              <div className="flex flex-col gap-2.5">
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>New project</p>
+                </div>
+                <input
+                  autoFocus
+                  value={newProjName}
+                  onChange={(event) => setNewProjName(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') submitProject()
+                    if (event.key === 'Escape') setAddingProject(false)
+                  }}
+                  placeholder="Project name…"
+                  maxLength={60}
+                  className="w-full text-sm px-3 py-2 rounded-xl"
+                  style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(var(--accent-rgb),0.25)', color: 'var(--text-primary)' }}
+                />
+                <ColorPalettePicker colors={PROJECT_COLORS} value={newProjColor} onChange={(next) => next && setNewProjColor(next)} />
+                <div className="flex gap-2">
+                  <button type="button" onClick={submitProject} className="flex-1 btn-accent py-1.5 text-xs">Create project</button>
+                  <button type="button" onClick={() => setAddingProject(false)} className="btn-ghost py-1.5 text-xs px-3">Cancel</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="space-y-3">
+            {topLevelProjects.length === 0 && programDirectTasks.length === 0 && !addingProject ? (
+              <div className="rounded-2xl px-4 py-3 text-center text-[11px]" style={{ background: 'rgba(255,255,255,0.02)', border: '1px dashed rgba(255,255,255,0.08)', color: 'var(--text-secondary)' }}>
+                No projects yet. Add the first project for this program.
+              </div>
+            ) : (
+              topLevelProjects.map((projectItem) => (
+                <ProjectPanel key={projectItem.id} project={projectItem} />
+              ))
+            )}
+          </div>
+        </div>
+        </motion.div>
+      )}
+      </AnimatePresence>
+
+      {canShareProgram && showShare && <ShareModal resourceType="program" resourceId={program.id} resourceName={program.name} onClose={() => setShowShare(false)} />}
+    </motion.div>
+  )
+})
+
+const UnassignedSection = memo(function UnassignedSection({ projects }) {
+  const moveProject = useProjectStore((state) => state.moveProject)
+  const [collapsed, setCollapsed] = useState(false)
+  const topLevelProjects = projects.filter((project) => !project.parentId)
+  if (topLevelProjects.length === 0) return null
+
+  return (
+    <div className="mb-6 rounded-[28px] overflow-hidden" onDragOver={(event) => {
+      const payload = readDragPayload(event)
+      if (!payload || payload.type !== 'project') return
+      event.preventDefault()
+      event.dataTransfer.dropEffect = 'move'
+    }} onDrop={(event) => {
+      const payload = readDragPayload(event)
+      if (!payload || payload.type !== 'project') return
+      event.preventDefault()
+      event.stopPropagation()
+      moveProject(payload.id, { programId: null, parentId: null })
+    }} style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)' }}>
+      <div className="flex items-center gap-2.5 px-4 py-4" style={{ background: 'rgba(255,255,255,0.03)' }}>
+        <button type="button" onClick={() => setCollapsed((current) => !current)} style={{ color: 'var(--text-secondary)' }}>
+          {collapsed ? <ChevronRight size={15} /> : <ChevronDown size={15} />}
+        </button>
+        <Folder size={14} style={{ color: 'var(--text-secondary)' }} />
+        <div className="flex-1 min-w-0">
+          <h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Unassigned projects</h2>
+          <p className="text-[11px] mt-1" style={{ color: 'var(--text-secondary)' }}>Projects not currently attached to a program.</p>
+        </div>
+        <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--text-secondary)' }}>
+          {topLevelProjects.length}
+        </span>
+      </div>
+      {!collapsed && (
+        <div className="px-4 py-4 space-y-3">
+          {topLevelProjects.map((project) => <ProjectPanel key={project.id} project={project} />)}
+        </div>
+      )}
+    </div>
+  )
+})
+
+const NewProgramForm = memo(function NewProgramForm({ onDone }) {
+  const [name, setName] = useState('')
+  const [color, setColor] = useState(PROJECT_COLORS[0])
+  const [desc, setDesc] = useState('')
+  const workspaceViewScope = useSettingsStore((state) => state.workspaceViewScope)
+  const [scope, setScope] = useState(workspaceViewScope)
+  const addProgram = useProjectStore((state) => state.addProgram)
+
+  const submit = () => {
+    if (!name.trim()) return
+    addProgram({ name: name.trim(), color, description: desc.trim(), scope })
+    onDone()
+  }
+
+  return (
+    <GlassCard padding="p-4" className="flex flex-col gap-3 mb-6">
+      <div className="flex items-center gap-2">
+        <div className="w-3 h-3 rounded flex-shrink-0" style={{ background: color }} />
+        <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>New Program</span>
+      </div>
+      <input
+        autoFocus
+        value={name}
+        onChange={(event) => setName(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') submit()
+          if (event.key === 'Escape') onDone()
+        }}
+        placeholder="Program name (e.g. Credit Cards, GTM)…"
+        maxLength={60}
+        className="w-full text-sm px-3 py-2 rounded-xl"
+        style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(var(--accent-rgb),0.25)', color: 'var(--text-primary)' }}
+      />
+      <input
+        value={desc}
+        onChange={(event) => setDesc(event.target.value)}
+        placeholder="Description (optional)"
+        maxLength={120}
+        className="w-full text-sm px-3 py-2 rounded-xl"
+        style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', color: 'var(--text-primary)' }}
+      />
+      <div className="grid grid-cols-2 gap-2">
+        {PROGRAM_SCOPE_OPTIONS.map((option) => {
+          const active = scope === option.id
+          const palette = PROGRAM_SCOPE_CONFIG[option.id]
+          return (
+            <button
+              key={option.id}
+              type="button"
+              onClick={() => setScope(option.id)}
+              className="px-3 py-2 rounded-xl text-xs font-semibold transition-colors"
+              style={active
+                ? { background: palette.background, color: palette.color, border: `1px solid ${palette.color}44` }
+                : { background: 'rgba(255,255,255,0.04)', color: 'var(--text-secondary)', border: '1px solid rgba(255,255,255,0.08)' }}
+            >
+              {option.label}
+            </button>
+          )
+        })}
+      </div>
+      <ColorPalettePicker colors={PROJECT_COLORS} value={color} onChange={(next) => next && setColor(next)} />
+      <div className="flex gap-2">
+        <button type="button" onClick={submit} className="flex-1 btn-accent py-2 text-xs">Create program</button>
+        <button type="button" onClick={onDone} className="btn-ghost py-2 text-xs px-3">Cancel</button>
+      </div>
+    </GlassCard>
+  )
+})
+
+const Projects = memo(function Projects() {
+  const { programs, projects, tasks } = useWorkspaceScopedData()
+  const activeProjectId = useSettingsStore((state) => state.activeProjectId)
+  const activeProgramId = useSettingsStore((state) => state.activeProgramId)
+  const setActiveProgram = useSettingsStore((state) => state.setActiveProgram)
+  const setActiveProject = useSettingsStore((state) => state.setActiveProject)
+  const [addingProgram, setAddingProgram] = useState(false)
+
+  const activeProject = projects.find((project) => project.id === activeProjectId) ?? null
+  const focusedProgramId = activeProgramId ?? activeProject?.programId ?? null
+  const focusedProgram = focusedProgramId ? programs.find((program) => program.id === focusedProgramId) ?? null : null
+
+  const visiblePrograms = useMemo(() => (focusedProgram ? [focusedProgram] : programs), [focusedProgram, programs])
+  const visibleProjects = useMemo(
+    () => (focusedProgram ? projects.filter((project) => project.programId === focusedProgram.id) : projects),
+    [focusedProgram, projects]
+  )
+  const unassignedProjects = useMemo(
+    () => (focusedProgram ? [] : projects.filter((project) => !project.programId || !programs.find((program) => program.id === project.programId))),
+    [focusedProgram, programs, projects]
+  )
+  const visibleTasks = useMemo(
+    () => (focusedProgram ? tasks.filter((task) => taskMatchesProgram(task, focusedProgram.id, projects)) : tasks),
+    [focusedProgram, projects, tasks]
+  )
+  const totalTasks = visibleTasks.length
+  const doneTasks = visibleTasks.filter((task) => task.status === 'done').length
+  const topLevelProjectCount = focusedProgram ? visibleProjects.filter((project) => !project.parentId).length : projects.filter((project) => !project.parentId).length
+  const headerTitle = focusedProgram ? focusedProgram.name : 'Programs'
+  const [openProgramId, setOpenProgramId] = useState(null)
+  const reduceMotion = useReducedMotion()
+  const sectionVariants = useMemo(() => createFadeUpVariants(reduceMotion), [reduceMotion])
+  const staggerVariants = useMemo(() => createStaggerContainer(reduceMotion, 0.045, 0.03), [reduceMotion])
+
+  useEffect(() => {
+    if (focusedProgramId) {
+      setOpenProgramId(focusedProgramId)
+      return
+    }
+    if (activeProject?.programId) {
+      setOpenProgramId(activeProject.programId)
+      return
+    }
+    setOpenProgramId((current) => {
+      if (current && visiblePrograms.some((program) => program.id === current)) return current
+      return visiblePrograms[0]?.id ?? null
+    })
+  }, [focusedProgramId, activeProject?.programId, visiblePrograms])
+
+  useEffect(() => {
+    const selector = activeProjectId
+      ? `[data-project-id="${activeProjectId}"]`
+      : activeProgramId
+        ? `[data-program-id="${activeProgramId}"]`
+        : null
+
+    if (!selector) return undefined
+
+    const scrollToTarget = () => {
+      const target = document.querySelector(selector)
+      if (!target) return false
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      return true
+    }
+
+    if (scrollToTarget()) return undefined
+    const timeoutId = setTimeout(scrollToTarget, 80)
+    return () => clearTimeout(timeoutId)
+  }, [activeProjectId, activeProgramId, programs.length, projects.length])
+
+  const clearFocus = () => {
+    setActiveProject(null)
+    setActiveProgram(null)
+  }
+
+  return (
+    <div className="flex-1 overflow-y-auto px-4 md:px-6 pb-24 md:pb-8">
+      <motion.div variants={staggerVariants} initial="initial" animate="animate" className="py-2 mb-3">
+      <motion.div variants={sectionVariants}>
+        <GlassCard padding="p-4 md:p-5" rounded="rounded-[30px]">
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.24em]" style={{ color: 'var(--text-secondary)' }}>
+                  Programs
+                </div>
+                <InfoTooltip text="Use focus to jump to one program, or keep all visible and work one expanded program at a time." />
+              </div>
+              <h1 className="mt-2 text-[1.9rem] md:text-[2.15rem] font-bold leading-tight" style={{ color: 'var(--text-primary)' }}>
+                {headerTitle}
+              </h1>
+              {programs.length > 0 && (
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <span className="text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>
+                    Focus
+                  </span>
+                  <select
+                    value={focusedProgram?.id ?? ''}
+                    onChange={(event) => {
+                      const nextProgramId = event.target.value || null
+                      setActiveProject(null)
+                      setActiveProgram(nextProgramId)
+                    }}
+                    className="text-xs px-3 py-2 rounded-xl min-w-[220px]"
+                    style={{ background: 'rgba(255,255,255,0.045)', border: '1px solid rgba(255,255,255,0.08)', color: 'var(--text-primary)' }}
+                  >
+                    <option value="">All programs</option>
+                    {programs.map((program) => (
+                      <option key={program.id} value={program.id}>{program.name}</option>
+                    ))}
+                  </select>
+                  {focusedProgram && (
+                    <button type="button" onClick={clearFocus} className="btn-ghost px-3 py-2 text-xs">
+                      Show all
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-start gap-2.5 flex-wrap xl:justify-end">
+              <CompactStat label="Programs" value={programs.length} tone="accent" />
+              <CompactStat label="Projects" value={topLevelProjectCount} />
+              <CompactStat label="Done" value={`${doneTasks}/${totalTasks}`} tone="success" />
+              <button type="button" onClick={() => setAddingProgram(true)} className="btn-accent flex items-center gap-1.5 px-3.5 py-2.5 text-xs">
+                <Plus size={13} /> New program
+              </button>
+            </div>
+          </div>
+        </GlassCard>
+      </motion.div>
+
+      <AnimatePresence initial={false}>
+        {addingProgram && (
+          <motion.div variants={sectionVariants} initial="initial" animate="animate" exit="exit">
+            <NewProgramForm onDone={() => setAddingProgram(false)} />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {programs.length === 0 && unassignedProjects.length === 0 && !addingProgram ? (
+        <motion.div variants={sectionVariants} className="flex flex-col items-center justify-center py-20 gap-3">
+          <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(var(--accent-rgb),0.1)' }}>
+            <FolderOpen size={22} style={{ color: 'var(--accent)' }} />
+          </div>
+          <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>No programs yet</p>
+          <p className="text-xs text-center max-w-xs" style={{ color: 'var(--text-secondary)' }}>
+            Create a program first, then split the work into projects and only open tasks where you actually need to operate.
+          </p>
+          <button type="button" onClick={() => setAddingProgram(true)} className="btn-accent px-4 py-2 text-xs mt-1">
+            Create first program
+          </button>
+        </motion.div>
+      ) : (
+        <motion.div variants={staggerVariants} className="space-y-0">
+          {visiblePrograms.map((program) => (
+            <motion.div key={program.id} variants={sectionVariants}>
+            <ProgramSection
+              key={program.id}
+              program={program}
+              projects={visibleProjects.filter((project) => project.programId === program.id)}
+              expanded={focusedProgram ? true : openProgramId === program.id}
+              onToggle={() => {
+                if (focusedProgram) return
+                setOpenProgramId((current) => (current === program.id ? null : program.id))
+              }}
+            />
+            </motion.div>
+          ))}
+          {!focusedProgram && (
+            <motion.div variants={sectionVariants}>
+              <UnassignedSection projects={unassignedProjects} />
+            </motion.div>
+          )}
+        </motion.div>
+      )}
+      </motion.div>
     </div>
   )
 })
