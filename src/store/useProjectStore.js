@@ -61,6 +61,32 @@ const getSyncContext = () => {
 const normalizeScopeValue = (scope) =>
   scope === 'personal' ? 'personal' : 'professional'
 
+const hasOwn = (value, key) => Object.prototype.hasOwnProperty.call(value ?? {}, key)
+
+const hasScopeColumn = (row) => hasOwn(row, 'scope') && row?.scope != null
+
+const stripScopeField = (row) => {
+  if (!hasOwn(row, 'scope')) return row
+  const { scope: _scope, ...rest } = row
+  return rest
+}
+
+const isMissingScopeColumnError = (error) => {
+  const normalized = error?.message?.toLowerCase?.() ?? ''
+  return normalized.includes('scope') && (normalized.includes('column') || normalized.includes('schema cache'))
+}
+
+async function upsertRowsWithScopeFallback(table, rows, options) {
+  if (!rows || (Array.isArray(rows) && rows.length === 0)) return { error: null }
+
+  let result = await supabase.from(table).upsert(rows, options)
+  if (!result.error || !isMissingScopeColumnError(result.error)) return result
+
+  const fallbackRows = Array.isArray(rows) ? rows.map(stripScopeField) : stripScopeField(rows)
+  result = await supabase.from(table).upsert(fallbackRows, options)
+  return result
+}
+
 const resolveProjectScope = (project, state) => {
   if (!project) return 'professional'
 
@@ -293,17 +319,21 @@ async function ensureMilestoneParents(milestone, workspaceId, userId, getState) 
   const rootProgram = rootProgramId ? programMap.get(rootProgramId) : null
 
   if (rootProgram) {
-    const { error: programError } = await supabase
-      .from('programs')
-      .upsert(toProgramRow(rootProgram, workspaceId, userId), { onConflict: 'id' })
+    const { error: programError } = await upsertRowsWithScopeFallback(
+      'programs',
+      toProgramRow(rootProgram, workspaceId, userId),
+      { onConflict: 'id' }
+    )
 
     if (programError) throw programError
   }
 
   for (const project of projectChain) {
-    const { error: projectError } = await supabase
-      .from('projects')
-      .upsert(toProjectRow(project, workspaceId, userId), { onConflict: 'id' })
+    const { error: projectError } = await upsertRowsWithScopeFallback(
+      'projects',
+      toProjectRow(project, workspaceId, userId),
+      { onConflict: 'id' }
+    )
 
     if (projectError) throw projectError
   }
@@ -392,9 +422,7 @@ const useProjectStore = create(
 
         const { workspaceId, userId } = getSyncContext()
         if (workspaceId) {
-          void supabase
-            .from('programs')
-            .upsert(toProgramRow(created, workspaceId, userId))
+          void upsertRowsWithScopeFallback('programs', toProgramRow(created, workspaceId, userId))
             .then(({ error }) => {
               if (error) reportProjectSyncError(set, error, 'create program')
               else markProjectSyncSuccess(set)
@@ -413,9 +441,7 @@ const useProjectStore = create(
         const updated = get().programs.find((p) => p.id === id)
         const { workspaceId, userId } = getSyncContext()
         if (workspaceId && updated) {
-          void supabase
-            .from('programs')
-            .upsert(toProgramRow(updated, workspaceId, userId))
+          void upsertRowsWithScopeFallback('programs', toProgramRow(updated, workspaceId, userId))
             .then(({ error }) => {
               if (error) reportProjectSyncError(set, error, 'update program')
               else markProjectSyncSuccess(set)
@@ -442,9 +468,7 @@ const useProjectStore = create(
         const updated = get().programs.find((p) => p.id === id)
         const { workspaceId, userId } = getSyncContext()
         if (workspaceId && updated) {
-          void supabase
-            .from('programs')
-            .upsert(toProgramRow(updated, workspaceId, userId))
+          void upsertRowsWithScopeFallback('programs', toProgramRow(updated, workspaceId, userId))
             .then(({ error }) => {
               if (error) reportProjectSyncError(set, error, 'move program')
               else markProjectSyncSuccess(set)
@@ -493,9 +517,7 @@ const useProjectStore = create(
 
         const { workspaceId, userId } = getSyncContext()
         if (workspaceId) {
-          void supabase
-            .from('projects')
-            .upsert(toProjectRow(created, workspaceId, userId))
+          void upsertRowsWithScopeFallback('projects', toProjectRow(created, workspaceId, userId))
             .then(({ error }) => {
               if (error) reportProjectSyncError(set, error, 'create project')
               else markProjectSyncSuccess(set)
@@ -517,9 +539,7 @@ const useProjectStore = create(
         const updated = get().projects.find((p) => p.id === id)
         const { workspaceId, userId } = getSyncContext()
         if (workspaceId && updated) {
-          void supabase
-            .from('projects')
-            .upsert(toProjectRow(updated, workspaceId, userId))
+          void upsertRowsWithScopeFallback('projects', toProjectRow(updated, workspaceId, userId))
             .then(({ error }) => {
               if (error) reportProjectSyncError(set, error, 'update project')
               else markProjectSyncSuccess(set)
@@ -561,9 +581,7 @@ const useProjectStore = create(
         const updated = get().projects.find((p) => p.id === id)
         const { workspaceId, userId } = getSyncContext()
         if (workspaceId && updated) {
-          void supabase
-            .from('projects')
-            .upsert(toProjectRow(updated, workspaceId, userId))
+          void upsertRowsWithScopeFallback('projects', toProjectRow(updated, workspaceId, userId))
             .then(({ error }) => {
               if (error) reportProjectSyncError(set, error, 'move project')
               else markProjectSyncSuccess(set)
@@ -740,8 +758,14 @@ const useProjectStore = create(
         const projectRows = (state.projects ?? []).map((p) => toProjectRow(p, workspaceId, userId))
         const milestoneRows = (state.milestones ?? []).map((m) => toMilestoneRow(m))
 
-        if (programRows.length > 0) await supabase.from('programs').upsert(programRows)
-        if (projectRows.length > 0) await supabase.from('projects').upsert(projectRows)
+        if (programRows.length > 0) {
+          const { error } = await upsertRowsWithScopeFallback('programs', programRows)
+          if (error) throw error
+        }
+        if (projectRows.length > 0) {
+          const { error } = await upsertRowsWithScopeFallback('projects', projectRows)
+          if (error) throw error
+        }
         if (milestoneRows.length > 0) await supabase.from('milestones').upsert(milestoneRows)
       },
 
@@ -769,8 +793,26 @@ const useProjectStore = create(
             }
           }
 
-          const remotePrograms = programRows.map(fromProgramRow)
-          const remoteProjects = projectRows.map(fromProjectRow)
+          const localProgramScopeById = new Map(
+            (localState.programs ?? []).map((program) => [program.id, normalizeScopeValue(program.scope)])
+          )
+          const localProjectScopeById = new Map(
+            (localState.projects ?? []).map((project) => [project.id, normalizeScopeValue(project.scope)])
+          )
+          const remotePrograms = programRows.map((row) => {
+            const program = fromProgramRow(row)
+            if (!hasScopeColumn(row) && localProgramScopeById.has(program.id)) {
+              program.scope = localProgramScopeById.get(program.id)
+            }
+            return program
+          })
+          const remoteProjects = projectRows.map((row) => {
+            const project = fromProjectRow(row)
+            if (!hasScopeColumn(row) && localProjectScopeById.has(project.id)) {
+              project.scope = localProjectScopeById.get(project.id)
+            }
+            return project
+          })
           const remoteMilestones = milestoneRows.map(fromMilestoneRow)
           const mergeOptions = {
             lastSyncedAt: localState.lastSyncedAt,
@@ -804,6 +846,7 @@ const useProjectStore = create(
         set((s) => {
           const program = fromProgramRow(row)
           const idx = s.programs.findIndex((p) => p.id === program.id)
+          if (!hasScopeColumn(row) && idx !== -1) program.scope = normalizeScopeValue(s.programs[idx].scope)
           if (idx === -1) s.programs.push(program)
           else s.programs[idx] = { ...s.programs[idx], ...program }
         }),
@@ -818,6 +861,7 @@ const useProjectStore = create(
         set((s) => {
           const project = fromProjectRow(row)
           const idx = s.projects.findIndex((p) => p.id === project.id)
+          if (!hasScopeColumn(row) && idx !== -1) project.scope = normalizeScopeValue(s.projects[idx].scope)
           if (idx === -1) s.projects.push(project)
           else s.projects[idx] = { ...s.projects[idx], ...project }
         }),

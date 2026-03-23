@@ -125,6 +125,50 @@ const mergeRemoteTasks = (remoteTasks = [], localTasks = [], { lastSyncedAt = nu
 
 const hasOwn = (value, key) => Object.prototype.hasOwnProperty.call(value, key)
 
+const hasScopeColumn = (row) => hasOwn(row ?? {}, 'scope') && row?.scope != null
+
+const stripScopeField = (row) => {
+  if (!hasOwn(row ?? {}, 'scope')) return row
+  const { scope: _scope, ...rest } = row
+  return rest
+}
+
+const isMissingScopeColumnError = (error) => {
+  const normalized = error?.message?.toLowerCase?.() ?? ''
+  return normalized.includes('scope') && (normalized.includes('column') || normalized.includes('schema cache'))
+}
+
+async function upsertRowsWithScopeFallback(table, rows, options) {
+  if (!rows || (Array.isArray(rows) && rows.length === 0)) return { error: null }
+
+  let result = await supabase.from(table).upsert(rows, options)
+  if (!result.error || !isMissingScopeColumnError(result.error)) return result
+
+  const fallbackRows = Array.isArray(rows) ? rows.map(stripScopeField) : stripScopeField(rows)
+  result = await supabase.from(table).upsert(fallbackRows, options)
+  return result
+}
+
+async function updateTaskPatchWithScopeFallback(taskId, patch) {
+  let result = await supabase
+    .from('tasks')
+    .update(patch)
+    .eq('id', taskId)
+    .select('id')
+    .maybeSingle()
+
+  if (!result.error || !isMissingScopeColumnError(result.error)) return result
+
+  result = await supabase
+    .from('tasks')
+    .update(stripScopeField(patch))
+    .eq('id', taskId)
+    .select('id')
+    .maybeSingle()
+
+  return result
+}
+
 const getProgramIdForProject = (projectId) => {
   if (!projectId) return null
   const project = useProjectStore.getState().projects.find((entry) => entry.id === projectId)
@@ -184,19 +228,15 @@ const buildTaskPatchFromUpdates = (task, updates = {}) => {
 }
 
 async function persistTaskPatch(task, patch, workspaceId, userId) {
-  const { data, error } = await supabase
-    .from('tasks')
-    .update(patch)
-    .eq('id', task.id)
-    .select('id')
-    .maybeSingle()
+  const { data, error } = await updateTaskPatchWithScopeFallback(task.id, patch)
 
   if (error) throw error
 
   if (!data) {
-    const { error: upsertError } = await supabase
-      .from('tasks')
-      .upsert(toTaskRow(task, workspaceId, userId))
+    const { error: upsertError } = await upsertRowsWithScopeFallback(
+      'tasks',
+      toTaskRow(task, workspaceId, userId)
+    )
 
     if (upsertError) throw upsertError
   }
@@ -309,9 +349,10 @@ async function persistSubtask(taskId, subtask, get) {
   const parentTask = get().getTaskById(taskId)
   if (!parentTask) throw new Error('Parent task missing while syncing subtask.')
 
-  const { error: taskError } = await supabase
-    .from('tasks')
-    .upsert(toTaskRow(parentTask, workspaceId, userId))
+  const { error: taskError } = await upsertRowsWithScopeFallback(
+    'tasks',
+    toTaskRow(parentTask, workspaceId, userId)
+  )
 
   if (taskError) throw taskError
 
@@ -354,9 +395,10 @@ async function persistNote(taskId, note, get) {
   const parentTask = get().getTaskById(taskId)
   if (!parentTask) throw new Error('Parent task missing while syncing note.')
 
-  const { error: taskError } = await supabase
-    .from('tasks')
-    .upsert(toTaskRow(parentTask, workspaceId, userId))
+  const { error: taskError } = await upsertRowsWithScopeFallback(
+    'tasks',
+    toTaskRow(parentTask, workspaceId, userId)
+  )
 
   if (taskError) throw taskError
 
@@ -452,9 +494,7 @@ const useTaskStore = create(
 
         const { workspaceId, userId } = getSyncContext()
         if (workspaceId) {
-          void supabase
-            .from('tasks')
-            .upsert(toTaskRow(created, workspaceId, userId))
+          void upsertRowsWithScopeFallback('tasks', toTaskRow(created, workspaceId, userId))
             .then(({ error }) => {
               if (error) reportTaskSyncError(set, error, 'create task')
               else markTaskSyncSuccess(set)
@@ -987,7 +1027,7 @@ const useTaskStore = create(
         )
 
         if (taskRows.length > 0) {
-          const { error } = await supabase.from('tasks').upsert(taskRows)
+          const { error } = await upsertRowsWithScopeFallback('tasks', taskRows)
           if (error) throw error
         }
         if (subtaskRows.length > 0) await supabase.from('subtasks').upsert(subtaskRows)
@@ -1013,7 +1053,17 @@ const useTaskStore = create(
             }
           }
 
-          const assembled = taskRows.map(fromTaskRow)
+          const localTaskScopeById = new Map(
+            [...(localState.tasks ?? []), ...(localState.trashTasks ?? [])]
+              .map((task) => [task.id, normalizeWorkspaceViewScope(task.scope)])
+          )
+          const assembled = taskRows.map((row) => {
+            const task = fromTaskRow(row)
+            if (!hasScopeColumn(row) && localTaskScopeById.has(task.id)) {
+              task.scope = localTaskScopeById.get(task.id)
+            }
+            return task
+          })
           const byId = new Map(assembled.map((task) => [task.id, task]))
 
           subtaskRows.forEach((row) => {
@@ -1063,6 +1113,10 @@ const useTaskStore = create(
           const targetKey = incoming.deletedAt ? 'trashTasks' : 'tasks'
           const otherKey = incoming.deletedAt ? 'tasks' : 'trashTasks'
           const existing = findTaskCollection(state, incoming.id)
+
+          if (!hasScopeColumn(row) && existing?.task?.scope) {
+            incoming.scope = normalizeWorkspaceViewScope(existing.task.scope)
+          }
 
           state[otherKey] = state[otherKey].filter((task) => task.id !== incoming.id)
 
