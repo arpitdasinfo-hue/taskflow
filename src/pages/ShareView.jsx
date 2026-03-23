@@ -30,6 +30,12 @@ import useElementFullscreen from '../hooks/useElementFullscreen'
 import { TIMELINE_VIEW_MODES } from '../components/timeline/timelineConfig'
 import { getTaskProgramId } from '../lib/taskScope'
 import { sortTasksByStartDate } from '../lib/taskSort'
+import {
+  filterMilestonesByWorkspaceScope,
+  filterProgramsByWorkspaceScope,
+  filterProjectsByWorkspaceScope,
+  filterTasksByWorkspaceScope,
+} from '../lib/workspaceScope'
 
 const isValidDate = (value) => {
   if (!value) return false
@@ -75,6 +81,7 @@ const mapProject = (row) => ({
   workspaceId: row.workspace_id,
   programId: row.program_id || null,
   parentId: row.parent_id || null,
+  scope: row.scope ?? 'professional',
   name: row.name,
   color: row.color || '#22d3ee',
   description: row.description || '',
@@ -199,7 +206,7 @@ const ScopeFilterBar = ({
           {activeSectionMeta?.label || 'Overview'} Scope
         </p>
         <p className="mt-2 text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-          {activeSectionMeta?.meta || 'Scope this dashboard to the program or project you want to review.'}
+          {activeSectionMeta?.meta || 'Scope this view to the program or project you want to review.'}
         </p>
       </div>
 
@@ -696,9 +703,24 @@ export default function ShareView({ token }) {
           return
         }
 
+        if (!project.program_id && (project.scope ?? 'professional') === 'personal') {
+          if (!cancelled) {
+            setError('Personal standalone projects stay private and cannot be opened through shared links.')
+            setLoading(false)
+          }
+          return
+        }
+
         if (project.program_id) {
           const programRes = await supabase.from('programs').select('*').eq('id', project.program_id).maybeSingle()
-          if (!programRes.error && programRes.data) {
+          if (programRes.error) {
+            if (!cancelled) {
+              setError(programRes.error.message || 'Unable to verify whether this project can be opened through a shared link.')
+              setLoading(false)
+            }
+            return
+          }
+          if (programRes.data) {
             if (isPersonalProgramRow(programRes.data)) {
               if (!cancelled) {
                 setError('Projects inside personal programs stay private and cannot be opened through shared links.')
@@ -752,18 +774,14 @@ export default function ShareView({ token }) {
         return
       }
 
-      const mappedPrograms = programRows
-        .map(mapProgram)
-        .filter((program) => program.scope !== 'personal')
+      const mappedPrograms = filterProgramsByWorkspaceScope(programRows.map(mapProgram), 'professional')
       const visibleProgramIds = new Set(mappedPrograms.map((program) => program.id))
 
-      const mappedProjects = projectRows
-        .map(mapProject)
+      const mappedProjects = filterProjectsByWorkspaceScope(projectRows.map(mapProject), mappedPrograms, 'professional')
         .filter((project) => !project.programId || visibleProgramIds.has(project.programId))
       const visibleProjectIds = new Set(mappedProjects.map((project) => project.id))
 
-      const mappedTasks = taskRows
-        .map(mapTask)
+      const mappedTasks = filterTasksByWorkspaceScope(taskRows.map(mapTask), mappedPrograms, mappedProjects, 'professional')
         .filter((task) => {
           if (task.programId && !visibleProgramIds.has(task.programId)) return false
           if (task.projectId && !visibleProjectIds.has(task.projectId)) return false
@@ -774,7 +792,14 @@ export default function ShareView({ token }) {
         const projectIds = mappedProjects.map((project) => project.id)
         if (projectIds.length > 0) {
           const milestoneRes = await supabase.from('milestones').select('*').in('project_id', projectIds)
-          if (!milestoneRes.error) milestoneRows = (milestoneRes.data ?? []).map(mapMilestone)
+          if (!milestoneRes.error) {
+            milestoneRows = filterMilestonesByWorkspaceScope(
+              (milestoneRes.data ?? []).map(mapMilestone),
+              mappedProjects,
+              mappedPrograms,
+              'professional'
+            )
+          }
         }
       }
 
@@ -975,9 +1000,9 @@ export default function ShareView({ token }) {
     if (shareConfig.modules.analytics) {
       sections.push({
         id: 'analytics',
-        label: 'Analytics',
+        label: 'Portfolio',
         icon: BarChart3,
-        meta: 'Program roll-ups, completion signals, and portfolio load.',
+        meta: 'Program roll-ups, completion signals, and delivery load.',
       })
     }
     if (shareConfig.modules.projects) {
@@ -1075,7 +1100,7 @@ export default function ShareView({ token }) {
         {(loading || error) && (
           <GlassCard padding="p-5">
             {loading ? (
-              <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Loading shared dashboard…</p>
+              <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Loading shared view…</p>
             ) : (
               <div className="flex items-start gap-2">
                 <AlertTriangle size={14} style={{ color: '#ef4444', marginTop: 2 }} />
@@ -1091,14 +1116,14 @@ export default function ShareView({ token }) {
               <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div className="min-w-0">
                   <div className="text-[11px] font-semibold uppercase tracking-[0.24em]" style={{ color: 'var(--text-secondary)' }}>
-                    TaskFlow Dashboard
+                    TaskFlow Shared View
                   </div>
                   <div className="mt-2 flex items-center gap-2 flex-wrap">
                     <h2 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>
-                      {link?.name || 'Shared Dashboard'}
+                      {link?.name || 'Shared View'}
                     </h2>
                     <InfoTooltip
-                      text="Live snapshot of progress, analytics, milestones, and timeline. The same link keeps reflecting the latest data while it stays active."
+                      text="Live snapshot of progress, portfolio health, milestones, and timeline. The same link keeps reflecting the latest data while it stays active."
                       widthClassName="w-72"
                     />
                   </div>
@@ -1141,7 +1166,7 @@ export default function ShareView({ token }) {
               <ScopeBar
                 eyebrow={`${activeSectionMeta?.label || 'Overview'} scope`}
                 title="Focus the shared view"
-                infoText={activeSectionMeta?.meta || 'Scope this dashboard to the program or project you want to review.'}
+                infoText={activeSectionMeta?.meta || 'Scope this view to the program or project you want to review.'}
                 compact
                 controls={
                   <>
@@ -1262,8 +1287,8 @@ export default function ShareView({ token }) {
 
                 {activeSection === 'analytics' && shareConfig.modules.analytics && (
                   <Section
-                    title="Program Analytics"
-                    description="Portfolio roll-up by program for quick scanning of scope, delivery load, blocked work, and completion."
+                    title="Portfolio Summary"
+                    description="Program roll-up for quick scanning of scope, delivery load, blocked work, and completion."
                     icon={BarChart3}
                   >
                     {milestoneTimelineItems.length > 0 && (
@@ -1277,7 +1302,7 @@ export default function ShareView({ token }) {
                     )}
 
                     {programStats.length === 0 ? (
-                      <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>No program analytics available.</p>
+                      <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>No portfolio summary available.</p>
                     ) : (
                       <div className="overflow-x-auto">
                         <table className="w-full text-xs min-w-[560px]">
@@ -1482,7 +1507,7 @@ export default function ShareView({ token }) {
                 {activeSection === 'gantt' && shareConfig.modules.gantt && (
                   <Section
                     title="Gantt"
-                    description="Timeline view of programs, projects, tasks, and milestones with the same filters available in this dashboard."
+                    description="Timeline view of programs, projects, tasks, and milestones with the same filters available in this shared view."
                     icon={ShieldCheck}
                     padding="p-4"
                   >

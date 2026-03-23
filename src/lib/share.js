@@ -6,8 +6,8 @@ export const SHARE_STATUS = {
 }
 
 export const SHARE_MODULE_OPTIONS = [
-  { key: 'overview', label: 'Overview KPIs' },
-  { key: 'analytics', label: 'Analytics Panels' },
+  { key: 'overview', label: 'Executive Summary' },
+  { key: 'analytics', label: 'Portfolio Summary' },
   { key: 'gantt', label: 'Gantt Chart' },
   { key: 'details', label: 'Item Details' },
   { key: 'projects', label: 'Projects Section' },
