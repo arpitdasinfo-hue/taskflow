@@ -8,12 +8,12 @@ export const SHARE_STATUS = {
 export const SHARE_MODULE_OPTIONS = [
   { key: 'overview', label: 'Executive Summary' },
   { key: 'analytics', label: 'Portfolio Summary' },
-  { key: 'gantt', label: 'Gantt Chart' },
-  { key: 'details', label: 'Item Details' },
-  { key: 'projects', label: 'Projects Section' },
-  { key: 'tasks', label: 'Tasks Section' },
-  { key: 'milestones', label: 'Milestones Section' },
-  { key: 'dependencies', label: 'Dependencies' },
+  { key: 'gantt', label: 'Timeline View' },
+  { key: 'details', label: 'Context Notes' },
+  { key: 'projects', label: 'Delivery Overview' },
+  { key: 'tasks', label: 'Execution Watchlist' },
+  { key: 'milestones', label: 'Milestone Tracker' },
+  { key: 'dependencies', label: 'Dependency Signals' },
 ]
 
 export const TASK_STATUS_OPTIONS = [
@@ -36,12 +36,12 @@ export const DEFAULT_SHARE_CONFIG = {
   modules: {
     overview: true,
     analytics: true,
-    gantt: true,
-    details: true,
+    gantt: false,
+    details: false,
     projects: true,
-    tasks: true,
+    tasks: false,
     milestones: true,
-    dependencies: true,
+    dependencies: false,
   },
   filters: {
     includeCompleted: true,

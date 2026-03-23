@@ -29,7 +29,6 @@ import useTimelineRows from '../hooks/useTimelineRows'
 import useElementFullscreen from '../hooks/useElementFullscreen'
 import { TIMELINE_VIEW_MODES } from '../components/timeline/timelineConfig'
 import { getTaskProgramId } from '../lib/taskScope'
-import { sortTasksByStartDate } from '../lib/taskSort'
 import {
   filterMilestonesByWorkspaceScope,
   filterProgramsByWorkspaceScope,
@@ -118,6 +117,127 @@ const mapMilestone = (row) => ({
 })
 
 const isPersonalProgramRow = (row) => (row?.scope ?? 'professional') === 'personal'
+const DAY_MS = 1000 * 60 * 60 * 24
+
+const fmtDateTime = (value) => {
+  if (!value) return '—'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '—'
+  return date.toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  })
+}
+
+const countLabel = (count, label) => `${count} ${label}${count === 1 ? '' : 's'}`
+
+const daysUntilDate = (value) => {
+  if (!isValidDate(value)) return null
+  return Math.round((startOfDayTs(value) - startOfDayTs(new Date())) / DAY_MS)
+}
+
+const getNextMilestone = (milestones = []) =>
+  (milestones ?? [])
+    .filter((milestone) => !milestone?.completed && isValidDate(milestone?.dueDate))
+    .sort((left, right) => startOfDayTs(left.dueDate) - startOfDayTs(right.dueDate))[0] ?? null
+
+const collectProjectTreeIds = (projectId, projects = []) => {
+  const ids = new Set([projectId])
+  let changed = true
+
+  while (changed) {
+    changed = false
+    ;(projects ?? []).forEach((project) => {
+      if (project.parentId && ids.has(project.parentId) && !ids.has(project.id)) {
+        ids.add(project.id)
+        changed = true
+      }
+    })
+  }
+
+  return ids
+}
+
+const getDeliveryHealth = ({ blocked = 0, overdue = 0, nextDate = '', totalTasks = 0, completion = 0, status = '' }) => {
+  const normalizedStatus = String(status || '').trim().toLowerCase()
+  const horizonDays = daysUntilDate(nextDate)
+
+  if (['completed', 'done', 'closed'].includes(normalizedStatus) || (totalTasks > 0 && completion === 100 && blocked === 0 && overdue === 0)) {
+    return { label: 'Complete', color: '#10b981', note: 'All tracked work is complete.' }
+  }
+
+  if (overdue > 0 || (horizonDays !== null && horizonDays < 0)) {
+    return {
+      label: 'Off track',
+      color: '#ef4444',
+      note: overdue > 0 ? `${countLabel(overdue, 'overdue item')} need recovery.` : 'A key checkpoint has already slipped.',
+    }
+  }
+
+  if (blocked > 0 || (horizonDays !== null && horizonDays <= 7 && completion < 85)) {
+    return {
+      label: 'At risk',
+      color: '#f59e0b',
+      note: blocked > 0 ? `${countLabel(blocked, 'blocked item')} may need leadership help.` : 'A key checkpoint is approaching soon.',
+    }
+  }
+
+  if (totalTasks === 0 && horizonDays === null) {
+    return { label: 'Setting up', color: '#94a3b8', note: 'Scope exists, but delivery signals are still light.' }
+  }
+
+  if (horizonDays === 0) {
+    return { label: 'On track', color: '#10b981', note: 'A checkpoint lands today and the plan still looks healthy.' }
+  }
+
+  return {
+    label: 'On track',
+    color: '#10b981',
+    note: horizonDays !== null ? `Next checkpoint is in ${countLabel(horizonDays, 'day')}.` : 'Delivery signals look healthy.',
+  }
+}
+
+const getConfidenceState = (healthLabel) => {
+  if (healthLabel === 'Off track') return { label: 'Low', color: '#ef4444' }
+  if (healthLabel === 'At risk') return { label: 'Medium', color: '#f59e0b' }
+  if (healthLabel === 'Complete') return { label: 'Complete', color: '#10b981' }
+  if (healthLabel === 'Setting up') return { label: 'Pending', color: '#94a3b8' }
+  return { label: 'High', color: '#10b981' }
+}
+
+const getTaskWatchSignal = (task) => {
+  const overdue = Boolean(task?.dueDate) && startOfDayTs(task.dueDate) < startOfDayTs(new Date()) && task.status !== 'done'
+  const dueInDays = daysUntilDate(task?.dueDate)
+
+  if (task?.status === 'blocked' && overdue) {
+    return { score: 180, label: 'Critical', note: `Blocked and overdue since ${fmtDate(task.dueDate)}.`, color: '#ef4444' }
+  }
+  if (overdue) {
+    return { score: 160, label: 'Overdue', note: `Due date passed on ${fmtDate(task.dueDate)}.`, color: '#f97316' }
+  }
+  if (task?.status === 'blocked') {
+    return { score: 140, label: 'Blocked', note: 'Progress is currently blocked.', color: '#ef4444' }
+  }
+  if (task?.priority === 'critical') {
+    return { score: 110, label: 'Critical', note: 'Critical-priority work in active delivery.', color: '#fb7185' }
+  }
+  if (dueInDays !== null && dueInDays >= 0 && dueInDays <= 7 && task?.status !== 'done') {
+    return { score: 95, label: 'Due soon', note: `Due in ${countLabel(dueInDays, 'day')}.`, color: '#22d3ee' }
+  }
+  if (task?.priority === 'high') {
+    return { score: 75, label: 'High priority', note: 'Important work worth watching closely.', color: '#f59e0b' }
+  }
+  if (task?.status === 'review') {
+    return { score: 60, label: 'In review', note: 'Awaiting review or approval.', color: '#a78bfa' }
+  }
+  if (task?.status === 'in-progress') {
+    return { score: 45, label: 'In progress', note: 'Active execution item.', color: '#38bdf8' }
+  }
+  return { score: 20, label: 'Monitor', note: 'Keep an eye on this task.', color: '#94a3b8' }
+}
 
 const StatCard = ({ label, value, color }) => (
   <div
@@ -127,6 +247,28 @@ const StatCard = ({ label, value, color }) => (
     <p className="text-[10px] uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>{label}</p>
     <p className="text-2xl font-bold mt-2" style={{ color: color || 'var(--text-primary)' }}>{value}</p>
   </div>
+)
+
+const MetaCard = ({ label, value, meta = '', color = 'var(--text-primary)' }) => (
+  <div
+    className="rounded-2xl px-4 py-3"
+    style={{ background: 'rgba(255,255,255,0.035)', border: '1px solid rgba(255,255,255,0.08)' }}
+  >
+    <p className="text-[10px] uppercase tracking-[0.22em]" style={{ color: 'var(--text-secondary)' }}>{label}</p>
+    <p className="text-sm font-semibold mt-2" style={{ color }}>{value}</p>
+    {meta ? (
+      <p className="text-[11px] mt-1.5 leading-5" style={{ color: 'var(--text-secondary)' }}>{meta}</p>
+    ) : null}
+  </div>
+)
+
+const HealthPill = ({ health }) => (
+  <span
+    className="px-2.5 py-1 rounded-full text-[11px] font-semibold"
+    style={{ background: `${health.color}20`, color: health.color, border: `1px solid ${health.color}33` }}
+  >
+    {health.label}
+  </span>
 )
 
 const Section = ({ title, description, icon: Icon, action = null, padding = 'p-5', children }) => (
@@ -533,6 +675,7 @@ export default function ShareView({ token }) {
   const [error, setError] = useState('')
   const [link, setLink] = useState(null)
   const [shareConfig, setShareConfig] = useState(() => normalizeShareConfig(DEFAULT_SHARE_CONFIG))
+  const [snapshotLoadedAt, setSnapshotLoadedAt] = useState('')
   const [programs, setPrograms] = useState([])
   const [projects, setProjects] = useState([])
   const [tasks, setTasks] = useState([])
@@ -540,6 +683,13 @@ export default function ShareView({ token }) {
   const [selectedProgramId, setSelectedProgramId] = useState('')
   const [selectedProjectId, setSelectedProjectId] = useState('')
   const [selectedSubProjectId, setSelectedSubProjectId] = useState('')
+  const viewerTimeZone = useMemo(() => {
+    try {
+      return Intl.DateTimeFormat().resolvedOptions().timeZone || 'Local time'
+    } catch {
+      return 'Local time'
+    }
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -825,6 +975,7 @@ export default function ShareView({ token }) {
         setProjects(mappedProjects)
         setTasks(filteredTasks)
         setMilestones(milestoneRows)
+        setSnapshotLoadedAt(new Date().toISOString())
         setLoading(false)
       }
     }
@@ -959,26 +1110,6 @@ export default function ShareView({ token }) {
     return { total, done, blocked, inProgress, overdue, completion }
   }, [filteredTasks])
 
-  const programStats = filteredPrograms.map((program) => {
-    const programProjects = filteredProjects.filter((project) => project.programId === program.id)
-    const projectIds = new Set(programProjects.map((project) => project.id))
-    const programTasks = filteredTasks.filter((task) =>
-      getTaskProgramId(task, projects) === program.id &&
-      (!task.projectId || projectIds.has(task.projectId))
-    )
-    const done = programTasks.filter((task) => task.status === 'done').length
-    return {
-      id: program.id,
-      name: program.name,
-      color: program.color,
-      projects: programProjects.length,
-      tasks: programTasks.length,
-      done,
-      completion: programTasks.length ? Math.round((done / programTasks.length) * 100) : 0,
-      blocked: programTasks.filter((task) => task.status === 'blocked').length,
-    }
-  })
-
   const shareScopeLabel = (() => {
     if (!link?.resource_type) return 'Shared view'
     if (link.resource_type === 'workspace') return 'Workspace'
@@ -987,14 +1118,140 @@ export default function ShareView({ token }) {
     return 'Shared view'
   })()
 
+  const nextMilestone = useMemo(() => getNextMilestone(filteredMilestones), [filteredMilestones])
+  const portfolioHealth = useMemo(
+    () => getDeliveryHealth({
+      blocked: stats.blocked,
+      overdue: stats.overdue,
+      nextDate: nextMilestone?.dueDate,
+      totalTasks: stats.total,
+      completion: stats.completion,
+    }),
+    [nextMilestone, stats.blocked, stats.completion, stats.overdue, stats.total]
+  )
+
+  const currentScopeLabel = useMemo(() => {
+    const labels = ['Portfolio']
+    const selectedProgram = selectedProgramId ? programs.find((program) => program.id === selectedProgramId) : null
+    const selectedProject = selectedProjectId ? projects.find((project) => project.id === selectedProjectId) : null
+    const selectedSubProject = selectedSubProjectId ? projects.find((project) => project.id === selectedSubProjectId) : null
+
+    if (selectedProgram?.name) labels.push(selectedProgram.name)
+    if (selectedProject?.name) labels.push(selectedProject.name)
+    if (selectedSubProject?.name) labels.push(selectedSubProject.name)
+
+    return labels.join(' / ')
+  }, [programs, projects, selectedProgramId, selectedProjectId, selectedSubProjectId])
+
+  const trustSignals = useMemo(() => {
+    const accessValue = link?.expires_at ? `Expires ${fmtDateTime(link.expires_at)}` : 'No expiry'
+    const accessMeta = link?.created_at ? `Shared ${fmtDateTime(link.created_at)}` : 'Active until disabled or revoked.'
+    return [
+      {
+        label: 'Scope',
+        value: shareScopeLabel,
+        meta: currentScopeLabel,
+      },
+      {
+        label: 'Visibility',
+        value: 'Professional only',
+        meta: 'Personal work is excluded from this view.',
+      },
+      {
+        label: 'Snapshot',
+        value: snapshotLoadedAt ? fmtDateTime(snapshotLoadedAt) : 'Loading…',
+        meta: viewerTimeZone,
+      },
+      {
+        label: 'Access',
+        value: accessValue,
+        meta: accessMeta,
+      },
+    ]
+  }, [currentScopeLabel, link?.created_at, link?.expires_at, shareScopeLabel, snapshotLoadedAt, viewerTimeZone])
+
+  const programStats = useMemo(() => {
+    const rows = filteredPrograms.map((program) => {
+      const programProjects = filteredProjects.filter((project) => project.programId === program.id)
+      const projectIds = new Set(programProjects.map((project) => project.id))
+      const programTasks = filteredTasks.filter((task) =>
+        getTaskProgramId(task, projects) === program.id &&
+        (!task.projectId || projectIds.has(task.projectId))
+      )
+      const programMilestones = filteredMilestones.filter((milestone) => milestone.projectId && projectIds.has(milestone.projectId))
+      const done = programTasks.filter((task) => task.status === 'done').length
+      const blocked = programTasks.filter((task) => task.status === 'blocked').length
+      const overdue = programTasks.filter((task) => task.dueDate && startOfDayTs(task.dueDate) < startOfDayTs(new Date()) && task.status !== 'done').length
+      const completion = programTasks.length ? Math.round((done / programTasks.length) * 100) : 0
+      const upcomingMilestone = getNextMilestone(programMilestones)
+      return {
+        id: program.id,
+        name: program.name,
+        color: program.color,
+        projects: programProjects.length,
+        tasks: programTasks.length,
+        done,
+        blocked,
+        overdue,
+        completion,
+        nextMilestone: upcomingMilestone,
+        health: getDeliveryHealth({
+          blocked,
+          overdue,
+          nextDate: upcomingMilestone?.dueDate,
+          totalTasks: programTasks.length,
+          completion,
+          status: program.status,
+        }),
+      }
+    })
+
+    const standaloneRootProjects = filteredProjects.filter((project) => !project.programId && !project.parentId)
+    const standaloneProjectIds = standaloneRootProjects.flatMap((project) => [...collectProjectTreeIds(project.id, filteredProjects)])
+    const standaloneProjectIdSet = new Set(standaloneProjectIds)
+    const standaloneTasks = filteredTasks.filter((task) =>
+      (task.projectId && standaloneProjectIdSet.has(task.projectId)) ||
+      (!task.projectId && !task.programId)
+    )
+    if (standaloneRootProjects.length > 0 || standaloneTasks.length > 0) {
+      const standaloneMilestones = filteredMilestones.filter((milestone) => milestone.projectId && standaloneProjectIdSet.has(milestone.projectId))
+      const done = standaloneTasks.filter((task) => task.status === 'done').length
+      const blocked = standaloneTasks.filter((task) => task.status === 'blocked').length
+      const overdue = standaloneTasks.filter((task) => task.dueDate && startOfDayTs(task.dueDate) < startOfDayTs(new Date()) && task.status !== 'done').length
+      const completion = standaloneTasks.length ? Math.round((done / standaloneTasks.length) * 100) : 0
+      const upcomingMilestone = getNextMilestone(standaloneMilestones)
+      rows.push({
+        id: 'standalone-work',
+        name: 'Standalone work',
+        color: '#94a3b8',
+        projects: standaloneRootProjects.length,
+        tasks: standaloneTasks.length,
+        done,
+        blocked,
+        overdue,
+        completion,
+        nextMilestone: upcomingMilestone,
+        health: getDeliveryHealth({
+          blocked,
+          overdue,
+          nextDate: upcomingMilestone?.dueDate,
+          totalTasks: standaloneTasks.length,
+          completion,
+        }),
+      })
+    }
+
+    return rows
+  }, [filteredMilestones, filteredPrograms, filteredProjects, filteredTasks, projects])
+
   const availableSections = useMemo(() => {
     const sections = []
     if (shareConfig.modules.overview) {
       sections.push({
         id: 'overview',
-        label: 'Overview',
+        label: 'Summary',
         icon: ShieldCheck,
-        meta: 'Executive summary, delivery health, and immediate attention items.',
+        meta: 'Executive summary, delivery health, and manager attention items.',
       })
     }
     if (shareConfig.modules.analytics) {
@@ -1016,9 +1273,9 @@ export default function ShareView({ token }) {
     if (shareConfig.modules.tasks) {
       sections.push({
         id: 'tasks',
-        label: 'Tasks',
+        label: 'Watchlist',
         icon: Lock,
-        meta: 'Detailed task register with scope, dates, and priorities.',
+        meta: 'Highest-signal tasks that may require follow-up or escalation.',
       })
     }
     if (shareConfig.modules.milestones) {
@@ -1032,9 +1289,9 @@ export default function ShareView({ token }) {
     if (shareConfig.modules.gantt) {
       sections.push({
         id: 'gantt',
-        label: 'Gantt',
+        label: 'Timeline',
         icon: Target,
-        meta: 'Interactive timeline with scope filters and time controls.',
+        meta: 'Milestone-first timeline with optional detailed schedule below.',
       })
     }
     return sections
@@ -1083,6 +1340,115 @@ export default function ShareView({ token }) {
     return [...overdueTasks, ...blockedTasks, ...upcomingMilestones].slice(0, 5)
   }, [filteredMilestones, filteredTasks])
 
+  const leadershipSummary = useMemo(() => {
+    const topRisk = attentionItems[0]
+    const managerAttention = stats.overdue > 0
+      ? `Review recovery plans for ${countLabel(stats.overdue, 'overdue task')}.`
+      : stats.blocked > 0
+        ? `Help unblock ${countLabel(stats.blocked, 'task')} that is stuck.`
+        : nextMilestone && daysUntilDate(nextMilestone.dueDate) !== null && daysUntilDate(nextMilestone.dueDate) <= 7
+          ? `Confirm readiness for ${nextMilestone.name}.`
+          : 'No immediate escalation is needed.'
+
+    return [
+      {
+        label: 'Overall status',
+        value: portfolioHealth.label,
+        meta: portfolioHealth.note,
+        color: portfolioHealth.color,
+      },
+      {
+        label: 'Next milestone',
+        value: nextMilestone ? nextMilestone.name : 'No milestone set',
+        meta: nextMilestone ? `Due ${fmtDate(nextMilestone.dueDate)}` : 'Add a milestone to show the next checkpoint.',
+        color: nextMilestone ? '#22d3ee' : '#94a3b8',
+      },
+      {
+        label: 'Top risk',
+        value: topRisk ? topRisk.label : 'No urgent risks',
+        meta: topRisk?.meta || 'Nothing currently stands out as a delivery risk.',
+        color: topRisk?.color || '#10b981',
+      },
+      {
+        label: 'Manager attention',
+        value: managerAttention,
+        meta: `${countLabel(filteredPrograms.length, 'program')} and ${countLabel(filteredProjects.filter((project) => !project.parentId).length, 'project')} in scope.`,
+        color: stats.overdue > 0 || stats.blocked > 0 ? '#f59e0b' : '#10b981',
+      },
+    ]
+  }, [attentionItems, filteredPrograms.length, filteredProjects, nextMilestone, portfolioHealth, stats.blocked, stats.overdue])
+
+  const projectSummaries = useMemo(
+    () => filteredProjects
+      .filter((project) => !project.parentId)
+      .map((project) => {
+        const scopedIds = collectProjectTreeIds(project.id, filteredProjects)
+        const projectTasks = filteredTasks.filter((task) => task.projectId && scopedIds.has(task.projectId))
+        const projectMilestones = filteredMilestones.filter((milestone) => milestone.projectId && scopedIds.has(milestone.projectId))
+        const done = projectTasks.filter((task) => task.status === 'done').length
+        const blocked = projectTasks.filter((task) => task.status === 'blocked').length
+        const overdue = projectTasks.filter((task) => task.dueDate && startOfDayTs(task.dueDate) < startOfDayTs(new Date()) && task.status !== 'done').length
+        const completion = projectTasks.length ? Math.round((done / projectTasks.length) * 100) : 0
+        const nextCheckpoint = getNextMilestone(projectMilestones)
+        const health = getDeliveryHealth({
+          blocked,
+          overdue,
+          nextDate: nextCheckpoint?.dueDate || project.dueDate,
+          totalTasks: projectTasks.length,
+          completion,
+          status: project.status,
+        })
+        const confidence = getConfidenceState(health.label)
+        const managerAttention = overdue > 0
+          ? 'Recovery plan needed'
+          : blocked > 0
+            ? 'Needs unblock decision'
+            : nextCheckpoint && daysUntilDate(nextCheckpoint.dueDate) !== null && daysUntilDate(nextCheckpoint.dueDate) <= 7
+              ? 'Checkpoint prep needed'
+              : 'No escalation needed'
+
+        return {
+          ...project,
+          projectTasks,
+          done,
+          blocked,
+          overdue,
+          completion,
+          nextCheckpoint,
+          health,
+          confidence,
+          managerAttention,
+          programName: project.programId ? programById.get(project.programId)?.name : 'Standalone project',
+        }
+      }),
+    [filteredMilestones, filteredProjects, filteredTasks, programById]
+  )
+
+  const watchlistItems = useMemo(() => {
+    const activeTasks = filteredTasks.filter((task) => task.status !== 'done')
+    const sourceTasks = activeTasks.length > 0 ? activeTasks : filteredTasks
+    const enriched = sourceTasks
+      .map((task) => ({
+        task,
+        signal: getTaskWatchSignal(task),
+      }))
+      .sort((left, right) => {
+        if (right.signal.score !== left.signal.score) return right.signal.score - left.signal.score
+        const leftDue = isValidDate(left.task.dueDate) ? startOfDayTs(left.task.dueDate) : Number.POSITIVE_INFINITY
+        const rightDue = isValidDate(right.task.dueDate) ? startOfDayTs(right.task.dueDate) : Number.POSITIVE_INFINITY
+        return leftDue - rightDue
+      })
+
+    const prioritized = enriched.filter((item) => item.signal.score >= 60)
+    return (prioritized.length > 0 ? prioritized : enriched).slice(0, 10)
+  }, [filteredTasks])
+
+  const hiddenWatchlistCount = useMemo(() => {
+    const activeCount = filteredTasks.filter((task) => task.status !== 'done').length
+    const baseline = activeCount > 0 ? activeCount : filteredTasks.length
+    return Math.max(baseline - watchlistItems.length, 0)
+  }, [filteredTasks, watchlistItems.length])
+
   const activeSectionMeta = useMemo(
     () => availableSections.find((section) => section.id === activeSection) ?? availableSections[0] ?? null,
     [activeSection, availableSections]
@@ -1116,14 +1482,15 @@ export default function ShareView({ token }) {
               <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div className="min-w-0">
                   <div className="text-[11px] font-semibold uppercase tracking-[0.24em]" style={{ color: 'var(--text-secondary)' }}>
-                    TaskFlow Shared View
+                    Professional Delivery View
                   </div>
                   <div className="mt-2 flex items-center gap-2 flex-wrap">
                     <h2 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>
                       {link?.name || 'Shared View'}
                     </h2>
+                    <HealthPill health={portfolioHealth} />
                     <InfoTooltip
-                      text="Live snapshot of progress, portfolio health, milestones, and timeline. The same link keeps reflecting the latest data while it stays active."
+                      text="Professional-only delivery snapshot with live progress, milestone health, and optional execution detail."
                       widthClassName="w-72"
                     />
                   </div>
@@ -1132,7 +1499,7 @@ export default function ShareView({ token }) {
                       {shareScopeLabel}
                     </span>
                     <span className="px-2.5 py-1 rounded-full" style={{ background: 'rgba(16,185,129,0.12)', color: '#10b981' }}>
-                      Live data
+                      Professional only
                     </span>
                   </div>
                 </div>
@@ -1141,10 +1508,21 @@ export default function ShareView({ token }) {
                   <StatCard label="Programs" value={filteredPrograms.length} />
                   <StatCard label="Projects" value={filteredProjects.filter((project) => !project.parentId).length} />
                   <StatCard label="Tasks" value={stats.total} />
-                  <StatCard label="Done %" value={`${stats.completion}%`} color="#10b981" />
+                  <StatCard label="Complete" value={`${stats.completion}%`} color="#10b981" />
                   <StatCard label="Blocked" value={stats.blocked} color="#ef4444" />
                   <StatCard label="Overdue" value={stats.overdue} color="#f97316" />
                 </div>
+              </div>
+
+              <div className="mt-4 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+                {trustSignals.map((signal) => (
+                  <MetaCard
+                    key={signal.label}
+                    label={signal.label}
+                    value={signal.value}
+                    meta={signal.meta}
+                  />
+                ))}
               </div>
             </GlassCard>
 
@@ -1164,8 +1542,8 @@ export default function ShareView({ token }) {
 
             <div className="space-y-4 min-w-0">
               <ScopeBar
-                eyebrow={`${activeSectionMeta?.label || 'Overview'} scope`}
-                title="Focus the shared view"
+                eyebrow={`${activeSectionMeta?.label || 'Overview'} focus`}
+                title="Choose the area you want to review"
                 infoText={activeSectionMeta?.meta || 'Scope this view to the program or project you want to review.'}
                 compact
                 controls={
@@ -1200,33 +1578,43 @@ export default function ShareView({ token }) {
                         <option key={project.id} value={project.id}>{project.name}</option>
                       ))}
                     </select>
-                    <select
-                      value={selectedSubProjectId}
-                      onChange={(event) => setSelectedSubProjectId(event.target.value)}
-                      className="text-xs px-3 py-2 rounded-xl min-w-[210px]"
-                      style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-primary)' }}
-                    >
-                      <option value="">All sub-projects</option>
-                      {visibleSubProjects.map((project) => {
-                        const parent = project.parentId ? projectById.get(project.parentId) : null
-                        const label = parent ? `${parent.name} / ${project.name}` : project.name
-                        return (
-                          <option key={project.id} value={project.id}>{label}</option>
-                        )
-                      })}
-                    </select>
+                    {selectedProjectId && visibleSubProjects.length > 0 && (
+                      <select
+                        value={selectedSubProjectId}
+                        onChange={(event) => setSelectedSubProjectId(event.target.value)}
+                        className="text-xs px-3 py-2 rounded-xl min-w-[210px]"
+                        style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-primary)' }}
+                      >
+                        <option value="">All sub-projects</option>
+                        {visibleSubProjects.map((project) => {
+                          const parent = project.parentId ? projectById.get(project.parentId) : null
+                          const label = parent ? `${parent.name} / ${project.name}` : project.name
+                          return (
+                            <option key={project.id} value={project.id}>{label}</option>
+                          )
+                        })}
+                      </select>
+                    )}
                   </>
                 }
                 actions={
-                  (selectedProgramId || selectedProjectId || selectedSubProjectId) ? (
-                    <button
-                      onClick={clearScopeFilters}
+                  <>
+                    <span
                       className="px-3 py-2 rounded-xl text-xs"
                       style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)', border: '1px solid rgba(255,255,255,0.1)' }}
                     >
-                      Clear
-                    </button>
-                  ) : null
+                      {currentScopeLabel}
+                    </span>
+                    {(selectedProgramId || selectedProjectId || selectedSubProjectId) ? (
+                      <button
+                        onClick={clearScopeFilters}
+                        className="px-3 py-2 rounded-xl text-xs"
+                        style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)', border: '1px solid rgba(255,255,255,0.1)' }}
+                      >
+                        Clear
+                      </button>
+                    ) : null}
+                  </>
                 }
               />
 
@@ -1234,12 +1622,24 @@ export default function ShareView({ token }) {
                 {activeSection === 'overview' && (
                   <>
                     <Section
-                      title="Overview KPIs"
-                      description="Executive summary of completion, blocked work, overdue load, and active scope size."
+                      title="Executive Summary"
+                      description="A concise manager snapshot of overall health, next checkpoint, top risk, and where attention is needed."
                       icon={ShieldCheck}
+                      action={<HealthPill health={portfolioHealth} />}
                     >
+                      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3 mb-4">
+                        {leadershipSummary.map((item) => (
+                          <MetaCard
+                            key={item.label}
+                            label={item.label}
+                            value={item.value}
+                            meta={item.meta}
+                            color={item.color}
+                          />
+                        ))}
+                      </div>
                       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
-                        <StatCard label="Done %" value={`${stats.completion}%`} color="#10b981" />
+                        <StatCard label="Complete" value={`${stats.completion}%`} color="#10b981" />
                         <StatCard label="In Progress" value={stats.inProgress} color="#22d3ee" />
                         <StatCard label="Blocked" value={stats.blocked} color="#ef4444" />
                         <StatCard label="Overdue" value={stats.overdue} color="#f97316" />
@@ -1288,7 +1688,7 @@ export default function ShareView({ token }) {
                 {activeSection === 'analytics' && shareConfig.modules.analytics && (
                   <Section
                     title="Portfolio Summary"
-                    description="Program roll-up for quick scanning of scope, delivery load, blocked work, and completion."
+                    description="Roll-up by program so a manager can quickly scan health, upcoming checkpoints, and where risk is accumulating."
                     icon={BarChart3}
                   >
                     {milestoneTimelineItems.length > 0 && (
@@ -1305,15 +1705,17 @@ export default function ShareView({ token }) {
                       <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>No portfolio summary available.</p>
                     ) : (
                       <div className="overflow-x-auto">
-                        <table className="w-full text-xs min-w-[560px]">
+                        <table className="w-full text-xs min-w-[880px]">
                           <thead>
                             <tr style={{ color: 'var(--text-secondary)' }}>
                               <th className="text-left py-2">Program</th>
                               <th className="text-left py-2">Projects</th>
                               <th className="text-left py-2">Tasks</th>
-                              <th className="text-left py-2">Done</th>
+                              <th className="text-left py-2">Next milestone</th>
                               <th className="text-left py-2">Blocked</th>
+                              <th className="text-left py-2">Overdue</th>
                               <th className="text-left py-2">Completion</th>
+                              <th className="text-left py-2">Health</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -1327,9 +1729,15 @@ export default function ShareView({ token }) {
                                 </td>
                                 <td className="py-3" style={{ color: 'var(--text-secondary)' }}>{stat.projects}</td>
                                 <td className="py-3" style={{ color: 'var(--text-secondary)' }}>{stat.tasks}</td>
-                                <td className="py-3" style={{ color: '#10b981' }}>{stat.done}</td>
+                                <td className="py-3" style={{ color: 'var(--text-secondary)' }}>
+                                  {stat.nextMilestone ? `${stat.nextMilestone.name} · ${fmtDate(stat.nextMilestone.dueDate)}` : 'No milestone set'}
+                                </td>
                                 <td className="py-3" style={{ color: '#ef4444' }}>{stat.blocked}</td>
+                                <td className="py-3" style={{ color: stat.overdue > 0 ? '#f97316' : 'var(--text-secondary)' }}>{stat.overdue}</td>
                                 <td className="py-3" style={{ color: 'var(--text-primary)' }}>{stat.completion}%</td>
+                                <td className="py-3">
+                                  <HealthPill health={stat.health} />
+                                </td>
                               </tr>
                             ))}
                           </tbody>
@@ -1341,25 +1749,15 @@ export default function ShareView({ token }) {
 
                 {activeSection === 'delivery' && shareConfig.modules.projects && (
                   <Section
-                    title="Project Delivery Board"
-                    description="Top-level projects with delivery status, completion, and timing for scanning active execution."
+                    title="Delivery Overview"
+                    description="Project-by-project view of health, next checkpoint, timing confidence, and where manager attention may be needed."
                     icon={FolderKanban}
                   >
-                    {filteredProjects.length === 0 ? (
+                    {projectSummaries.length === 0 ? (
                       <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>No projects available.</p>
                     ) : (
                       <div className="grid grid-cols-1 gap-3">
-                        {filteredProjects.filter((project) => !project.parentId).map((project) => {
-                          const scopedIds = new Set([
-                            project.id,
-                            ...filteredProjects.filter((candidate) => candidate.parentId === project.id).map((candidate) => candidate.id),
-                          ])
-                          const projectTasks = filteredTasks.filter((task) => task.projectId && scopedIds.has(task.projectId))
-                          const done = projectTasks.filter((task) => task.status === 'done').length
-                          const blocked = projectTasks.filter((task) => task.status === 'blocked').length
-                          const overdue = projectTasks.filter((task) => task.dueDate && startOfDayTs(task.dueDate) < startOfDayTs(new Date()) && task.status !== 'done').length
-                          const completion = projectTasks.length ? Math.round((done / projectTasks.length) * 100) : 0
-                          const programName = project.programId ? programById.get(project.programId)?.name : 'Unassigned'
+                        {projectSummaries.map((project) => {
                           return (
                             <div
                               key={project.id}
@@ -1375,36 +1773,55 @@ export default function ShareView({ token }) {
                                     </p>
                                   </div>
                                   <p className="text-[11px] mt-1 truncate" style={{ color: 'var(--text-secondary)' }}>
-                                    {programName}
+                                    {project.programName}
                                   </p>
+                                  {project.description ? (
+                                    <p className="text-[11px] mt-2 line-clamp-2" style={{ color: 'var(--text-secondary)' }}>
+                                      {project.description}
+                                    </p>
+                                  ) : null}
                                 </div>
-                                <span className="text-[10px] px-2 py-1 rounded-full" style={{ background: `${project.color}22`, color: project.color }}>
-                                  {completion}%
-                                </span>
+                                <HealthPill health={project.health} />
                               </div>
 
                               <div className="mt-3 grid grid-cols-4 gap-3 text-[11px]">
                                 <div>
                                   <div style={{ color: 'var(--text-secondary)' }}>Tasks</div>
-                                  <div className="mt-1 text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{projectTasks.length}</div>
+                                  <div className="mt-1 text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{project.projectTasks.length}</div>
                                 </div>
                                 <div>
                                   <div style={{ color: 'var(--text-secondary)' }}>Done</div>
-                                  <div className="mt-1 text-sm font-semibold" style={{ color: '#10b981' }}>{done}</div>
+                                  <div className="mt-1 text-sm font-semibold" style={{ color: '#10b981' }}>{project.done}</div>
                                 </div>
                                 <div>
                                   <div style={{ color: 'var(--text-secondary)' }}>Blocked</div>
-                                  <div className="mt-1 text-sm font-semibold" style={{ color: blocked > 0 ? '#ef4444' : 'var(--text-primary)' }}>{blocked}</div>
+                                  <div className="mt-1 text-sm font-semibold" style={{ color: project.blocked > 0 ? '#ef4444' : 'var(--text-primary)' }}>{project.blocked}</div>
                                 </div>
                                 <div>
                                   <div style={{ color: 'var(--text-secondary)' }}>Overdue</div>
-                                  <div className="mt-1 text-sm font-semibold" style={{ color: overdue > 0 ? '#f97316' : 'var(--text-primary)' }}>{overdue}</div>
+                                  <div className="mt-1 text-sm font-semibold" style={{ color: project.overdue > 0 ? '#f97316' : 'var(--text-primary)' }}>{project.overdue}</div>
                                 </div>
                               </div>
 
-                              <div className="flex items-center justify-between mt-3 text-[10px]" style={{ color: 'var(--text-secondary)' }}>
-                                <span>Start: {fmtDate(project.startDate)}</span>
-                                <span>Due: {fmtDate(project.dueDate)}</span>
+                              <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3">
+                                <MetaCard
+                                  label="Next checkpoint"
+                                  value={project.nextCheckpoint ? project.nextCheckpoint.name : 'No checkpoint set'}
+                                  meta={project.nextCheckpoint ? `Due ${fmtDate(project.nextCheckpoint.dueDate)}` : `Target date ${fmtDate(project.dueDate)}`}
+                                  color={project.nextCheckpoint ? '#22d3ee' : 'var(--text-primary)'}
+                                />
+                                <MetaCard
+                                  label="Date confidence"
+                                  value={project.confidence.label}
+                                  meta={project.health.note}
+                                  color={project.confidence.color}
+                                />
+                                <MetaCard
+                                  label="Manager attention"
+                                  value={project.managerAttention}
+                                  meta={project.overdue > 0 ? `${countLabel(project.overdue, 'overdue task')} need action.` : project.blocked > 0 ? `${countLabel(project.blocked, 'blocked task')} need follow-up.` : `${project.completion}% complete.`}
+                                  color={project.overdue > 0 || project.blocked > 0 ? '#f59e0b' : '#10b981'}
+                                />
                               </div>
                             </div>
                           )
@@ -1416,42 +1833,74 @@ export default function ShareView({ token }) {
 
                 {activeSection === 'tasks' && shareConfig.modules.tasks && (
                   <Section
-                    title="Task Register"
-                    description="Task detail with project context, delivery status, priority, and schedule dates."
+                    title="Execution Watchlist"
+                    description="Highest-signal tasks in the current scope, trimmed down for leadership review rather than full execution tracking."
                     icon={Lock}
+                    action={
+                      <span className="text-[11px] px-2.5 py-1 rounded-full" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)' }}>
+                        {watchlistItems.length} shown{hiddenWatchlistCount > 0 ? ` · ${hiddenWatchlistCount} hidden` : ''}
+                      </span>
+                    }
                   >
                     {filteredTasks.length === 0 ? (
                       <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>No tasks in this shared scope.</p>
                     ) : (
-                      <TaskDataTable
-                        items={filteredTasks.slice().sort(sortTasksByStartDate)}
-                        getContextContent={(task) => {
-                          const project = task.projectId ? projectById.get(task.projectId) : null
-                          const programId = getTaskProgramId(task, projects)
-                          const program = programId ? programById.get(programId) : null
-                          const label = program?.name || 'Standalone'
-                          const color = program?.color || project?.color || '#94a3b8'
-                          return <TaskContextChip label={label} color={color} />
-                        }}
-                        getProjectContent={(task) => {
-                          const project = task.projectId ? projectById.get(task.projectId) : null
-                          const programId = getTaskProgramId(task, projects)
-                          const program = programId ? programById.get(programId) : null
-                          return project?.name || (program ? 'Program task' : 'Standalone')
-                        }}
-                        extraColumns={shareConfig.modules.dependencies ? [{
-                          key: 'dependencies',
-                          label: 'Dependencies',
-                          render: (task) => (
-                            task.dependsOn?.length
-                              ? task.dependsOn
-                                  .map((dependencyId) => taskById.get(dependencyId)?.title || 'Unavailable task')
-                                  .join(', ')
-                              : '—'
-                          ),
-                        }] : []}
-                        minWidthClassName={shareConfig.modules.dependencies ? 'min-w-[1040px]' : 'min-w-[920px]'}
-                      />
+                      <div className="space-y-3">
+                        <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                          Showing the highest-signal tasks in this scope so a manager can review risks without wading through the full execution backlog.
+                        </p>
+                        <TaskDataTable
+                          items={watchlistItems}
+                          getTask={(item) => item.task}
+                          getContextContent={(item, task) => {
+                            const project = task.projectId ? projectById.get(task.projectId) : null
+                            const programId = getTaskProgramId(task, projects)
+                            const program = programId ? programById.get(programId) : null
+                            const label = program?.name || 'Standalone'
+                            const color = program?.color || project?.color || '#94a3b8'
+                            return <TaskContextChip label={label} color={color} />
+                          }}
+                          getProjectContent={(item, task) => {
+                            const project = task.projectId ? projectById.get(task.projectId) : null
+                            const programId = getTaskProgramId(task, projects)
+                            const program = programId ? programById.get(programId) : null
+                            return project?.name || (program ? 'Program task' : 'Standalone')
+                          }}
+                          extraColumns={[
+                            {
+                              key: 'signal',
+                              label: 'Signal',
+                              render: (item) => (
+                                <span
+                                  className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-medium"
+                                  style={{ background: `${item.signal.color}18`, color: item.signal.color }}
+                                >
+                                  {item.signal.label}
+                                </span>
+                              ),
+                            },
+                            {
+                              key: 'note',
+                              label: 'Why it matters',
+                              render: (item) => item.signal.note,
+                            },
+                            ...(shareConfig.modules.dependencies ? [{
+                              key: 'dependencies',
+                              label: 'Dependencies',
+                              render: (item) => (
+                                item.task.dependsOn?.length
+                                  ? item.task.dependsOn
+                                      .map((dependencyId) => taskById.get(dependencyId)?.title || 'Unavailable task')
+                                      .join(', ')
+                                  : '—'
+                              ),
+                            }] : []),
+                          ]}
+                          minWidthClassName={shareConfig.modules.dependencies ? 'min-w-[1180px]' : 'min-w-[1080px]'}
+                          emptyTitle="No watchlist items"
+                          emptyDescription="The current scope does not have any high-signal tasks to review."
+                        />
+                      </div>
                     )}
                   </Section>
                 )}
@@ -1506,17 +1955,30 @@ export default function ShareView({ token }) {
 
                 {activeSection === 'gantt' && shareConfig.modules.gantt && (
                   <Section
-                    title="Gantt"
-                    description="Timeline view of programs, projects, tasks, and milestones with the same filters available in this shared view."
+                    title="Timeline"
+                    description="Milestone-first timeline with the detailed schedule available below when a deeper review is needed."
                     icon={ShieldCheck}
                     padding="p-4"
                   >
-                    <ManagerGantt
-                      programs={filteredPrograms}
-                      projects={filteredProjects}
-                      tasks={filteredTasks}
-                      milestones={filteredMilestones}
-                    />
+                    <div className="space-y-4">
+                      <MilestoneTimeline
+                        milestones={milestoneTimelineItems}
+                        compact
+                        emptyLabel="No milestone dates in this shared scope."
+                      />
+                      <div
+                        className="rounded-2xl px-4 py-3 text-xs"
+                        style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', color: 'var(--text-secondary)' }}
+                      >
+                        Milestones are surfaced first for quick leadership review. The detailed delivery schedule is included below because this shared link has timeline access enabled.
+                      </div>
+                      <ManagerGantt
+                        programs={filteredPrograms}
+                        projects={filteredProjects}
+                        tasks={filteredTasks}
+                        milestones={filteredMilestones}
+                      />
+                    </div>
                   </Section>
                 )}
               </div>
