@@ -353,7 +353,7 @@ export const findMilestoneForTask = (milestones = [], task) => {
 }
 
 async function fetchWorkspaceProjectData(workspaceId) {
-  const [programRes, projectRes] = await Promise.all([
+  const [programRes, projectRes, milestoneRes] = await Promise.all([
     supabase
       .from('programs')
       .select('*')
@@ -364,28 +364,52 @@ async function fetchWorkspaceProjectData(workspaceId) {
       .select('*')
       .eq('workspace_id', workspaceId)
       .order('created_at', { ascending: true }),
+    supabase
+      .from('milestones')
+      .select('*, project:projects!inner(id, workspace_id, program_id, parent_id, name, color, description, status, start_date, due_date, created_at, updated_at)')
+      .eq('project.workspace_id', workspaceId)
+      .order('created_at', { ascending: true }),
   ])
+
+  const mergedProjectRows = new Map()
+  ;(projectRes.data ?? []).forEach((row) => {
+    if (!row?.id) return
+    mergedProjectRows.set(row.id, row)
+  })
 
   if (programRes.error) throw programRes.error
   if (projectRes.error) throw projectRes.error
 
-  const projectIds = (projectRes.data ?? []).map((p) => p.id)
   let milestoneRows = []
 
-  if (projectIds.length > 0) {
-    const milestonesRes = await supabase
-      .from('milestones')
-      .select('*')
-      .in('project_id', projectIds)
-      .order('created_at', { ascending: true })
+  if (milestoneRes.error) {
+    const projectIds = Array.from(mergedProjectRows.keys())
 
-    if (milestonesRes.error) throw milestonesRes.error
-    milestoneRows = milestonesRes.data ?? []
+    if (projectIds.length > 0) {
+      const fallbackMilestonesRes = await supabase
+        .from('milestones')
+        .select('*')
+        .in('project_id', projectIds)
+        .order('created_at', { ascending: true })
+
+      if (fallbackMilestonesRes.error) throw fallbackMilestonesRes.error
+      milestoneRows = fallbackMilestonesRes.data ?? []
+    }
+  } else {
+    milestoneRows = (milestoneRes.data ?? []).map((row) => {
+      if (row?.project?.id && !mergedProjectRows.has(row.project.id)) {
+        mergedProjectRows.set(row.project.id, row.project)
+      }
+
+      const normalizedRow = { ...row }
+      delete normalizedRow.project
+      return normalizedRow
+    })
   }
 
   return {
     programRows: programRes.data ?? [],
-    projectRows: projectRes.data ?? [],
+    projectRows: Array.from(mergedProjectRows.values()),
     milestoneRows,
   }
 }
