@@ -1,9 +1,36 @@
-import { memo, useState } from 'react'
-import { Plus, Check, Trash2, Flag, Calendar, MoreHorizontal, Pencil } from 'lucide-react'
+import { memo, useEffect, useMemo, useState } from 'react'
+import { Plus, Check, Trash2, Flag, Calendar, MoreHorizontal, Pencil, ArrowUpRight } from 'lucide-react'
 import { format } from 'date-fns'
 import useProjectStore from '../../store/useProjectStore'
+import MilestoneTimeline from '../common/MilestoneTimeline'
 
-const MilestoneRow = memo(function MilestoneRow({ milestone, projectColor }) {
+const DEFAULT_MILESTONE_COLOR = '#38bdf8'
+
+const sortMilestones = (milestones = []) => (
+  [...milestones].sort((left, right) => {
+    const leftTs = left?.dueDate ? new Date(left.dueDate).getTime() : Number.MAX_SAFE_INTEGER
+    const rightTs = right?.dueDate ? new Date(right.dueDate).getTime() : Number.MAX_SAFE_INTEGER
+    return leftTs - rightTs
+  })
+)
+
+const buildProjectPathLabel = (project, projectById) => {
+  if (!project) return 'Project'
+
+  const parts = [project.name]
+  let parentId = project.parentId ?? null
+
+  while (parentId) {
+    const parent = projectById.get(parentId)
+    if (!parent) break
+    parts.unshift(parent.name)
+    parentId = parent.parentId ?? null
+  }
+
+  return parts.join(' / ')
+}
+
+const MilestoneRow = memo(function MilestoneRow({ milestone, projectColor, projectName = '' }) {
   const toggleMilestone = useProjectStore((s) => s.toggleMilestone)
   const deleteMilestone = useProjectStore((s) => s.deleteMilestone)
   const updateMilestone = useProjectStore((s) => s.updateMilestone)
@@ -107,10 +134,19 @@ const MilestoneRow = memo(function MilestoneRow({ milestone, projectColor }) {
             {milestone.description}
           </span>
         )}
-        {milestone.taskId && (
-          <span className="text-[10px] inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full" style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--text-secondary)' }}>
-            Linked task
-          </span>
+        {(milestone.taskId || projectName) && (
+          <div className="flex flex-wrap items-center gap-1 mt-1">
+            {projectName && (
+              <span className="text-[10px] inline-flex items-center gap-1 px-2 py-0.5 rounded-full" style={{ background: 'rgba(255,255,255,0.06)', color: projectColor }}>
+                {projectName}
+              </span>
+            )}
+            {milestone.taskId && (
+              <span className="text-[10px] inline-flex items-center gap-1 px-2 py-0.5 rounded-full" style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--text-secondary)' }}>
+                Linked task
+              </span>
+            )}
+          </div>
         )}
       </div>
 
@@ -183,21 +219,88 @@ const MilestoneRow = memo(function MilestoneRow({ milestone, projectColor }) {
   )
 })
 
-const MilestonePanel = memo(function MilestonePanel({ projectId, projectColor }) {
-  const milestones    = useProjectStore((s) => s.milestones)
-  const addMilestone  = useProjectStore((s) => s.addMilestone)
+const MilestonePanel = memo(function MilestonePanel({
+  projectId = null,
+  projectIds = [],
+  projectColor = DEFAULT_MILESTONE_COLOR,
+  projectOptions = [],
+  title = 'Milestones',
+  description = null,
+  emptyLabel = 'No milestones yet',
+  showProjectName = false,
+  onOpenTimeline = null,
+}) {
+  const milestones = useProjectStore((s) => s.milestones)
+  const addMilestone = useProjectStore((s) => s.addMilestone)
+  const projects = useProjectStore((s) => s.projects)
 
-  const [adding, setAdding]   = useState(false)
-  const [name, setName]       = useState('')
+  const projectById = useMemo(
+    () => new Map((projects ?? []).map((project) => [project.id, project])),
+    [projects]
+  )
+  const fallbackProjectOptions = useMemo(() => {
+    if (projectOptions.length > 0) return projectOptions
+    if (projectId) {
+      const project = projectById.get(projectId)
+      return project ? [project] : []
+    }
+    if (projectIds.length > 0) {
+      const allowed = new Set(projectIds)
+      return (projects ?? []).filter((project) => allowed.has(project.id))
+    }
+    return []
+  }, [projectOptions, projectId, projectIds, projectById, projects])
+  const scopedProjectIds = useMemo(() => {
+    if (projectId) return [projectId]
+    if (projectIds.length > 0) return projectIds
+    return fallbackProjectOptions.map((project) => project.id)
+  }, [projectId, projectIds, fallbackProjectOptions])
+  const scopedProjectIdSet = useMemo(() => new Set(scopedProjectIds), [scopedProjectIds])
+  const visibleMilestones = useMemo(
+    () => sortMilestones((milestones ?? []).filter((milestone) => milestone.projectId && scopedProjectIdSet.has(milestone.projectId))),
+    [milestones, scopedProjectIdSet]
+  )
+  const timelineItems = useMemo(
+    () => visibleMilestones.map((milestone) => {
+      const linkedProject = milestone.projectId ? projectById.get(milestone.projectId) : null
+      return {
+        id: milestone.id,
+        name: milestone.name,
+        dueDate: milestone.dueDate,
+        completed: milestone.status === 'completed',
+        color: linkedProject?.color ?? projectColor,
+        context: linkedProject ? buildProjectPathLabel(linkedProject, projectById) : 'Milestone',
+      }
+    }),
+    [visibleMilestones, projectById, projectColor]
+  )
+
+  const [adding, setAdding] = useState(false)
+  const [name, setName] = useState('')
   const [dueDate, setDueDate] = useState('')
-  const [desc, setDesc]       = useState('')
+  const [desc, setDesc] = useState('')
+  const [selectedProjectId, setSelectedProjectId] = useState(() =>
+    projectId ?? fallbackProjectOptions[0]?.id ?? ''
+  )
 
-  const projectMilestones = (milestones ?? []).filter((m) => m.projectId === projectId)
+  useEffect(() => {
+    const preferredProjectId = projectId ?? fallbackProjectOptions[0]?.id ?? ''
+    setSelectedProjectId((current) => {
+      if (current && scopedProjectIdSet.has(current)) return current
+      return preferredProjectId
+    })
+  }, [projectId, fallbackProjectOptions, scopedProjectIdSet])
+
+  const completedCount = visibleMilestones.filter((milestone) => milestone.status === 'completed').length
+  const upcomingCount = visibleMilestones.length - completedCount
+  const canAssignProject = fallbackProjectOptions.length > 1 || !projectId
+  const resolvedTargetProjectId = projectId ?? selectedProjectId
+  const canCreateMilestone = Boolean(projectId || fallbackProjectOptions.length > 0)
 
   const submit = () => {
-    if (!name.trim()) return
+    if (!name.trim() || !resolvedTargetProjectId) return
     addMilestone({
-      projectId,
+      projectId: resolvedTargetProjectId,
       name: name.trim(),
       dueDate: dueDate ? new Date(dueDate).toISOString() : null,
       description: desc.trim(),
@@ -207,25 +310,49 @@ const MilestonePanel = memo(function MilestonePanel({ projectId, projectColor })
 
   return (
     <div className="mt-3">
-      {/* Section header */}
       <div className="flex items-center justify-between mb-2 px-1">
-        <div className="flex items-center gap-1.5">
-          <Flag size={11} style={{ color: projectColor }} />
-          <span className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>
-            Milestones
-            {projectMilestones.length > 0 && ` (${projectMilestones.filter(m => m.status === 'completed').length}/${projectMilestones.length})`}
-          </span>
+        <div className="min-w-0">
+          <div className="flex items-center gap-1.5">
+            <Flag size={11} style={{ color: projectColor }} />
+            <span className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>
+              {title}
+              {visibleMilestones.length > 0 && ` (${completedCount}/${visibleMilestones.length})`}
+            </span>
+          </div>
+          {description && (
+            <p className="text-[10px] mt-1 leading-5" style={{ color: 'var(--text-secondary)' }}>
+              {description}
+            </p>
+          )}
+          {visibleMilestones.length > 0 && !description && (
+            <p className="text-[10px] mt-1" style={{ color: 'var(--text-secondary)' }}>
+              {upcomingCount} upcoming, {completedCount} completed
+            </p>
+          )}
         </div>
-        <button
-          onClick={() => setAdding((v) => !v)}
-          className="text-[10px] flex items-center gap-0.5 px-1.5 py-0.5 rounded-lg transition-colors hover:bg-white/5"
-          style={{ color: 'var(--accent)' }}
-        >
-          <Plus size={10} /> Add
-        </button>
+        <div className="flex items-center gap-2">
+          {onOpenTimeline && visibleMilestones.length > 0 && (
+            <button
+              type="button"
+              onClick={onOpenTimeline}
+              className="text-[10px] flex items-center gap-1 px-2 py-1 rounded-lg transition-colors hover:bg-white/5"
+              style={{ color: 'var(--text-secondary)' }}
+            >
+              <ArrowUpRight size={10} />
+              Timeline
+            </button>
+          )}
+          <button
+            onClick={() => setAdding((v) => !v)}
+            disabled={!canCreateMilestone}
+            className="text-[10px] flex items-center gap-0.5 px-1.5 py-0.5 rounded-lg transition-colors hover:bg-white/5"
+            style={canCreateMilestone ? { color: 'var(--accent)' } : { color: 'var(--text-secondary)', opacity: 0.6, cursor: 'not-allowed' }}
+          >
+            <Plus size={10} /> Add
+          </button>
+        </div>
       </div>
 
-      {/* Add form */}
       {adding && (
         <div className="mb-2 p-3 rounded-xl space-y-2"
           style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(var(--accent-rgb),0.2)' }}>
@@ -242,27 +369,56 @@ const MilestonePanel = memo(function MilestonePanel({ projectId, projectColor })
             className="w-full text-xs px-2.5 py-1.5 rounded-lg"
             style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: 'var(--text-primary)' }}
           />
+          {!canCreateMilestone && (
+            <p className="text-[10px]" style={{ color: 'var(--text-secondary)' }}>
+              Add a project first. Milestones are stored against a project or sub-project in the database.
+            </p>
+          )}
+          {canAssignProject && fallbackProjectOptions.length > 0 && (
+            <select
+              value={selectedProjectId}
+              onChange={(event) => setSelectedProjectId(event.target.value)}
+              className="w-full text-xs px-2.5 py-1.5 rounded-lg"
+              style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: 'var(--text-primary)' }}
+            >
+              {fallbackProjectOptions.map((projectOption) => (
+                <option key={projectOption.id} value={projectOption.id}>
+                  {buildProjectPathLabel(projectOption, projectById)}
+                </option>
+              ))}
+            </select>
+          )}
           <input
             type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)}
             className="w-full text-xs px-2.5 py-1.5 rounded-lg"
             style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: 'var(--text-primary)', colorScheme: 'dark' }}
           />
           <div className="flex gap-2">
-            <button onClick={submit} className="flex-1 btn-accent py-1 text-xs">Add Milestone</button>
+            <button onClick={submit} disabled={!canCreateMilestone || !resolvedTargetProjectId} className="flex-1 btn-accent py-1 text-xs disabled:opacity-60 disabled:cursor-not-allowed">Add Milestone</button>
             <button onClick={() => setAdding(false)} className="btn-ghost py-1 text-xs px-2">Cancel</button>
           </div>
         </div>
       )}
 
-      {/* Milestones list */}
-      {projectMilestones.length === 0 && !adding ? (
+      {visibleMilestones.length > 0 && (
+        <div className="mb-2">
+          <MilestoneTimeline milestones={timelineItems} compact emptyLabel={emptyLabel} />
+        </div>
+      )}
+
+      {visibleMilestones.length === 0 && !adding ? (
         <p className="text-[10px] text-center py-2" style={{ color: 'var(--text-secondary)' }}>
-          No milestones yet
+          {emptyLabel}
         </p>
       ) : (
         <div className="space-y-1">
-          {projectMilestones.map((m) => (
-            <MilestoneRow key={m.id} milestone={m} projectColor={projectColor} />
+          {visibleMilestones.map((m) => (
+            <MilestoneRow
+              key={m.id}
+              milestone={m}
+              projectColor={projectById.get(m.projectId)?.color ?? projectColor}
+              projectName={showProjectName ? buildProjectPathLabel(projectById.get(m.projectId), projectById) : ''}
+            />
           ))}
         </div>
       )}
