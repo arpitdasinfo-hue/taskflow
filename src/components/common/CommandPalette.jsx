@@ -1,7 +1,7 @@
 import { memo, useEffect, useRef, useState } from 'react'
 import {
   LayoutDashboard, ListTodo, CalendarClock, Settings2, FolderKanban,
-  BarChart3, GanttChart, Trash2, Search, ArrowRight, CheckSquare, Folder, Activity,
+  GanttChart, Trash2, Search, ArrowRight, CheckSquare, Folder, Activity,
 } from 'lucide-react'
 import useSettingsStore from '../../store/useSettingsStore'
 import useTaskStore from '../../store/useTaskStore'
@@ -12,7 +12,6 @@ const NAV_ITEMS = [
   { id: 'tasks',             label: 'All Tasks',    icon: ListTodo        },
   { id: 'today',             label: 'Planner',      icon: CalendarClock   },
   { id: 'projects',          label: 'Programs',     icon: FolderKanban    },
-  { id: 'program-dashboard', label: 'Program Overview',    icon: BarChart3       },
   { id: 'timeline',          label: 'Gantt Chart',  icon: GanttChart      },
   { id: 'activity',          label: 'Activity',     icon: Activity        },
   { id: 'trash',             label: 'Trash',        icon: Trash2          },

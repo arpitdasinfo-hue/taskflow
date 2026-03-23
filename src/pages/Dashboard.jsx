@@ -302,7 +302,7 @@ const Dashboard = memo(function Dashboard() {
     clearTaskDrilldown()
     clearAnalyticsInsight()
     if (programId) setActiveProgram(programId)
-    setPage('program-dashboard')
+    setPage('projects')
   }
 
   if (programs.length === 0 && activeTasks.length === 0) {
@@ -422,7 +422,7 @@ const Dashboard = memo(function Dashboard() {
                 onOpen={() => {
                   if (milestone.programId) setActiveProgram(milestone.programId)
                   if (milestone.projectId) setActiveProject(milestone.projectId)
-                  setPage('program-dashboard')
+                  setPage('projects')
                 }}
               />
             ))}
@@ -505,7 +505,7 @@ const Dashboard = memo(function Dashboard() {
                 stats={allStats[program.id]}
                 onOpen={() => {
                   setActiveProgram(program.id)
-                  setPage('program-dashboard')
+                  setPage('projects')
                 }}
               />
             ))}
