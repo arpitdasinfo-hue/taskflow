@@ -3,6 +3,7 @@ import { X, Download, ChevronLeft, ChevronRight, Table, FileText, FileSpreadshee
 import useTaskStore from '../../store/useTaskStore'
 import useProjectStore from '../../store/useProjectStore'
 import useSettingsStore from '../../store/useSettingsStore'
+import { buildProgramSummary, buildProjectSummary } from '../../lib/programWorkspace'
 
 const fmt = (iso) => iso ? new Date(iso).toISOString().split('T')[0] : ''
 const fmtHuman = (iso) => iso ? new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'
@@ -204,14 +205,14 @@ const TASK_PROGRESS_BY_STATUS = {
   todo: 0,
 }
 
-const getTaskColumnValue = (task, key, getProject, getProgram) => {
+const getTaskColumnValue = (task, key, getProject, getProgramForTask) => {
   switch (key) {
     case 'id': return task.id
     case 'title': return task.title ?? ''
     case 'status': return task.status ?? ''
     case 'priority': return task.priority ?? ''
     case 'project': return getProject(task.projectId)?.name ?? '—'
-    case 'program': return getProgram(task.projectId)?.name ?? '—'
+    case 'program': return getProgramForTask(task)?.name ?? '—'
     case 'dueDate': return fmt(task.dueDate)
     case 'startDate': return fmt(task.startDate)
     case 'tags': return (task.tags ?? []).join(', ')
@@ -229,6 +230,65 @@ const getDateBounds = (items) => {
     start: starts.length ? fmt(new Date(Math.min(...starts)).toISOString()) : '',
     end: ends.length ? fmt(new Date(Math.max(...ends)).toISOString()) : '',
   }
+}
+
+const EXCEL_WORKSHEET_NAME_LIMIT = 31
+const EXCEL_INVALID_WORKSHEET_CHARS = /[:\\/?*\[\]]/g
+
+const buildSelectedTaskValues = (task, selectedColumnKeys, getProject, getProgramForTask) => (
+  Object.fromEntries(
+    selectedColumnKeys.map((key) => [
+      XLSX_COLUMN_LABEL[key] ?? key,
+      getTaskColumnValue(task, key, getProject, getProgramForTask),
+    ])
+  )
+)
+
+const toWorksheetNameBase = (value) => {
+  const normalized = String(value ?? '')
+    .replace(EXCEL_INVALID_WORKSHEET_CHARS, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  return normalized || 'Sheet'
+}
+
+const getUniqueWorksheetName = (value, usedNames) => {
+  const base = toWorksheetNameBase(value)
+  let candidate = base.slice(0, EXCEL_WORKSHEET_NAME_LIMIT)
+  let index = 2
+
+  while (usedNames.has(candidate)) {
+    const suffix = ` (${index})`
+    candidate = `${base.slice(0, Math.max(0, EXCEL_WORKSHEET_NAME_LIMIT - suffix.length)).trimEnd()}${suffix}`
+    index += 1
+  }
+
+  usedNames.add(candidate)
+  return candidate
+}
+
+const addWorksheet = (sheets, usedNames, name, rows) => {
+  sheets.push({
+    name: getUniqueWorksheetName(name, usedNames),
+    rows,
+  })
+}
+
+const getProjectHierarchy = (project, getProject) => {
+  if (!project) return []
+
+  const chain = []
+  let current = project
+  const seen = new Set()
+
+  while (current && !seen.has(current.id)) {
+    chain.unshift(current)
+    seen.add(current.id)
+    current = current.parentId ? getProject(current.parentId) : null
+  }
+
+  return chain
 }
 
 const escapeXml = (value) =>
@@ -273,6 +333,180 @@ const buildWorkbookXml = (sheets) => `<?xml version="1.0"?>
   ${sheets.map((sheet) => rowsToWorksheetXml(sheet.name, sheet.rows)).join('\n')}
 </Workbook>`
 
+function buildProgramDetailSheetRows({
+  program,
+  projects,
+  tasks,
+  milestones,
+  columns,
+  include,
+  getProject,
+  getProgramForTask,
+}) {
+  const selectedColumnKeys = Object.keys(columns).filter((key) => columns[key])
+  const summary = buildProgramSummary({ program, projects, tasks, milestones })
+
+  const overviewRows = [
+    { Section: 'Overview', Metric: 'Program', Value: program.name, Detail: program.description || 'No description' },
+    { Section: 'Overview', Metric: 'Scope', Value: program.scope ?? 'professional', Detail: 'Workspace scope' },
+    { Section: 'Overview', Metric: 'Status', Value: program.status ?? 'planning', Detail: 'Current program status' },
+    {
+      Section: 'Overview',
+      Metric: 'Timeline',
+      Value: summary.scheduleLabel,
+      Detail: `${fmt(program.startDate) || 'No start'} -> ${fmt(program.endDate) || 'No end'}`,
+    },
+    {
+      Section: 'Overview',
+      Metric: 'Projects',
+      Value: summary.topLevelProjects.length,
+      Detail: `${summary.programProjects.length} project rows in scope`,
+    },
+    {
+      Section: 'Overview',
+      Metric: 'Tasks',
+      Value: summary.totalTasks,
+      Detail: `${summary.doneTasks} done, ${summary.openTasks} open, ${summary.blockedTasks} blocked`,
+    },
+    {
+      Section: 'Overview',
+      Metric: 'Completion %',
+      Value: summary.completion,
+      Detail: `${summary.overdueTasks} overdue, ${summary.unscheduledTasks} unscheduled`,
+    },
+    {
+      Section: 'Overview',
+      Metric: 'Next milestone',
+      Value: summary.nextMilestone?.name ?? 'None',
+      Detail: summary.nextMilestone
+        ? `${fmt(summary.nextMilestone.dueDate)} | ${summary.nextMilestone.status ?? 'pending'}`
+        : 'No pending milestones',
+    },
+    {
+      Section: 'Overview',
+      Metric: 'Risk',
+      Value: summary.risk.label,
+      Detail: summary.risk.detail,
+    },
+  ]
+
+  const buildProjectRows = (project, rootProject = project, lineage = []) => {
+    const projectSummary = buildProjectSummary({
+      project,
+      allProjects: summary.programProjects,
+      tasks: summary.programTasks,
+      milestones: summary.programMilestones,
+    })
+
+    const currentRow = {
+      Section: 'Projects',
+      Type: lineage.length > 0 ? 'Sub-project' : 'Project',
+      Program: program.name,
+      Project: rootProject.name,
+      'Sub-project': lineage.join(' / '),
+      'Item Name': project.name,
+      Status: project.status ?? 'active',
+      Start: fmt(project.startDate),
+      Due: fmt(project.dueDate),
+      'Completion %': projectSummary.completion,
+      'Task Count': projectSummary.totalTasks,
+      'Open Tasks': projectSummary.openTasks,
+      'Done Tasks': projectSummary.doneTasks,
+      'Blocked Tasks': projectSummary.blockedTasks,
+      'Critical Tasks': projectSummary.criticalTasks,
+      'Overdue Tasks': projectSummary.overdueTasks,
+      Schedule: projectSummary.scheduleLabel,
+      Risk: projectSummary.risk.label,
+      Description: project.description ?? '',
+    }
+
+    return [
+      currentRow,
+      ...projectSummary.childProjects.flatMap((childProject) =>
+        buildProjectRows(
+          childProject,
+          rootProject,
+          [...lineage, childProject.name]
+        )
+      ),
+    ]
+  }
+
+  const projectRows = summary.topLevelProjects.flatMap((project) => buildProjectRows(project))
+
+  const milestoneRows = include.milestones
+    ? summary.programMilestones.map((milestone) => {
+      const project = getProject(milestone.projectId)
+      const hierarchy = getProjectHierarchy(project, getProject)
+      const rootProject = hierarchy[0] ?? null
+      return {
+        Section: 'Milestones',
+        Type: 'Milestone',
+        Program: program.name,
+        Project: rootProject?.name ?? project?.name ?? '—',
+        'Sub-project': hierarchy.slice(1).map((entry) => entry.name).join(' / '),
+        Milestone: milestone.name,
+        Status: milestone.status ?? 'pending',
+        'Due Date': fmt(milestone.dueDate),
+        'Linked Task ID': milestone.taskId ?? '',
+        Description: milestone.description ?? '',
+      }
+    })
+    : []
+
+  const taskRows = include.tasks
+    ? summary.programTasks.flatMap((task) => {
+      const project = getProject(task.projectId)
+      const hierarchy = getProjectHierarchy(project, getProject)
+      const rootProject = hierarchy[0] ?? null
+      const selectedValues = buildSelectedTaskValues(task, selectedColumnKeys, getProject, getProgramForTask)
+      const baseRow = {
+        Section: 'Tasks',
+        Type: task.projectId ? 'Task' : 'Direct program task',
+        Program: program.name,
+        Project: rootProject?.name ?? '',
+        'Sub-project': hierarchy.slice(1).map((entry) => entry.name).join(' / '),
+        Task: task.title ?? '',
+        'Task ID': task.id,
+        Status: task.status ?? 'todo',
+        Priority: task.priority ?? 'medium',
+        Start: fmt(task.startDate),
+        Due: fmt(task.dueDate),
+        'Progress %': TASK_PROGRESS_BY_STATUS[task.status] ?? 0,
+        'Dependency IDs': (task.dependsOn ?? []).join(', '),
+        Tags: (task.tags ?? []).join(', '),
+        Notes: (task.notes ?? []).map((note) => note.content).join(' | '),
+        ...selectedValues,
+      }
+
+      const subtaskRows = include.subtasks
+        ? (task.subtasks ?? []).map((subtask) => ({
+          Section: 'Tasks',
+          Type: 'Subtask',
+          Program: program.name,
+          Project: rootProject?.name ?? '',
+          'Sub-project': hierarchy.slice(1).map((entry) => entry.name).join(' / '),
+          Task: `Subtask: ${subtask.title ?? 'Untitled subtask'}`,
+          'Task ID': subtask.id,
+          'Parent Task': task.title ?? '',
+          Status: subtask.completed ? 'done' : 'todo',
+          Priority: '',
+          Start: '',
+          Due: '',
+          'Progress %': subtask.completed ? 100 : 0,
+          'Dependency IDs': '',
+          Tags: '',
+          Notes: '',
+        }))
+        : []
+
+      return [baseRow, ...subtaskRows]
+    })
+    : []
+
+  return [...overviewRows, ...projectRows, ...milestoneRows, ...taskRows]
+}
+
 function buildExcelWorkbookXml({
   tasks,
   projects,
@@ -285,11 +519,13 @@ function buildExcelWorkbookXml({
   selectedProgramIds = [],
   selectedProjectIds = [],
 }) {
-  const getProject = (id) => projects.find((project) => project.id === id)
-  const getProgram = (projectId) => {
-    const project = getProject(projectId)
-    if (!project?.programId) return null
-    return programs.find((program) => program.id === project.programId)
+  const projectById = new Map(projects.map((project) => [project.id, project]))
+  const programById = new Map(programs.map((program) => [program.id, program]))
+  const getProject = (id) => projectById.get(id) ?? null
+  const getProgramForTask = (task) => {
+    if (task?.programId) return programById.get(task.programId) ?? null
+    const project = getProject(task?.projectId)
+    return project?.programId ? programById.get(project.programId) ?? null : null
   }
 
   const selectedColumnKeys = Object.keys(columns).filter((key) => columns[key])
@@ -303,6 +539,7 @@ function buildExcelWorkbookXml({
     ? projects.filter((project) => selectedProjectIds.includes(project.id)).map((project) => project.name)
     : []
   const selectedSheets = [
+    include.programSheets && programs.length > 0 ? `${programs.length} Program detail sheets` : null,
     include.tasks ? 'Work_Items' : null,
     include.milestones ? 'Milestones' : null,
     include.summaries ? 'Summary' : null,
@@ -343,24 +580,26 @@ function buildExcelWorkbookXml({
     { Setting: 'project_count', Value: projects.filter((project) => !project.parentId).length, Detail: 'Top-level projects inside the selected scope' },
     { Setting: 'sub_project_count', Value: projects.filter((project) => project.parentId).length, Detail: 'Sub-projects inside the selected scope' },
     { Setting: 'program_count', Value: programs.length, Detail: 'Programs inside the selected scope' },
+    { Setting: 'program_sheet_count', Value: include.programSheets ? programs.length : 0, Detail: 'Program-level worksheets included in this export' },
     { Setting: 'include_subtasks', Value: String(Boolean(include.subtasks)), Detail: 'Whether subtasks were requested in export options' },
     { Setting: 'include_milestones', Value: String(Boolean(include.milestones)), Detail: 'Whether milestones sheet is included' },
     { Setting: 'include_summary', Value: String(Boolean(include.summaries)), Detail: 'Whether summary sheet is included' },
     { Setting: 'include_gantt_config', Value: String(Boolean(include.ganttConfig)), Detail: 'Whether gantt config sheet is included' },
+    { Setting: 'include_program_sheets', Value: String(Boolean(include.programSheets)), Detail: 'Whether one worksheet per program is included' },
   ]
 
-  const taskRows = tasks.map((task) => {
+  const taskRows = tasks.flatMap((task) => {
     const project = getProject(task.projectId)
-    const parentProject = project?.parentId ? getProject(project.parentId) : null
-    const selectedValues = Object.fromEntries(
-      selectedColumnKeys.map((key) => [XLSX_COLUMN_LABEL[key] ?? key, getTaskColumnValue(task, key, getProject, getProgram)])
-    )
-    return {
+    const hierarchy = getProjectHierarchy(project, getProject)
+    const rootProject = hierarchy[0] ?? null
+    const selectedValues = buildSelectedTaskValues(task, selectedColumnKeys, getProject, getProgramForTask)
+
+    const rows = [{
       ...selectedTemplate,
       'Row Type': 'Task',
-      Program: getProgram(task.projectId)?.name ?? 'Unassigned',
-      Project: parentProject ? parentProject.name : project?.name ?? '—',
-      'Sub-project': parentProject ? project?.name ?? '' : '',
+      Program: getProgramForTask(task)?.name ?? 'Unassigned',
+      Project: rootProject?.name ?? '',
+      'Sub-project': hierarchy.slice(1).map((entry) => entry.name).join(' / '),
       'Item Name': task.title,
       'Item ID': task.id,
       'Parent ID': task.projectId ?? '',
@@ -369,7 +608,24 @@ function buildExcelWorkbookXml({
       'Progress %': TASK_PROGRESS_BY_STATUS[task.status] ?? 0,
       'Dependency IDs': (task.dependsOn ?? []).join(', '),
       ...selectedValues,
-    }
+    }]
+
+    if (!include.subtasks) return rows
+
+    return rows.concat((task.subtasks ?? []).map((subtask) => ({
+      ...selectedTemplate,
+      'Row Type': 'Subtask',
+      Program: getProgramForTask(task)?.name ?? 'Unassigned',
+      Project: rootProject?.name ?? '',
+      'Sub-project': hierarchy.slice(1).map((entry) => entry.name).join(' / '),
+      'Item Name': `Subtask: ${subtask.title ?? 'Untitled subtask'}`,
+      'Item ID': subtask.id,
+      'Parent ID': task.id,
+      Start: '',
+      Due: '',
+      'Progress %': subtask.completed ? 100 : 0,
+      'Dependency IDs': '',
+    })))
   })
 
   const topLevelProjects = projects.filter((project) => !project.parentId)
@@ -400,8 +656,8 @@ function buildExcelWorkbookXml({
       'Item Name': program.name,
       'Item ID': program.id,
       'Parent ID': '',
-      Start: bounds.start,
-      Due: bounds.end,
+      Start: bounds.start || fmt(program.startDate),
+      Due: bounds.end || fmt(program.endDate),
       'Progress %': programProgress,
       'Dependency IDs': '',
     })
@@ -501,55 +757,73 @@ function buildExcelWorkbookXml({
   })
 
   const workItemsRows = [...hierarchyRows, ...taskRows]
-  const sheets = [
-    { name: 'Export_Selection', rows: selectionRows },
-  ]
+  const sheets = []
+  const usedSheetNames = new Set()
+
+  addWorksheet(sheets, usedSheetNames, 'Export_Selection', selectionRows)
+
+  if (include.programSheets && programs.length > 0) {
+    programs.forEach((program) => {
+      addWorksheet(
+        sheets,
+        usedSheetNames,
+        program.name,
+        buildProgramDetailSheetRows({
+          program,
+          projects,
+          tasks,
+          milestones,
+          columns,
+          include,
+          getProject,
+          getProgramForTask,
+        })
+      )
+    })
+  }
 
   if (include.tasks) {
-    sheets.push({
-      name: 'Work_Items',
-      rows: workItemsRows.length ? workItemsRows : [{ 'Row Type': 'Info', 'Item Name': 'No matching work items' }],
-    })
+    addWorksheet(sheets, usedSheetNames, 'Work_Items', workItemsRows.length ? workItemsRows : [{ 'Row Type': 'Info', 'Item Name': 'No matching work items' }])
   }
 
   if (include.milestones) {
     const milestoneRows = milestones.map((milestone) => {
       const project = getProject(milestone.projectId)
-      const parentProject = project?.parentId ? getProject(project.parentId) : null
-      const program = project?.programId ? programs.find((item) => item.id === project.programId) : null
+      const hierarchy = getProjectHierarchy(project, getProject)
+      const rootProject = hierarchy[0] ?? null
+      const program = project?.programId ? programById.get(project.programId) : null
       return {
         Milestone: milestone.name,
         Program: program?.name ?? '—',
-        Project: parentProject ? parentProject.name : project?.name ?? '—',
-        'Sub-project': parentProject ? project?.name ?? '' : '',
+        Project: rootProject?.name ?? project?.name ?? '—',
+        'Sub-project': hierarchy.slice(1).map((entry) => entry.name).join(' / '),
         'Due Date': fmt(milestone.dueDate),
         Status: milestone.status,
       }
     })
-    sheets.push({
-      name: 'Milestones',
-      rows: milestoneRows.length ? milestoneRows : [{ Milestone: 'No milestones in selected scope' }],
-    })
+    addWorksheet(
+      sheets,
+      usedSheetNames,
+      'Milestones',
+      milestoneRows.length ? milestoneRows : [{ Milestone: 'No milestones in selected scope' }]
+    )
   }
 
   if (include.summaries) {
     const done = tasks.filter((task) => task.status === 'done').length
     const blocked = tasks.filter((task) => task.status === 'blocked').length
     const overdue = tasks.filter((task) => task.dueDate && new Date(task.dueDate) < new Date() && task.status !== 'done').length
-    sheets.push({
-      name: 'Summary',
-      rows: [
-        { Metric: 'Generated At', Value: fmtHuman(new Date().toISOString()) },
-        { Metric: 'Scope', Value: scope },
-        { Metric: 'Programs', Value: programs.length },
-        { Metric: 'Projects', Value: projects.filter((project) => !project.parentId).length },
-        { Metric: 'Sub-projects', Value: projects.filter((project) => project.parentId).length },
-        { Metric: 'Tasks', Value: tasks.length },
-        { Metric: 'Done Tasks', Value: done },
-        { Metric: 'Blocked Tasks', Value: blocked },
-        { Metric: 'Overdue Tasks', Value: overdue },
-      ],
-    })
+    addWorksheet(sheets, usedSheetNames, 'Summary', [
+      { Metric: 'Generated At', Value: fmtHuman(new Date().toISOString()) },
+      { Metric: 'Scope', Value: scope },
+      { Metric: 'Programs', Value: programs.length },
+      { Metric: 'Projects', Value: projects.filter((project) => !project.parentId).length },
+      { Metric: 'Sub-projects', Value: projects.filter((project) => project.parentId).length },
+      { Metric: 'Tasks', Value: tasks.length },
+      { Metric: 'Done Tasks', Value: done },
+      { Metric: 'Blocked Tasks', Value: blocked },
+      { Metric: 'Overdue Tasks', Value: overdue },
+    ])
   }
 
   if (include.ganttConfig) {
@@ -572,7 +846,7 @@ function buildExcelWorkbookXml({
       { Setting: 'expanded_project_ids', Value: (ganttConfig.expandedProjectIds ?? []).join(', '), Note: 'Expanded project rows in tree' },
       { Setting: 'export_scope', Value: scope, Note: 'Export modal scope option' },
     ]
-    sheets.push({ name: 'Gantt_Config', rows: ganttRows })
+    addWorksheet(sheets, usedSheetNames, 'Gantt_Config', ganttRows)
   }
 
   return buildWorkbookXml(sheets)
@@ -597,7 +871,7 @@ const COLUMN_OPTIONS = [
 const DEFAULT_COLUMNS = { id: false, title: true, status: true, priority: true, project: true,
   program: true, dueDate: true, startDate: false, tags: false, dependencies: false, notes: false, createdAt: false }
 
-const DEFAULT_INCLUDE = { tasks: true, subtasks: false, milestones: false, summaries: true, ganttConfig: true }
+const DEFAULT_INCLUDE = { tasks: true, subtasks: false, milestones: false, summaries: true, ganttConfig: true, programSheets: true }
 
 const ExportModal = memo(function ExportModal({ onClose }) {
   const tasks      = useTaskStore((s) => s.tasks)
@@ -768,10 +1042,13 @@ const ExportModal = memo(function ExportModal({ onClose }) {
               <div>
                 <SectionLabel>Include</SectionLabel>
                 <div className="grid grid-cols-2 gap-1.5">
-                  {[['tasks', 'Tasks'], ['subtasks', 'Subtasks'], ['milestones', 'Milestones'], ['summaries', 'Summary stats'], ['ganttConfig', 'Gantt config']].map(([key, label]) => (
+                  {[['tasks', 'Tasks'], ['subtasks', 'Subtasks'], ['milestones', 'Milestones'], ['summaries', 'Summary stats'], ['ganttConfig', 'Gantt config'], ['programSheets', 'Program sheets (Excel)']].map(([key, label]) => (
                     <ColCheck key={key} label={label} active={include[key]} onChange={() => toggleInclude(key)} />
                   ))}
                 </div>
+                <p className="mt-2 text-[11px]" style={{ color: 'var(--text-secondary)' }}>
+                  Program sheets add one worksheet per program in Excel exports, with overview, project, milestone, and task details.
+                </p>
               </div>
 
               {/* Format */}
@@ -805,7 +1082,7 @@ const ExportModal = memo(function ExportModal({ onClose }) {
                     className="mt-2 rounded-xl px-3 py-2 text-[11px]"
                     style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.16)', color: '#a7f3d0' }}
                   >
-                    Excel workbook includes an <span className="font-semibold">Export_Selection</span> sheet with scope, selected programs/projects, included sections, and chosen columns.
+                    Excel workbook includes an <span className="font-semibold">Export_Selection</span> sheet plus optional per-program worksheets with summary, projects, milestones, and task details.
                   </div>
                 )}
               </div>
