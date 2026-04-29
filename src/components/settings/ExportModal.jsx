@@ -3,7 +3,7 @@ import { X, Download, ChevronLeft, ChevronRight, Table, FileText, FileSpreadshee
 import useTaskStore from '../../store/useTaskStore'
 import useProjectStore from '../../store/useProjectStore'
 import useSettingsStore from '../../store/useSettingsStore'
-import { buildProgramSummary, buildProjectSummary } from '../../lib/programWorkspace'
+import { buildProgramSummary, buildProjectSummary, collectProjectDescendantIds } from '../../lib/programWorkspace'
 
 const fmt = (iso) => iso ? new Date(iso).toISOString().split('T')[0] : ''
 const fmtHuman = (iso) => iso ? new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'
@@ -642,7 +642,10 @@ function buildExcelWorkbookXml({
     const programProjectIds = new Set(
       programProjects.flatMap((project) => [project.id, ...(subProjectsByParent.get(project.id) ?? []).map((sub) => sub.id)])
     )
-    const programTasks = tasks.filter((task) => task.projectId && programProjectIds.has(task.projectId))
+    const programTasks = tasks.filter((task) => {
+      if (task.projectId) return programProjectIds.has(task.projectId)
+      return getProgramForTask(task)?.id === program.id
+    })
     const programDone = programTasks.filter((task) => task.status === 'done').length
     const programProgress = programTasks.length ? Math.round((programDone / programTasks.length) * 100) : 0
     const bounds = getDateBounds(programTasks)
@@ -899,15 +902,44 @@ const ExportModal = memo(function ExportModal({ onClose }) {
   // Resolve scope to tasks/projects/milestones
   const scopedData = useMemo(() => {
     let resolvedProjects = projects
-    if (scope === 'programs' && selProgramIds.size > 0)
-      resolvedProjects = projects.filter((p) => selProgramIds.has(p.programId))
-    else if (scope === 'projects' && selProjectIds.size > 0)
-      resolvedProjects = projects.filter((p) => selProjectIds.has(p.id))
-    const projectIdSet = new Set(resolvedProjects.map((p) => p.id))
-    const resolvedTasks = tasks.filter((t) => !t.projectId || projectIdSet.has(t.projectId))
-    const resolvedMilestones = milestones.filter((m) => projectIdSet.has(m.projectId))
-    return { tasks: resolvedTasks, projects: resolvedProjects, milestones: resolvedMilestones }
-  }, [scope, selProgramIds, selProjectIds, tasks, projects, milestones])
+    let scopedProgramIds = new Set(programs.map((program) => program.id))
+
+    if (scope === 'programs' && selProgramIds.size > 0) {
+      scopedProgramIds = new Set(selProgramIds)
+      resolvedProjects = projects.filter((project) => scopedProgramIds.has(project.programId))
+    } else if (scope === 'projects' && selProjectIds.size > 0) {
+      const descendantIds = new Set()
+      selProjectIds.forEach((projectId) => {
+        collectProjectDescendantIds(projects, projectId).forEach((id) => descendantIds.add(id))
+      })
+      resolvedProjects = projects.filter((project) => descendantIds.has(project.id))
+      scopedProgramIds = new Set(
+        resolvedProjects
+          .map((project) => project.programId)
+          .filter(Boolean)
+      )
+    } else if (scope !== 'all') {
+      scopedProgramIds = new Set(
+        resolvedProjects
+          .map((project) => project.programId)
+          .filter(Boolean)
+      )
+    }
+
+    const projectIdSet = new Set(resolvedProjects.map((project) => project.id))
+    const resolvedTasks = tasks.filter((task) => {
+      if (task.projectId) return projectIdSet.has(task.projectId)
+      if (scope === 'all') return true
+      return scopedProgramIds.has(task.programId)
+    })
+    const resolvedMilestones = milestones.filter((milestone) => projectIdSet.has(milestone.projectId))
+
+    return {
+      tasks: resolvedTasks,
+      projects: resolvedProjects,
+      milestones: resolvedMilestones,
+    }
+  }, [scope, selProgramIds, selProjectIds, tasks, projects, milestones, programs])
 
   const taskCount = scopedData.tasks.length
   const scopedPrograms = useMemo(() => {
@@ -1042,13 +1074,22 @@ const ExportModal = memo(function ExportModal({ onClose }) {
               <div>
                 <SectionLabel>Include</SectionLabel>
                 <div className="grid grid-cols-2 gap-1.5">
-                  {[['tasks', 'Tasks'], ['subtasks', 'Subtasks'], ['milestones', 'Milestones'], ['summaries', 'Summary stats'], ['ganttConfig', 'Gantt config'], ['programSheets', 'Program sheets (Excel)']].map(([key, label]) => (
+                  {[
+                    ['tasks', 'Tasks'],
+                    ['subtasks', 'Subtasks'],
+                    ['milestones', 'Milestones'],
+                    ['summaries', 'Summary stats'],
+                    ['ganttConfig', 'Gantt config'],
+                    ...(format === 'xlsx' ? [['programSheets', 'Program sheets (Excel)']] : []),
+                  ].map(([key, label]) => (
                     <ColCheck key={key} label={label} active={include[key]} onChange={() => toggleInclude(key)} />
                   ))}
                 </div>
-                <p className="mt-2 text-[11px]" style={{ color: 'var(--text-secondary)' }}>
-                  Program sheets add one worksheet per program in Excel exports, with overview, project, milestone, and task details.
-                </p>
+                {format === 'xlsx' && (
+                  <p className="mt-2 text-[11px]" style={{ color: 'var(--text-secondary)' }}>
+                    Program sheets add one worksheet per program in Excel exports, with overview, project, milestone, and task details.
+                  </p>
+                )}
               </div>
 
               {/* Format */}
