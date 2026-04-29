@@ -657,7 +657,7 @@ const ProjectPanel = memo(function ProjectPanel({ project, depth = 0 }) {
         className="group cursor-pointer px-3.5 py-2.5"
         style={{ background: expanded ? 'rgba(255,255,255,0.025)' : 'rgba(255,255,255,0.015)', borderBottom: expanded ? '1px solid rgba(255,255,255,0.05)' : 'none' }}
       >
-        <div className="flex items-start gap-3">
+        <div className="flex flex-wrap items-start gap-3">
           <button type="button" onClick={(event) => { event.stopPropagation(); toggleExpanded() }} style={{ color: 'var(--text-secondary)' }}>
             {expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
           </button>
@@ -1106,7 +1106,7 @@ const ProgramSection = memo(function ProgramSection({ program, projects, expande
               {projectMilestones.length > 0 && <span>{projectMilestones.length} milestone{projectMilestones.length === 1 ? '' : 's'}</span>}
             </div>
 
-            <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+            <div className="mt-3 grid grid-cols-2 gap-2 xl:grid-cols-4">
               <ProgramSignalButton
                 label="Open work"
                 value={totalTasks - doneTasks}
@@ -1138,7 +1138,7 @@ const ProgramSection = memo(function ProgramSection({ program, projects, expande
             </div>
           </div>
 
-          <div className="flex items-center gap-2" onClick={(event) => event.stopPropagation()}>
+          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end" onClick={(event) => event.stopPropagation()}>
             <button type="button" onClick={() => openProgramTasks('open')} className="text-[11px] px-3 py-2 rounded-xl" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-primary)' }}>
               Open tasks
             </button>

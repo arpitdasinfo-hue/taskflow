@@ -444,7 +444,7 @@ const Tasks = memo(function Tasks() {
 
       <div className="px-4 md:px-6 pb-3 space-y-3">
         <PageHero
-          title="All Tasks"
+          title="Tasks"
           compact
           stats={[
             { label: 'Visible tasks', value: filteredTasks.length, tone: 'accent' },

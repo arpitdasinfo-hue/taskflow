@@ -376,9 +376,9 @@ const Dashboard = memo(function Dashboard() {
       return { issue, actionLabel: 'Open tasks', onClick: () => openTasksView('blockedOrLate') }
     }
     if (issue.id.startsWith('dependency') || issue.id.startsWith('missing-dependency')) {
-      return { issue, actionLabel: 'Open gantt', onClick: () => openTimeline({ viewMode: 'risk', onlyDependencyRisk: true }) }
+      return { issue, actionLabel: 'Open timeline', onClick: () => openTimeline({ viewMode: 'risk', onlyDependencyRisk: true }) }
     }
-    return { issue, actionLabel: 'Open gantt', onClick: () => openTimeline({ viewMode: 'risk', onlyDelayed: true }) }
+    return { issue, actionLabel: 'Open timeline', onClick: () => openTimeline({ viewMode: 'risk', onlyDelayed: true }) }
   })
 
   if (programs.length === 0 && activeTasks.length === 0) {
@@ -432,7 +432,7 @@ const Dashboard = memo(function Dashboard() {
               clearAnalyticsInsight()
               setPage('timeline')
             }} className="btn-ghost px-3 py-2 text-xs">
-              Open gantt
+              Open timeline
             </button>
           </div>
         )}

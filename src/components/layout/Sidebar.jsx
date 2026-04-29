@@ -1,8 +1,7 @@
 import { memo, useEffect, useMemo, useState } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import {
-  LayoutDashboard, ListTodo, CalendarClock, Settings2, FolderKanban,
-  Zap, ChevronLeft, ChevronRight, Folder, ChevronDown, GanttChart, LogOut, Trash2, BriefcaseBusiness, House, Activity,
+  Zap, ChevronLeft, ChevronRight, Folder, ChevronDown, LogOut, BriefcaseBusiness, House,
 } from 'lucide-react'
 import useSettingsStore from '../../store/useSettingsStore'
 import useAuthStore from '../../store/useAuthStore'
@@ -10,19 +9,9 @@ import { useTaskStats } from '../../hooks/useFilteredTasks'
 import useWorkspaceScopedData from '../../hooks/useWorkspaceScopedData'
 import { WORKSPACE_VIEW_OPTIONS } from '../../lib/workspaceScope'
 import { createCollapseVariants, MOTION_SPRINGS } from '../../lib/motion'
+import { NAV_ITEMS } from './navigationConfig'
 
 void motion
-
-const NAV_ITEMS = [
-  { id: 'dashboard',         label: 'Dashboard',  icon: LayoutDashboard },
-  { id: 'tasks',             label: 'All Tasks',  icon: ListTodo        },
-  { id: 'today',             label: 'Planner',    icon: CalendarClock   },
-  { id: 'projects',          label: 'Programs',   icon: FolderKanban    },
-  { id: 'timeline',          label: 'Gantt Chart', icon: GanttChart     },
-  { id: 'activity',          label: 'Activity',   icon: Activity        },
-  { id: 'trash',             label: 'Trash',      icon: Trash2          },
-  { id: 'settings',          label: 'Settings',   icon: Settings2       },
-]
 
 const WORKSPACE_SCOPE_ICON = {
   professional: BriefcaseBusiness,

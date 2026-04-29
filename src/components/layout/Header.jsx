@@ -1,17 +1,7 @@
 import { memo } from 'react'
 import { LayoutList, Kanban, SlidersHorizontal, Table2 } from 'lucide-react'
 import useSettingsStore from '../../store/useSettingsStore'
-
-const PAGE_TITLES = {
-  dashboard:           'Dashboard',
-  tasks:               'All Tasks',
-  trash:               'Trash',
-  today:               'Planner',
-  projects:            'Programs',
-  settings:            'Settings',
-  'program-dashboard': 'Dashboard',
-  timeline:            'Gantt Chart',
-}
+import { PAGE_TITLES } from '../layout/navigationConfig'
 
 const Header = memo(function Header({ showViewToggle = false, showFilter = false, onFilter }) {
   const activePage = useSettingsStore((s) => s.activePage)

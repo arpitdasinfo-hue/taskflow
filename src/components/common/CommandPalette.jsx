@@ -1,22 +1,11 @@
 import { memo, useEffect, useRef, useState } from 'react'
 import {
-  LayoutDashboard, ListTodo, CalendarClock, Settings2, FolderKanban,
-  GanttChart, Trash2, Search, ArrowRight, CheckSquare, Folder, Activity,
+  Search, ArrowRight, CheckSquare, Folder,
 } from 'lucide-react'
 import useSettingsStore from '../../store/useSettingsStore'
 import useTaskStore from '../../store/useTaskStore'
 import useProjectStore from '../../store/useProjectStore'
-
-const NAV_ITEMS = [
-  { id: 'dashboard',         label: 'Dashboard',    icon: LayoutDashboard },
-  { id: 'tasks',             label: 'All Tasks',    icon: ListTodo        },
-  { id: 'today',             label: 'Planner',      icon: CalendarClock   },
-  { id: 'projects',          label: 'Programs',     icon: FolderKanban    },
-  { id: 'timeline',          label: 'Gantt Chart',  icon: GanttChart      },
-  { id: 'activity',          label: 'Activity',     icon: Activity        },
-  { id: 'trash',             label: 'Trash',        icon: Trash2          },
-  { id: 'settings',          label: 'Settings',     icon: Settings2       },
-]
+import { NAV_ITEMS } from '../layout/navigationConfig'
 
 const STATUS_SHORT = {
   'todo': 'todo',
