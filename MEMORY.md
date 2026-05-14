@@ -1,40 +1,132 @@
 # TaskFlow Memory
 
-This file is a working memory for the app and the product decisions made across implementation sessions. It is meant to help future work stay consistent without re-learning the same context repeatedly.
+This file is the working memory for TaskFlow. It should help future sessions keep the product direction, architecture, and recent implementation decisions intact without re-discovering them from scratch.
+
+## Project Snapshot
+
+- Product: TaskFlow
+- Type: React 19 + Vite PWA
+- Styling: Tailwind utilities plus app theme tokens
+- State: Zustand stores with `persist` and `immer`
+- Backend: Supabase auth, database, and realtime
+- Deployment: Vercel production
+- Main production alias: `https://taskflow-arpit.vercel.app`
 
 ## Product Intent
 
-TaskFlow is a planning and execution workspace for structured work:
+TaskFlow is an operational planning workspace for structured work across:
 
-- professional work that can be shared
-- personal work that stays private
-- programs, projects, sub-projects, tasks, milestones, dependencies, planner commitments, analytics, and gantt scheduling
+- programs
+- projects
+- sub-projects
+- tasks
+- subtasks
+- milestones
+- planner commitments
+- analytics/review
+- gantt scheduling
+- shareable leadership views
 
-The product direction favors:
+The app should feel business-ready, dense, calm, and fast. The product preference is to simplify visible UI before adding more visible features.
 
-- compact, operational UI
-- fewer decorative cards and chips
-- strong drilldowns from summary to underlying data
-- premium but restrained motion
-- clear separation between structure, execution, planning, review, and schedule views
+## Core Product Rules
 
-## Page Roles
+- Professional and personal work are distinct scopes.
+- Personal work stays private and should not leak into sharing flows.
+- Professional work can participate in sharing and leadership views.
+- Pages should stay opinionated and not collapse into one another.
+- Summary numbers should drill into underlying data whenever practical.
+- Decorative UI should be kept to a minimum.
 
-The app works best when each page has a single job:
+## Page Responsibilities
 
-- `Dashboard`: attention and action
-- `Programs`: structure and delivery hierarchy
-- `All Tasks`: dense execution surface
+Each major page has a primary job:
+
+- `Dashboard`: pressure check and action routing
+- `Tasks`: dense execution surface
 - `Planner`: commitment and sequencing
-- `Analytics`: review and drilldown
-- `Gantt`: timeline and schedule management
-- `Share View`: leadership/external review surface
+- `Programs`: structure, hierarchy, milestones, and delivery actions
+- `Timeline`: schedule management and gantt/risk review
+- `Activity`: recent changes and operational visibility
+- `Trash`: recovery surface
+- `Settings`: admin/config/export/share setup
+- `ShareView`: presentation-ready external or leadership surface
 
-Avoid letting one page absorb the responsibilities of another.
+Do not let one page absorb the role of another without a strong reason.
 
-## Data Model Context
+## Current Navigation Model
 
-### Hierarchy
+Navigation was standardized recently so the app uses the same page language everywhere:
+
+- `Dashboard`
+- `Tasks`
+- `Planner`
+- `Programs`
+- `Timeline`
+- `Activity`
+- `Trash`
+- `Settings`
+
+Important recent UI decision:
+
+- mobile navigation no longer horizontally scrolls
+- mobile now shows 5 primary destinations plus a `More` tray
+- secondary destinations in `More`: `Activity`, `Trash`, `Settings`
+
+Shared navigation config lives in [src/components/layout/navigationConfig.js](/Users/arpitdas/Documents/New%20project/Taskflow/src/components/layout/navigationConfig.js:1).
+
+## Repo Shape
+
+The codebase generally follows this structure:
+
+- `src/pages/`: screen-level composition
+- `src/components/`: reusable UI by domain
+- `src/store/`: Zustand state and domain actions
+- `src/hooks/`: derived view/data hooks
+- `src/lib/`: integrations, shaping, scope rules, helpers
+
+Important directories:
+
+- `src/components/layout`: shell, sidebar, bottom nav, header
+- `src/components/tasks`: task table, cards, detail drawer, filters
+- `src/components/projects`: program/project/milestone UI
+- `src/components/settings`: export and shared-view setup
+- `src/components/timeline`: gantt controls and timeline pieces
+
+## Runtime Architecture
+
+The app bootstraps through [src/App.jsx](/Users/arpitdas/Documents/New%20project/Taskflow/src/App.jsx:1).
+
+Key app-level behavior:
+
+- lazy-loads major pages
+- uses a top-level auth gate
+- subscribes to Supabase realtime
+- surfaces sync and PWA update banners
+- renders shared shell pieces like sidebar, bottom nav, task detail, quick add, toast, and command palette
+
+## State Model
+
+The app is store-driven. Important stores include:
+
+- `useSettingsStore`: page state, filters, active program/project, gantt config, task views, theme, density, workspace scope
+- `useTaskStore`: tasks, trash, task CRUD, sync
+- `useProjectStore`: programs, projects, milestones, hierarchy CRUD, sync
+- `usePlanningStore`: planner commitments and sync
+- `useWorkspaceStore`: workspace resolution/loading
+- `useAuthStore`: session and auth state
+
+Important settings state details:
+
+- `workspaceViewScope` controls whether the app is currently showing `professional` or `personal`
+- `activeProgramId` and `activeProjectId` drive focused navigation and drilldown behavior
+- `ganttConfig` is persisted and acts as the shared timeline filter model
+
+See [src/store/useSettingsStore.js](/Users/arpitdas/Documents/New%20project/Taskflow/src/store/useSettingsStore.js:1).
+
+## Data Model
+
+Hierarchy:
 
 - workspace
 - program
@@ -44,170 +136,180 @@ Avoid letting one page absorb the responsibilities of another.
 - subtask
 - milestone
 
-### Important relationships
+Important relationship notes:
 
 - milestones belong to projects
-- a task can also be linked to a milestone
-- a milestone may exist independently without requiring a task
-- dependencies should resolve to task names in UI, not raw IDs
+- tasks can be linked to milestones without ceasing to be tasks
+- tasks may exist directly under a program with no `projectId`
+- sub-projects are nested through `parentId`
+- dependencies should resolve to human-readable task names in UI, not raw IDs where users scan data
 
-### Planner behavior
-
-- tasks auto-flow into week/month based on start date windows
-- today is still a deliberate pull from week/month
-- planner items remain until the task is marked done
-
-## Workspace Model
+## Workspace Scope Model
 
 There are two workspace scopes:
 
 - `professional`
 - `personal`
 
-Rules:
+Scope logic matters a lot. The app should not silently misclassify records when parent entities are temporarily missing.
 
-- personal data is private and not shareable
-- professional data can participate in sharing flows
-- standalone tasks and projects must persist their own scope
-- scope resolution must never silently fall back to `professional` if parent entities are temporarily missing
+Important rules:
+
+- programs own explicit scope
+- projects inherit from their program when attached, otherwise use their own fallback scope
+- tasks inherit through program/project resolution when possible, otherwise use task/project fallback scope
+- milestones are visible only when their owning project is in-scope
+
+Scope utilities live in [src/lib/workspaceScope.js](/Users/arpitdas/Documents/New%20project/Taskflow/src/lib/workspaceScope.js:1), and scoped data is assembled through [src/hooks/useWorkspaceScopedData.js](/Users/arpitdas/Documents/New%20project/Taskflow/src/hooks/useWorkspaceScopedData.js:1).
+
+## Auth, Backend, and Sync
+
+TaskFlow uses Supabase for:
+
+- email OTP auth
+- persisted session storage
+- database reads/writes
+- realtime subscriptions
+
+Supabase client setup lives in [src/lib/supabase.js](/Users/arpitdas/Documents/New%20project/Taskflow/src/lib/supabase.js:1).
+
+Required env vars:
+
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_ANON_KEY`
+
+Important operational note from prior recovery work:
+
+- if auth suddenly fails with `Invalid API key`, verify the anon key value exactly
+- a malformed value with a trailing literal `\n` broke login before
 
 ## Sharing Model
 
-- shared views are for professional data only
-- shared task tables should show dependency task names, not IDs
-- leadership/shared views should use neutral language rather than internal terms like `manager` or `read-only`
+Sharing is for professional data only.
 
-## UI / UX Decisions Already Made
+Shared views are configurable by module and filters. Current shared modules include:
 
-### General
+- summary
+- portfolio
+- delivery
+- watchlist
+- milestones
+- timeline
+- dependency signals
 
-- prefer compact surfaces over stacked dashboard cards
-- use rows for operational objects; reserve cards for summary/signals
-- reduce chip count aggressively
-- every meaningful number should open the related data when possible
-- use one consistent task table language across `All Tasks`, `Planner`, and shared task lists
+Share config defaults and status helpers live in [src/lib/share.js](/Users/arpitdas/Documents/New%20project/Taskflow/src/lib/share.js:1).
 
-### Programs
+Language preference:
 
-- page has been simplified to a more compact hierarchy view
-- only one program should feel active/open at a time
-- milestone sections should be compressed and summary-first
-- project rows should be dense and neutral, not visually overloaded
+- keep shared surfaces presentation-ready
+- avoid overly internal terms when a more neutral label exists
 
-### All Tasks
+## Export Model
 
-- dense execution-first layout
-- inline editing for start, due, status, priority
-- right-side arrow opens task detail
-- project dropdown should not repeat the program name when program scope is already selected
+Export is a meaningful workflow in this app and should be treated like a product surface, not just a utility.
 
-### Planner
+Current export capabilities:
 
-- candidate pool should match the `All Tasks` list/table language
-- horizontal segregation for `Today`, `This Week`, `This Month`
-- no heavy board-style clutter
+- CSV
+- printable PDF/HTML
+- Excel workbook export
 
-### Analytics
+Export implementation lives in [src/components/settings/ExportModal.jsx](/Users/arpitdas/Documents/New%20project/Taskflow/src/components/settings/ExportModal.jsx:1).
 
-- review-first surface
-- top numbers and signal cards should drill into the actual data
-- avoid decorative summary blocks that do not lead anywhere
+Important current export behavior:
 
-### Gantt
+- workbook export supports sheet-wise program detail output
+- each program can get its own worksheet with overview, project structure, milestones, tasks, and optional subtasks
+- project-scoped export now includes descendant sub-project work
+- program rollups now include direct program tasks
+- Excel-only controls are hidden unless workbook export is selected
 
-- compact toolbar
-- fullscreen supported
-- internal chart scrolling required
-- keep contextual hierarchy visible where possible instead of hiding too aggressively
+Important technical note:
 
-### Milestones
+- the workbook builder is XML spreadsheet based, not a true `.xlsx` generator yet
+- upgrading to real `.xlsx` is still a worthwhile future improvement
 
-- tasks can be linked to milestones without ceasing to be tasks
-- milestones need add, edit, complete, delete flows
-- program milestone sections are rollups of project milestones
+## UX Direction
 
-## Motion Design Direction
+The app should feel:
 
-Motion should feel premium and helpful, not flashy.
+- compact
+- operational
+- premium but restrained
+- calm under heavy information density
 
-Desired qualities:
+Working heuristics:
 
-- smooth
-- layered
-- restrained
-- fast
-- functional
+- prefer rows for operational objects
+- reserve cards for signals and summaries
+- reduce chip and badge clutter aggressively
+- keep headers slim
+- make drilldowns obvious
+- keep mobile first-class, not merely tolerated
 
-Best use of motion:
+## Recent Product/UI Decisions
+
+These decisions are current and should be preserved unless there is a deliberate redesign:
+
+- `Dashboard` is the review surface, not the place to manage structure
+- `Programs` is the structure surface, not a second analytics dashboard
+- `Tasks` should stay dense and execution-first
+- `Planner` should reuse task language rather than inventing a completely different visual grammar
+- `Timeline` should stay useful for schedule/risk review, with hierarchy kept visible where practical
+
+Recent shipped simplifications:
+
+- shared navigation naming was standardized across sidebar, mobile nav, header, and command palette
+- mobile nav was simplified into primary destinations plus `More`
+- dense program headers were softened on smaller screens by allowing wrap and tighter mobile signal layout
+
+## Motion Direction
+
+Motion should be helpful, fast, and restrained.
+
+Good uses:
 
 - page transitions
-- sidebar active state and workspace toggle
 - drawer open/close
-- list insert/remove
-- planner commit motion
-- gantt fullscreen and expand/collapse
+- active nav state
+- workspace scope switch
+- expand/collapse surfaces
+- planner commit interactions
 
 Avoid:
 
-- bounce-heavy animation
-- slow decorative transitions
-- animating everything equally
+- slow flourish for its own sake
+- bounce-heavy motion
+- over-animating dense data surfaces
 
-## Engineering Standards
-
-- shared UI primitives should live in reusable components
-- avoid repeating scope logic per page
-- use optimistic updates with rollback/error visibility for Supabase writes
-- keep state normalized and ID-driven
-- shared tables and drawers should use common presentation logic
-- build for sync correctness across refreshes and devices
-
-## Known Product Preferences Collected From Working Sessions
-
-- cleaner, simpler UI with the same feature set
-- reduce clutter before adding visible features
-- maintain dense, business-ready workflows
-- keep personal and professional work separate
-- keep leadership/shared views polished and presentation-ready
-- make interactions discoverable with fewer visible controls
+Shared motion helpers live in `src/lib/motion.js`.
 
 ## Known Technical Notes
 
-- the project has historically had large main bundle warnings during build
-- build has been healthy, but chunk splitting is still a worthwhile future optimization
-- `artifacts/` and `test-results/` are often local-only and should not be included casually
+- production builds are healthy
+- the main bundle still throws a large chunk warning during `pnpm build`
+- further code-splitting is still worthwhile
+- local folders like `artifacts/` and `test-results/` are usually not intended for commit
+- the root `README.md` is still mostly the default Vite template and does not reflect the real app yet
 
-## Agent Workflow Notes
+## Practical Workflow Notes
 
-When continuing work on this repo:
+When working on this repo:
 
-- read this file together with `AGENTS.md`
-- preserve current product roles per page
-- prefer incremental, reviewable refactors
-- be careful not to mix unrelated local WIP into commits
-- when adding new summary numbers or cards, make them actionable where the data exists
+- read this file with `AGENTS.md`
+- preserve page responsibilities
+- avoid mixing unrelated local WIP into commits
+- prefer incremental, reviewable changes
+- run `pnpm build` before wrapping work
+- be careful with scope logic, export logic, and shared view language
 
-## Recent UI Standardization Work
+## Good Next Improvements
 
-These patterns were introduced to reduce visual weight while preserving information:
+These are sensible next-step improvements if no higher-priority product ask overrides them:
 
-- `PageHero` now supports a `minimal` mode for dense page headers
-- `ScopeBar` now supports a denser `minimal` mode
-- `SectionShell` was added as a shared compact section wrapper for titled content blocks
-- `TaskDataTable` was tightened for denser row scanning and calmer sticky action columns
+- replace the default `README.md` with a real project overview
+- upgrade Excel export from XML workbook output to true `.xlsx`
+- simplify the top of the `Tasks` page further by reducing visible filter/action density on mobile
+- promote export to a more first-class action instead of leaving it buried in `Settings`
+- continue bundle splitting for the heavy client entry
 
-Pages already moved toward this pattern:
-
-- `Dashboard`
-  - slimmer hero
-  - shared compact sections for launch watch, planner pulse, program pulse, and action queue
-- `Programs`
-  - slimmer top strip using the shared hero
-  - focus selection preserved without a large header card
-
-Design intent for this direction:
-
-- less card nesting
-- less duplicated chrome
-- more content visible above the fold
-- more consistent page rhythm across surfaces
